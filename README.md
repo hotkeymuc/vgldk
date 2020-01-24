@@ -1,6 +1,9 @@
 # VGLDK
 SDK for the Z80 based VTech "Genius LEADER" line of learning computers, also called "PreComputer" (us), "YENO MisterX" (de) or "Compusavant" (fr)
 
+This is under construction. For actually working stuff, visit the [Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking) and get started using the zipped snapshots of "VGL CP/M" and other SDCC code examples.
+
+
 ## Target platforms
 	pc1000
 		VTech PreComputer 1000
@@ -29,8 +32,8 @@ SDK for the Z80 based VTech "Genius LEADER" line of learning computers, also cal
 * Now it is all getting re-organized into an SDK
 
 ## Further Reading
-[Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking)
-[Discussion on the Z88DK forum](https://www.z88dk.org/forum/viewtopic.php?id=10055)
-[VTech hardware development](https://www.thingiverse.com/thing:3108809)
+* [Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking)
+* [Discussion on the Z88DK forum](https://www.z88dk.org/forum/viewtopic.php?id=10055)
+* [VTech hardware development](https://www.thingiverse.com/thing:3108809)
 
 2020-01-21 Bernhard "HotKey" Slawik
