@@ -9,7 +9,11 @@ V-Tech Genius Leader Sound
 void vgl_sound_off() {
 __asm
 	; Speaker off
-	ld	a, #0x00	; +20h
+	;ld	a, #0x00	; +20h
+	
+	in	a, (0x12)
+	and	#0xf7
+	
 	out	(0x12), a
 	ret
 __endasm;
@@ -149,5 +153,9 @@ void vgl_sound_note(word n, word len) {
 	frq = frq >> (n/12);
 	len = 150 * (len / frq);	// Length to wave length, correcting for rough milliseconds
 	vgl_sound(frq, len);
+}
+
+void beep() {
+	vgl_sound_note(12*4+0, 0x0111);
 }
 #endif // __VGL_SOUND_H

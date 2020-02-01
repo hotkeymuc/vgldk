@@ -65,7 +65,7 @@ typedef unsigned short word;
 		__endasm;
 	}
 #else
-	// Accessing I/O through memory mapped soft I/O
+	// Accessing I/O through memory mapped soft I/O (experimental and questionable)
 	#include <hardware/softio.h>
 	#include <hardware/sound.h>
 	

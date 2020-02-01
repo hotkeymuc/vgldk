@@ -9,8 +9,8 @@
 
 void main() __naked {
 	
-	lcd_init();
-	vgl_sound_off();
+	//lcd_init();
+	//vgl_sound_off();
 	
 	/*
 	putchar('H');
@@ -26,7 +26,10 @@ void main() __naked {
 	putchar('d');
 	*/
 	
-	printf("Hello World!\n");
+	printf("Hello World!");
+	
+	//gets();
+	//getchar();
 	
 	while(1) {
 	}

@@ -76,21 +76,44 @@ TODO:
 #define LCD_ROWS 4
 */
 
-#ifndef DISPLAY_ROWS
-	#error "DISPLAY_ROWS must be defined in order to use LCD"
-#endif
+
 #define LCD_COLS DISPLAY_COLS
 #define LCD_ROWS DISPLAY_ROWS
 
 
 // Mapping of screen coordinates to HDD44780 DDRAM addresses
-const byte lcd_map[LCD_ROWS * LCD_COLS + 1] = {
-	0,	1,	2,	3,	8,	9,	10,	11,	12,	13,	14,	15,	24,	25,	26,	27,	28,	29,	30,	31,
-	64,	65,	66,	67,	72,	73,	74,	75,	76,	77,	78,	79,	88,	89,	90,	91,	92,	93,	94,	95,
-	4,	5,	6,	7,	16,	17,	18,	19,	20,	21,	22,	23,	32,	33,	34,	35,	36,	37,	38,	39,
-	68,	69,	70,	71,	80,	81,	82,	83,	84,	85,	86,	87,	96,	97,	98, 99,	100,	101,	102,	103,
-	103	// Double
-};
+
+#if LCD_ROWS == 4
+	const byte lcd_map_4rows[LCD_ROWS * LCD_COLS + 1] = {
+		0,	1,	2,	3,	8,	9,	10,	11,	12,	13,	14,	15,	24,	25,	26,	27,	28,	29,	30,	31,
+		64,	65,	66,	67,	72,	73,	74,	75,	76,	77,	78,	79,	88,	89,	90,	91,	92,	93,	94,	95,
+		4,	5,	6,	7,	16,	17,	18,	19,	20,	21,	22,	23,	32,	33,	34,	35,	36,	37,	38,	39,
+		68,	69,	70,	71,	80,	81,	82,	83,	84,	85,	86,	87,	96,	97,	98, 99,	100,	101,	102,	103,
+		103	// Double
+	};
+	#define lcd_map lcd_map_4rows
+	
+#elif LCD_ROWS == 2
+	const byte lcd_map_2rows[LCD_ROWS * LCD_COLS + 1] = {
+		0,	1,	2,	3,	4,	5,	6,	7,	8,	9,	10,	11,	12,	13,	14,	15,	16,	17,	18,	19,
+		64,	65,	66,	67,	68,	69,	70,	71,	72,	73,	74,	75,	76,	77,	78,	79,	80,	81,	82,	83,
+		83	// Double
+	};
+	#define lcd_map lcd_map_2rows
+	
+#elif LCD_ROWS == 1
+	//@FIXME: Not yet working correctly...
+	const byte lcd_map_1row[LCD_ROWS * LCD_COLS + 1] = {
+		0,	1,	2,	3,	4,	5,	6,	7,	8,	9,	10,	11,	12,	13,	14,	15,	16,	17,	18,	19,
+		19	// Double
+	};
+	#define lcd_map lcd_map_1row
+	
+#else
+	#error "A sensible value for LCD_ROWS must be defined in order to use LCD"
+	
+#endif
+
 
 byte lcd_x = 0;
 byte lcd_y = 0;
@@ -216,6 +239,7 @@ void lcd_clear() {
 	lcd_y = 0;
 	
 	#ifndef lcd_MINIMAL
+	//@TODO: Use fillmem function!
 	for(i = 0; i < (LCD_COLS * LCD_ROWS); i++) {
 		lcd_buffer[i] = 0x20;
 	}
@@ -265,12 +289,15 @@ void lcd_scroll() {
 		__endasm;
 	*/
 	
-	// Copy from row 1 to row 0
 	p0 = &lcd_buffer[0];
+	
+	#if LCD_ROWS > 1
+	// Copy from row 1 to row 0
 	p1 = &lcd_buffer[LCD_COLS];
 	for(i = 0; i < (LCD_COLS * (LCD_ROWS-1)); i++) {
 		*p0++ = *p1++;
 	}
+	#endif
 	
 	// Fill last row
 	for(i = 0; i < LCD_COLS; i++) {

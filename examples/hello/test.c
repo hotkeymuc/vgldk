@@ -15,7 +15,8 @@ void main() __naked {
 	//lcd_init();
 	//vgl_sound_off();
 	
-	printf("Hello printf-World!\n");
+	printf("Testing printf!");
+	//beep();
 	
 	#ifdef VGLDK_SERIES
 		#define xstr(s) str(s)
@@ -25,6 +26,7 @@ void main() __naked {
 	
 	printf("key:");
 	c = getchar(); putchar(c);
+	beep();
 	
 	while(1) {
 		

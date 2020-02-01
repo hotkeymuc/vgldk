@@ -22,5 +22,6 @@ for use with SDCC compiler
 volatile __at (0xdce0) unsigned char KEY_STATUS;	// Controls reading from the keyboard on 2000 (put 0xc0 into it, wait for it to become 0xd0)
 volatile __at (0xdce4) unsigned char KEY_CURRENT;	// Holds the current key code on 2000
 
+// There is stuff going on with port 0xfe on start-up!
 
 #endif

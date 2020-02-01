@@ -2,24 +2,48 @@
 
 #NAME=test
 
-#VGLDK_SERIES=1000
-#VGLDK_SERIES=2000
-VGLDK_SERIES=4000
-VGLDK_DIRECTIO=1
+ifndef VGLDK_SERIES
+$(error VGLDK_SERIES is not set)
+	#VGLDK_SERIES=1000
+	#VGLDK_SERIES=2000
+	#VGLDK_SERIES=4000
+endif
+
+ifndef VGLDK_DIRECTIO
+#$(error VGLDK_DIRECTIO is not set)
+	#VGLDK_DIRECTIO=0
+	VGLDK_DIRECTIO=1
+endif
+
 
 # Start up / boot options
-# CRT_NAME specifies which crt0-file to prepend to the actual code binary
-CRT_NAME=cart_crt0
+#	
+#	CRT_NAME=cart_pc1000_crt0
+#		Specifies which crt0-file to prepend to the actual code binary
+#		This contains some "magic" bytes that make the cartridge auto-run
+#	
+#	LOC_CODE=0x8010
+#		Where the code will reside in address space while running
+#		Cartridges will get mapped to 0x8000
+#		This must leave some space for the CRT0 code
+#	
+#	LOC_DATA=0xc000
+#		Where variables are stored
+#		Series 1000     : 0x4000 - 0x47ff
+#		Series 2000/4000: 0xc000 - 0xdfff
+#	
 
-# Memory layout
-# Where the code will reside in address space while running
-# This must leave some space for the CRT0 code
-LOC_CODE=0x8010
-#LOC_CODE=0x8020
+# 
+ifeq (${VGLDK_SERIES},1000)
+	CRT_NAME=cart_pc1000_crt0
+	LOC_CODE=0x8020
+	LOC_DATA=0x4000
+else
+	CRT_NAME=cart_crt0
+	LOC_CODE=0x8010
+	LOC_DATA=0xc000
+endif
 
-# Where variables are stored
-# RAM is usually at 0xc000 - 0xdfff
-LOC_DATA=0xc000
 
 # Cartridge output options
 #  8 =  8KB = 0x2000 = AT28C64B:
