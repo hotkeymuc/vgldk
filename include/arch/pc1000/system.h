@@ -24,4 +24,15 @@ volatile __at (0xdce4) unsigned char KEY_CURRENT;	// Holds the current key code 
 
 // There is stuff going on with port 0xfe on start-up!
 
+
+#include "lcd.h"
+#include "keyboard.h"
+#include "sound.h"
+
+void vgldk_init {
+	lcd_init();
+	vgl_sound_off();
+	lcd_clear();
+}
+
 #endif

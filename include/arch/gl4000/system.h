@@ -22,5 +22,14 @@ for use with SDCC compiler
 volatile __at (0xdb00) unsigned char KEY_STATUS;	// Controls reading from the keyboard on 4000 (put 0xc0 into it, wait for it to become 0xd0)
 volatile __at (0xdb01) unsigned char KEY_CURRENT;	// Holds the current key code on 4000
 
+#include "lcd.h"
+#include "keyboard.h"
+#include "sound.h"
+
+void vgldk_init {
+	lcd_init();
+	vgl_sound_off();
+	lcd_clear();
+}
 
 #endif
