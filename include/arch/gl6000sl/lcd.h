@@ -1,11 +1,14 @@
 #ifndef __LCD_H
 #define __LCD_H
 
+#define LCD_W 240
+#define LCD_H 100
+#define LCD_ADDR 0xe000
 
-const byte lcd_w = 240;
-const byte lcd_h = 100;
+const byte lcd_w = LCD_W;
+const byte lcd_h = LCD_H;
 const word lcd_addr = 0xe000;
-#define LCD_FRAMEBUFFER_SIZE (240*100/8)
+#define LCD_FRAMEBUFFER_SIZE ((LCD_W * LCD_H) / 8)
 
 byte lcd_x = 0;
 byte lcd_y = 0;
@@ -148,7 +151,8 @@ void drawString(byte x, byte y, char *s) {
 }
 
 void putchar(byte c) {
-	//byte o;
+	byte x;
+	byte *p;
 	
 	if (c == '\r') {
 		lcd_x = 0;
@@ -166,32 +170,40 @@ void putchar(byte c) {
 		lcd_y += font_h;
 	}
 	
+	
+	// Scroll one line at a time until it fits
 	while (lcd_y + font_h >= lcd_h) {
 		// Minimal
 		//lcd_y = 0;
 		
-		// Scroll
+		// Scroll up
 		__asm
 		push bc
 		push de
 		push hl
 		
 		// Scroll one line
-		//ld bc, #0x0ac8	//(240/8)	//#2760 // 240*100 - 240*8
-		ld bc, #0xb9a	//#0x0ac8	//(240/8)	//#2760 // 240*100 - 240*8
-		ld hl, #0xe01e
-		ld de, #0xe000
-		ldir
-		
+		ld bc, #((LCD_W * (LCD_H - 1)) / 8)	// Number of bytes to scroll (i.e. whole screen minus one line)
+		ld hl, #(LCD_ADDR + (LCD_W / 8))	//#0xE01E	// Offset of 2nd line, i.e. LCD_ADDR + bytes-per-line
+		ld de, #LCD_ADDR	//#0xE000	// Offset of 1st line
+		ldir	// Copy BC bytes from HL to DE
 		
 		pop hl
 		pop de
 		pop bc
 		__endasm;
 		
-		lcd_y--;
 		
+		// Clear last line
+		p = (byte *)(LCD_ADDR + (LCD_W * (LCD_H - 1)) / 8);
+		for(x = 0; x < (LCD_W / 8); x++) {
+			*p++ = 0x00;	// white
+			//*p++ = 0xff;	// black
+		}
+		
+		lcd_y--;
 	}
+	
 	
 	
 	if (c > 0) {
