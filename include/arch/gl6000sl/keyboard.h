@@ -37,25 +37,6 @@ __endasm;
 
 
 
-byte isKeyPressed() {
-	byte b;
-	
-	// Activate ALL matrix lines
-	port_out_0x40(0x00);
-	
-	// Get both return values
-	b = (port_in_0x41() & port_in_0x42());
-	
-	// Disable ALL matrix lines
-	port_out_0x40(0xff);
-	
-	// check if ANY of the bits is LOW
-	if (b != 0xff) return 1;
-	
-	return 0;
-}
-
-
 #define VGL_KEY_MOUSE_LMB 1
 #define VGL_KEY_MOUSE_RMB 2
 
@@ -116,6 +97,73 @@ const byte VGL_KEY_CODES[8*16] = {
 	VGL_KEY_TOUCH_LMB, 0,0,0,0,0,0,0,
 	VGL_KEY_TOUCH_RMB, 0,0,0,0,0,0,0,
 };
+
+
+// Return "true" if a key is pressed
+byte checkkey() {
+	byte b;
+	
+	// Activate ALL matrix lines
+	port_out_0x40(0x00);
+	
+	// Get both return values
+	b = (port_in_0x41() & port_in_0x42());
+	
+	// Disable ALL matrix lines
+	port_out_0x40(0xff);
+	
+	// check if ANY of the bits is LOW
+	if (b != 0xff) return 1;
+	
+	return 0;	// No keys are pressed
+}
+
+char getchar_last = 0;
+char getchar() {
+	byte mx, my;
+	byte b;
+	byte scanCode;
+	byte currentChar;
+	//byte lastChar;
+	
+	scanCode = 0xff;
+	
+	while(1) {
+		
+		// Scan the keyboard matrix
+		scanCode = 0xff;
+		
+		for(my = 0; my < 8; my++) {
+			port_out_0x40(0xff - (1 << my));
+			//port_out_0x40(my);
+			
+			b = port_in_0x41();
+			for(mx = 0; mx < 8; mx++) {
+				if (!(b & (1 << mx))) scanCode = my*8 + mx;
+			}
+			
+			b = port_in_0x42();
+			for(mx = 0; mx < 8; mx++) {
+				if (!(b & (1 << mx))) scanCode = 0x40 + my*8 + mx;
+			}
+		}
+		
+		if (scanCode < 0xff) {
+			currentChar = VGL_KEY_CODES[scanCode];
+			
+			// Key changed: break
+			if (currentChar != getchar_last) break;
+			
+		} else {
+			currentChar = 0xff;
+		}
+		
+	}
+	
+	getchar_last = currentChar;	// Save for later
+	
+	return currentChar;
+}
 
 
 

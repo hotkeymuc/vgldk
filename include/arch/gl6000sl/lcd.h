@@ -6,6 +6,32 @@ const byte lcd_w = 240;
 const byte lcd_h = 100;
 const word lcd_addr = 0xe000;
 
+
+byte lcd_x = 0;
+byte lcd_y = 0;
+
+
+
+#include "font_console_8x8.h"
+const byte font_w = 8;
+const byte font_h = 8;
+#define font_data font_console_8x8
+
+
+void port_out_0x31(byte a) __naked {(void)a;
+__asm
+	; Get parameter from stack into a
+	ld hl,#0x0002
+	add hl,sp
+	ld a,(hl)
+	
+	; Put it to port
+	out	(0x31), a
+	ret
+__endasm;
+}
+
+
 void lcd_clear() {
 	byte x, y;
 	byte *p;
@@ -21,12 +47,84 @@ void lcd_clear() {
 			//*p++ = 0xff;	// black
 		}
 	}
+	lcd_x = 0;
+	lcd_y = 0;
 }
 
-#include "font_console_8x8.h"
-const byte font_w = 8;
-const byte font_h = 8;
-#define font_data font_console_8x8
+
+void lcd_init() {
+	/*
+	__asm
+	di
+	
+	
+	// Continue initialization (see GL6000SL ROM at 0x0b61)
+	// It is needed for initializing the LCD controller
+	ld hl, #0x00
+	ld de, #0x05
+	call 0x2900	// ?
+	
+	// Call function 0x4108 (in ROM segment 0x0A = 0x28000-0x2BFFF mapped at BANK2 at 0x4000-0x7FFF)
+	ld hl, #0x37f1	// 0x37f1: Call to L=08 H=41 OUT51=0A -> 0x4108 = physical ROM address 0x28108
+	call 0x26eb
+	
+	// This clears the LCD
+	// Call function at 0x4092 (in ROM segment 0x0A = 0x28000-0x2BFFF mapped at BANK2 at 0x4000-0x7FFF)
+	ld hl, #0x37dd	// 0x37dd: Call to L=92 H=40 OUT51=0A -> 0x4092 = physical ROM address 0x2800A
+	call 0x26eb
+	
+	//ld hl, #0x37dd
+	
+	__endasm;
+	*/
+	
+	
+	/*
+	// Dump of init port sequence (as captured in custom MAME)
+	port_out(0x31, 0x03);
+	
+	port_out(0x22, 0x00);
+	port_out(0x21, 0xe0);
+	port_out(0x23, 0x60);
+	
+	// Configure LCD
+	port_out(0x32, 0x1d);
+	port_out(0x33, 0xff);
+	port_out(0x34, 0x64);
+	port_out(0x35, 0x00);
+	port_out(0x3d, 0x00);
+	port_out(0x36, 0x00);
+	port_out(0x37, 0x00);
+	port_out(0x3a, 0x64);
+	port_out(0x3b, 0x00);
+	port_out(0x38, 0xb8);
+	port_out(0x39, 0x0b);
+	port_out(0x3d, 0x00);
+	port_out(0x3e, 0x00);
+	port_out(0x3f, 0x00);
+	
+	port_out(0x23, 0x60);
+	port_out(0x21, 0xe0);
+	port_out(0x21, 0xff);
+	port_out(0x23, 0x20);
+	*/
+	
+	//lcd_clear();
+	lcd_x = 0;
+	lcd_y = 0;
+	
+	// LCD on (?)
+	//port_out(0x31, 0x83);
+	port_out_0x31(0x83);
+	
+	//port_out(0x31, 0x83);
+	port_out_0x31(0x83);
+
+}
+
+
+
+
 
 void drawGlyph(byte x, byte y, byte code) {
 	byte *p;
@@ -49,8 +147,45 @@ void drawString(byte x, byte y, char *s) {
 	}
 }
 
-void lcd_init() {
+void putchar(byte c) {
+	byte o;
+	
+	if (c == '\r') {
+		lcd_x = 0;
+		c = 0;
+	}
+	else
+	if (c == '\n') {
+		lcd_x = 0;
+		lcd_y++;
+		c = 0;
+	}
+	
+	if (lcd_x >= lcd_w - font_w) {
+		lcd_x = 0;
+		lcd_y += font_h;
+	}
+	
+	if (lcd_y >= lcd_h - font_h) {
+		#ifndef lcd_MINIMAL
+			
+			//@TODO: Scroll!
+			// __asm ... ldir __endasm;
+			
+		#else
+			// Minimal
+			lcd_y = 0;
+		#endif
+	}
+	
+	
+	if (c > 0) {
+		drawGlyph(lcd_x, lcd_y, c);
+		
+		lcd_x += font_w;
+	}
 	
 }
+
 
 #endif	// __LCD_H
