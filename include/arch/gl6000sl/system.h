@@ -2,7 +2,9 @@
 #define __GL6000SL
 
 /*
-System header for the VTech Genius Leader 6000 SL
+
+System header for the VTech Genius LEADER 6000SL / PreComputer Prestige
+
 
 What's known so far (mostly from MAME's "prestige" driver):
 	* Screen is memory-mapped to e000-ebb8, 1 bbp
@@ -214,7 +216,12 @@ void vgldk_init() {
 	
 	lcd_clear();
 	
-	main();
+	keyboard_init();
+	
+	//main();
+	__asm
+		jp _main
+	__endasm;
 }
 
 #endif //__GL6000SL

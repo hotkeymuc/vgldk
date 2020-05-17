@@ -5,7 +5,7 @@
 const byte lcd_w = 240;
 const byte lcd_h = 100;
 const word lcd_addr = 0xe000;
-
+#define LCD_FRAMEBUFFER_SIZE (240*100/8)
 
 byte lcd_x = 0;
 byte lcd_y = 0;
@@ -148,7 +148,7 @@ void drawString(byte x, byte y, char *s) {
 }
 
 void putchar(byte c) {
-	byte o;
+	//byte o;
 	
 	if (c == '\r') {
 		lcd_x = 0;
@@ -157,25 +157,40 @@ void putchar(byte c) {
 	else
 	if (c == '\n') {
 		lcd_x = 0;
-		lcd_y++;
+		lcd_y += font_h;
 		c = 0;
 	}
 	
-	if (lcd_x >= lcd_w - font_w) {
+	if (lcd_x + font_w >= lcd_w) {
 		lcd_x = 0;
 		lcd_y += font_h;
 	}
 	
-	if (lcd_y >= lcd_h - font_h) {
-		#ifndef lcd_MINIMAL
-			
-			//@TODO: Scroll!
-			// __asm ... ldir __endasm;
-			
-		#else
-			// Minimal
-			lcd_y = 0;
-		#endif
+	while (lcd_y + font_h >= lcd_h) {
+		// Minimal
+		//lcd_y = 0;
+		
+		// Scroll
+		__asm
+		push bc
+		push de
+		push hl
+		
+		// Scroll one line
+		//ld bc, #0x0ac8	//(240/8)	//#2760 // 240*100 - 240*8
+		ld bc, #0xb9a	//#0x0ac8	//(240/8)	//#2760 // 240*100 - 240*8
+		ld hl, #0xe01e
+		ld de, #0xe000
+		ldir
+		
+		
+		pop hl
+		pop de
+		pop bc
+		__endasm;
+		
+		lcd_y--;
+		
 	}
 	
 	

@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 void main() __naked {
+	char c;
 	
 	//lcd_init();
 	//vgl_sound_off();
@@ -31,7 +32,13 @@ void main() __naked {
 	//gets();
 	//getchar();
 	
+	/*
 	while(1) {
+		//keyboard_update();
+		c = getchar();
+		//printf(c);
+		putchar(c);
 	}
+	*/
 	
 }
