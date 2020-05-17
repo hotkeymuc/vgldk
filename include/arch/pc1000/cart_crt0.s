@@ -19,6 +19,7 @@
 	
 	;; PreComputer1000 auto-start signature
 	.db #0x33  ; 0x33 = autostart jump to 0x8010
+	.db #0x00  ; Dont care
 	
 
 ;; PC1000 entry point at 0x8010 (fixed!)
@@ -29,8 +30,8 @@
 
 
 init:
-	;di ; disable interrupts
-	ld a, #0xb0	; value at 0x8002
+	di ; disable interrupts
+	;ld a, #0xb0	; value at 0x8002
 	
 	; from ROM1000 0x021e:
 	ld c, #0x0f
@@ -53,24 +54,24 @@ init:
 	ld sp, hl
 	
 	call	0x0290	; LCD init (sequence of outputs to ports 0x20, 0x21)
-	call	0x0244	
+	call	0x0244
 	
-	ld a, #0x04
-	ld (0x412e), a
-	call	0x0241
+	;ld a, #0x04
+	;ld (0x412e), a
+	;call	0x0241
 	
 	
 	; Show text at HL
-	ld	hl, #0x3e80
-	call	0x03ab
+	;ld	hl, #0x3e80
+	;call	0x03ab
 	
 	
-	ld a, #0x40
-	call 0x048e	; Output A to LCD
-	ld a, #0x41
-	call 0x048e	; Output A to LCD
-	ld a, #0x80
-	call 0x048e	; Output A to LCD
+	;ld a, #0x40
+	;call 0x048e	; Output A to LCD
+	;ld a, #0x41
+	;call 0x048e	; Output A to LCD
+	;ld a, #0x80
+	;call 0x048e	; Output A to LCD
 	
 	; Some internal resets (see ROM4000, 0x0eda)
 	;ld a,#0xff		;0edd	3e ff 	> . 
@@ -101,7 +102,9 @@ init:
 	
 	;; Call main() function (C entry point)
 	;call	_main
-	call	_vgldk_init
+	
+	jp	_vgldk_init
+	
 	;; End of main()
 	
 	;; Jump to shutdown code

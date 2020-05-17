@@ -36,49 +36,15 @@ typedef unsigned short word;
 
 // #include <arch/#VGLDK_ARCH.h>
 #if VGLDK_SERIES == 1000
-	#include <arch/pc1000.h>
+	#include "arch/pc1000/system.h"
 #elif VGLDK_SERIES == 2000
-	#include <arch/gl2000.h>
+	#include "arch/gl2000/system.h"
 #elif VGLDK_SERIES == 4000
-	#include <arch/gl4000.h>
+	#include "arch/gl4000/system.h"
+#elif VGLDK_SERIES == 6000
+	#include "arch/gl6000sl/system.h"
 #else
 	#error "Specified VGLDK_SERIES is unknown"
-#endif
-
-
-
-
-#if VGLDK_DIRECTIO == 1
-	// Accessing hardware directly
-	#include <hardware/keyboard.h>
-	#include <hardware/lcd.h>
-	#include <hardware/sound.h>
-	
-	//#define main(s) vgldk_init(s)
-	void vgldk_init() __naked {
-		
-		lcd_init();
-		vgl_sound_off();
-		
-		__asm
-			jp _main
-		__endasm;
-	}
-#else
-	// Accessing I/O through memory mapped soft I/O (experimental and questionable)
-	#include <hardware/softio.h>
-	#include <hardware/sound.h>
-	
-	void vgldk_init() __naked {
-		vgl_sound_off();
-		
-		softio_init();
-		
-		__asm
-			jp _main
-		__endasm;
-	}
-
 #endif
 
 

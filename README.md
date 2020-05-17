@@ -19,10 +19,13 @@ This is under construction. For actually working stuff, visit the [Hackaday proj
 		(CompuSavant?)
 		VTech Genius LEADER 4000 Quadro
 		VTech Genius LEADER 4004 Quadro L
+	gl6000sl
+		VTech Genius LEADER 6000 SL
+		VTech PreComputer Prestige
 
 ## Files
 * examples: Some demonstrative use cases
-* include: Contains all headers
+* include: Contains all the headers
 
 ## History
 * Started as a stand-alone reverse engineering project in late 2016

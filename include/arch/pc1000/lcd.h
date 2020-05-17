@@ -118,7 +118,7 @@ TODO:
 byte lcd_x = 0;
 byte lcd_y = 0;
 
-#ifndef lcd_MINIMAL
+#ifndef LCD_MINIMAL
 	// "Minimal" version does not include a screen buffer and custom scrolling
 	byte lcd_cursor = 1;
 	byte lcd_buffer[LCD_ROWS * LCD_COLS];
@@ -213,7 +213,7 @@ void lcd_cursor_off() {
 }
 */
 
-#ifndef lcd_MINIMAL
+#ifndef LCD_MINIMAL
 void lcd_set_cursor() {
 	// Set cursor
 	byte o;
@@ -226,7 +226,7 @@ void lcd_set_cursor() {
 #endif
 
 void lcd_clear() {
-	#ifndef lcd_MINIMAL
+	#ifndef LCD_MINIMAL
 	byte i;
 	#endif
 	
@@ -238,7 +238,7 @@ void lcd_clear() {
 	lcd_x = 0;
 	lcd_y = 0;
 	
-	#ifndef lcd_MINIMAL
+	#ifndef LCD_MINIMAL
 	//@TODO: Use fillmem function!
 	for(i = 0; i < (LCD_COLS * LCD_ROWS); i++) {
 		lcd_buffer[i] = 0x20;
@@ -249,7 +249,7 @@ void lcd_clear() {
 }
 
 
-#ifndef lcd_MINIMAL
+#ifndef LCD_MINIMAL
 void lcd_refresh() {
 	// Put buffer to screen
 	byte *p0;
@@ -275,7 +275,9 @@ void lcd_refresh() {
 void lcd_scroll() {
 	byte i;
 	byte *p0;
+	#if LCD_ROWS > 1
 	byte *p1;
+	#endif
 	
 	// Move buffer up one line
 	
@@ -340,7 +342,7 @@ void lcd_init() {
 	//lcd_x = 0;
 	//lcd_y = 0;
 	
-	#ifndef lcd_MINIMAL
+	#ifndef LCD_MINIMAL
 	lcd_cursor = 1;
 	lcd_scroll_cb = 0;
 	#endif
@@ -393,7 +395,7 @@ void putchar(byte c) {
 	}
 	
 	if (lcd_y >= LCD_ROWS) {
-		#ifndef lcd_MINIMAL
+		#ifndef LCD_MINIMAL
 		// Invoke scroll callback
 		if (lcd_scroll_cb != 0)
 			(*lcd_scroll_cb)();
@@ -419,7 +421,7 @@ void putchar(byte c) {
 		lcd_writeData(c);
 		lcd_x++;
 		
-		#ifndef lcd_MINIMAL
+		#ifndef LCD_MINIMAL
 		// Store in buffer (for scrolling)
 		lcd_buffer[o] = c;
 		

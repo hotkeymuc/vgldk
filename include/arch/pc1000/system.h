@@ -7,6 +7,7 @@ Header for
 	(CompuSavant?)
 
 
+@FIXME: This is not working correctly, yet! LCD is broken
 
 
 for use with SDCC compiler
@@ -16,6 +17,7 @@ for use with SDCC compiler
 
 //#define ARCH PC1000
 
+#define LCD_MINIMAL
 #define DISPLAY_COLS 20
 #define DISPLAY_ROWS 1
 
@@ -29,10 +31,12 @@ volatile __at (0xdce4) unsigned char KEY_CURRENT;	// Holds the current key code 
 #include "keyboard.h"
 #include "sound.h"
 
-void vgldk_init {
+void vgldk_init() {
 	lcd_init();
 	vgl_sound_off();
 	lcd_clear();
+	
+	main();
 }
 
 #endif

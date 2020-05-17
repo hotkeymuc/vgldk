@@ -9,11 +9,11 @@ $(error VGLDK_SERIES is not set)
 	#VGLDK_SERIES=4000
 endif
 
-ifndef VGLDK_DIRECTIO
-#$(error VGLDK_DIRECTIO is not set)
-	#VGLDK_DIRECTIO=0
-	VGLDK_DIRECTIO=1
-endif
+#ifndef VGLDK_DIRECTIO
+##$(error VGLDK_DIRECTIO is not set)
+#	#VGLDK_DIRECTIO=0
+#	VGLDK_DIRECTIO=1
+#endif
 
 
 # Start up / boot options
@@ -34,16 +34,35 @@ endif
 #	
 
 # 
+
+SYS_ID=gl${VGLDK_SERIES}
+LOC_CODE=0x8010
+LOC_DATA=0xc000
+
+
 ifeq (${VGLDK_SERIES},1000)
-	CRT_NAME=cart_pc1000_crt0
+	SYS_ID=pc1000
 	LOC_CODE=0x8020
 	LOC_DATA=0x4000
-else
-	CRT_NAME=cart_crt0
-	LOC_CODE=0x8010
-	LOC_DATA=0xc000
+endif
+ifeq (${VGLDK_SERIES},3000)
+	SYS_ID=gl3000s
+endif
+ifeq (${VGLDK_SERIES},6000)
+	SYS_ID=gl6000sl
 endif
 
+#EMU_SYS=pc1000
+#EMU_SYS=gl2000
+#EMU_SYS=gl3000s
+#EMU_SYS=gl4000
+#EMU_SYS=gl4004
+#EMU_SYS=gl5000
+#EMU_SYS=gl3000s
+EMU_SYS=${SYS_ID}
+
+
+CRT_NAME=cart_crt0
 
 # Cartridge output options
 #  8 =  8KB = 0x2000 = AT28C64B:
@@ -62,29 +81,13 @@ EMU_ROM_DIR="/z/apps/_emu/_roms"
 
 # Filenames
 INPUT_FILE=${NAME}.c
-CRT_S_FILE=${LIB_DIR}/arch/${CRT_NAME}.s
+CRT_S_FILE=${LIB_DIR}/arch/${SYS_ID}/${CRT_NAME}.s
 CRT_REL_FILE=${OUT_DIR}/${NAME}.crt0.rel
 OUTPUT_FILE_HEX=${OUT_DIR}/${NAME}.hex
 OUTPUT_FILE_BIN=${OUT_DIR}/${NAME}.bin
 OUTPUT_FILE_CART=${OUT_DIR}/${NAME}.cart.bin
 
 # Emulation options
-#EMU_SYS=pc1000
-#EMU_SYS=gl2000
-#EMU_SYS=gl3000s
-#EMU_SYS=gl4000
-#EMU_SYS=gl4004
-#EMU_SYS=gl5000
-#EMU_SYS=gl3000s
-#EMU_SYS=${ARCH}
-EMU_SYS=gl${VGLDK_SERIES}
-ifeq (${VGLDK_SERIES},1000)
-	EMU_SYS=pc${VGLDK_SERIES}
-endif
-ifeq (${VGLDK_SERIES},3000)
-	EMU_SYS=gl${VGLDK_SERIES}s
-endif
-
 
 # Commands
 MKDIR_P=mkdir -p

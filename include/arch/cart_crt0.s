@@ -77,7 +77,9 @@ init:
 	
 	;; Call main() function (C entry point)
 	;call	_main
-	call	_vgldk_init
+	
+	jp	_vgldk_init
+	
 	;; End of main()
 	
 	;; Jump to shutdown code

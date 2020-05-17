@@ -26,10 +26,11 @@ volatile __at (0xdce4) unsigned char KEY_CURRENT;	// Holds the current key code 
 #include "keyboard.h"
 #include "sound.h"
 
-void vgldk_init {
+void vgldk_init() {
 	lcd_init();
 	vgl_sound_off();
 	lcd_clear();
+	main();
 }
 
 #endif

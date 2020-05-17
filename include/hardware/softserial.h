@@ -5,7 +5,7 @@
 VTech SoftSerial
 ================
 
-Bit-banged serial functions for V-Tech Genius LEADER.
+Bit-banged serial functions for V-Tech Genius LEADER 4000.
 
 The parallel port has 9 output pins (1=STROBE and 2..9=D0..D7), but only ONE input pin (11=BUSY).
 The stock "link cable" uses D0..D7 to select a bit and BUSY/STROBE to receive data bit by bit from the PC.
