@@ -1,11 +1,11 @@
 /*
-	A simple "Hello World" for the VGLDK
+	A simple STDIO test for the VGLDK
 	
 	2020-01-22 Bernhard "HotKey" Slawik
 */
 
 #include <vgldk.h>
-#include <stdio.h>
+#include <stdiomin.h>
 
 
 void main() __naked {
