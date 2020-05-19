@@ -30,7 +30,11 @@ void vgldk_init() {
 	lcd_init();
 	vgl_sound_off();
 	lcd_clear();
-	main();
+	
+	//main();
+	__asm
+		jp _main;
+	__endasm;
 }
 
 #endif
