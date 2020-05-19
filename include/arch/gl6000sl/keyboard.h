@@ -45,69 +45,69 @@ __endasm;
 
 
 
-#define VGL_KEY_MOUSE_LMB 1
-#define VGL_KEY_MOUSE_RMB 2
+#define KEY_MOUSE_LMB 1
+#define KEY_MOUSE_RMB 2
 
-#define VGL_KEY_TOUCH_UP 24
-#define VGL_KEY_TOUCH_DOWN 25
-#define VGL_KEY_TOUCH_LEFT 27
-#define VGL_KEY_TOUCH_RIGHT 26
-#define VGL_KEY_TOUCH_LMB 1
-#define VGL_KEY_TOUCH_RMB 2
+#define KEY_TOUCH_UP 24
+#define KEY_TOUCH_DOWN 25
+#define KEY_TOUCH_LEFT 27
+#define KEY_TOUCH_RIGHT 26
+#define KEY_TOUCH_LMB 1
+#define KEY_TOUCH_RMB 2
 
-#define VGL_KEY_UP 24
-#define VGL_KEY_DOWN 25
-#define VGL_KEY_LEFT 27
-#define VGL_KEY_RIGHT 26
+#define KEY_UP 24
+#define KEY_DOWN 25
+#define KEY_LEFT 27
+#define KEY_RIGHT 26
 
-#define VGL_KEY_SPACE 0x20
-#define VGL_KEY_BACKSPACE 0x08
-#define VGL_KEY_ESCAPE 27
-#define VGL_KEY_ENTER 13
-#define VGL_KEY_INSERT 'I'
+#define KEY_SPACE 0x20
+#define KEY_BACKSPACE 0x08
+#define KEY_ESCAPE 27
+#define KEY_ENTER 13
+#define KEY_INSERT 'I'
 
-#define VGL_KEY_HELP '?'
-#define VGL_KEY_ANSWER '!'
-#define VGL_KEY_PLAYER 'P'
-#define VGL_KEY_LEVEL 'L'
-#define VGL_KEY_REPEAT 'R'
+#define KEY_HELP '?'
+#define KEY_ANSWER '!'
+#define KEY_PLAYER 'P'
+#define KEY_LEVEL 'L'
+#define KEY_REPEAT 'R'
 
-#define VGL_KEY_ACTIVITY_WORDGAMES 0x81
-#define VGL_KEY_ACTIVITY_MATH 0x82
-#define VGL_KEY_ACTIVITY_TRIVIA 0x83
-#define VGL_KEY_ACTIVITY_LOGIC 0x84
-#define VGL_KEY_ACTIVITY_BUSINESS 0x85
-#define VGL_KEY_CARTRIDGE 254
+#define KEY_ACTIVITY_WORDGAMES 0x81
+#define KEY_ACTIVITY_MATH 0x82
+#define KEY_ACTIVITY_TRIVIA 0x83
+#define KEY_ACTIVITY_LOGIC 0x84
+#define KEY_ACTIVITY_BUSINESS 0x85
+#define KEY_CARTRIDGE 254
 
-#define VGL_KEY_OFF 'O'
-#define VGL_KEY_SYMBOL '$'
-#define VGL_KEY_ALT 'A'
-#define VGL_KEY_CAPS 'C'
-#define VGL_KEY_LEFT_SHIFT 'S'
-#define VGL_KEY_RIGHT_SHIFT 'T'
+#define KEY_OFF 'O'
+#define KEY_SYMBOL '$'
+#define KEY_ALT 'A'
+#define KEY_CAPS 'C'
+#define KEY_LEFT_SHIFT 'S'
+#define KEY_RIGHT_SHIFT 'T'
 
 typedef byte keycode_t;
 typedef byte scancode_t;
 
 // Map scancode to keycode
-const keycode_t VGL_KEY_CODES[8*16] = {
-	VGL_KEY_MOUSE_LMB,  '1', '9', 'e', '(', 'g', VGL_KEY_LEFT_SHIFT, ',',
-	VGL_KEY_MOUSE_RMB,  '2', '0', 'r', '+', 'h', 'z', '.',
-	VGL_KEY_TOUCH_UP ,  '3', '\'', 't', VGL_KEY_INSERT, 'j', 'x', '-',
-	VGL_KEY_TOUCH_LMB,  '4', ')', 'y', VGL_KEY_CAPS, 'k', 'c', VGL_KEY_UP,
-	VGL_KEY_TOUCH_RMB,  '5', VGL_KEY_BACKSPACE, 'u', 'a', 'l', 'v', VGL_KEY_RIGHT_SHIFT,
-	VGL_KEY_TOUCH_DOWN, '6', VGL_KEY_ESCAPE, 'i', 's', '\\', 'b', VGL_KEY_HELP,
-	               '?', '7', 'q', 'o', 'd', '/', 'n', VGL_KEY_SYMBOL, 
-	VGL_KEY_OFF,        '8', 'w', 'p', 'f', VGL_KEY_ENTER, 'm', VGL_KEY_ANSWER,
+const keycode_t KEY_CODES[8*16] = {
+	KEY_MOUSE_LMB,  '1', '9', 'e', '(', 'g', KEY_LEFT_SHIFT, ',',
+	KEY_MOUSE_RMB,  '2', '0', 'r', '+', 'h', 'z', '.',
+	KEY_TOUCH_UP ,  '3', '\'', 't', KEY_INSERT, 'j', 'x', '-',
+	KEY_TOUCH_LMB,  '4', ')', 'y', KEY_CAPS, 'k', 'c', KEY_UP,
+	KEY_TOUCH_RMB,  '5', KEY_BACKSPACE, 'u', 'a', 'l', 'v', KEY_RIGHT_SHIFT,
+	KEY_TOUCH_DOWN, '6', KEY_ESCAPE, 'i', 's', '\\', 'b', KEY_HELP,
+	               '?', '7', 'q', 'o', 'd', '/', 'n', KEY_SYMBOL, 
+	KEY_OFF,        '8', 'w', 'p', 'f', KEY_ENTER, 'm', KEY_ANSWER,
 	
-	               VGL_KEY_SPACE, VGL_KEY_ACTIVITY_WORDGAMES, VGL_KEY_PLAYER, 0,0,0,0,0,
-	VGL_KEY_ALT, VGL_KEY_ACTIVITY_MATH, VGL_KEY_LEVEL, 0,0,0,0,0,
-	VGL_KEY_REPEAT, VGL_KEY_ACTIVITY_TRIVIA, VGL_KEY_CARTRIDGE, 0,0,0,0,0,
-	VGL_KEY_LEFT, VGL_KEY_ACTIVITY_LOGIC, VGL_KEY_ACTIVITY_BUSINESS, 0,0,0,0,0,
-	VGL_KEY_DOWN, 0,0,0,0,0,0,0,
-	VGL_KEY_RIGHT, 0,0,0,0,0,0,0,
-	VGL_KEY_TOUCH_LMB, 0,0,0,0,0,0,0,
-	VGL_KEY_TOUCH_RMB, 0,0,0,0,0,0,0,
+	               KEY_SPACE, KEY_ACTIVITY_WORDGAMES, KEY_PLAYER, 0,0,0,0,0,
+	KEY_ALT, KEY_ACTIVITY_MATH, KEY_LEVEL, 0,0,0,0,0,
+	KEY_REPEAT, KEY_ACTIVITY_TRIVIA, KEY_CARTRIDGE, 0,0,0,0,0,
+	KEY_LEFT, KEY_ACTIVITY_LOGIC, KEY_ACTIVITY_BUSINESS, 0,0,0,0,0,
+	KEY_DOWN, 0,0,0,0,0,0,0,
+	KEY_RIGHT, 0,0,0,0,0,0,0,
+	KEY_TOUCH_LMB, 0,0,0,0,0,0,0,
+	KEY_TOUCH_RMB, 0,0,0,0,0,0,0,
 };
 
 #define KEYBOARD_PRESSED_MAX 6
@@ -213,16 +213,16 @@ void keyboard_update() {
 		}
 		if (scancode != 0xff) {
 			// Key was released
-			keycode = VGL_KEY_CODES[scancode];
+			keycode = KEY_CODES[scancode];
 			//printf("KeyUp%02X", scancode);
 			//putchar('U'); putchar(scancode);
 			
 			// Update modifier status
 			switch (keycode) {
-				case VGL_KEY_LEFT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
-				case VGL_KEY_RIGHT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
-				case VGL_KEY_ALT:			keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_ALT); break;
-				case VGL_KEY_SYMBOL:		keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SYMBOL); break;
+				case KEY_LEFT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
+				case KEY_RIGHT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
+				case KEY_ALT:			keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_ALT); break;
+				case KEY_SYMBOL:		keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SYMBOL); break;
 			}
 			
 			// Remove (copy last element there)
@@ -245,15 +245,15 @@ void keyboard_update() {
 			// Key was previously unknown
 			
 			// Handle key press
-			keycode = VGL_KEY_CODES[scancode];
+			keycode = KEY_CODES[scancode];
 			//printf("KeyDown%02X", scancode);
 			//putchar('D'); putchar(scancode);
 			
 			switch (keycode) {
-				case VGL_KEY_LEFT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
-				case VGL_KEY_RIGHT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
-				case VGL_KEY_ALT:			keyboard_modifiers |= KEYBOARD_MODIFIER_ALT; break;
-				case VGL_KEY_SYMBOL:		keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL; break;
+				case KEY_LEFT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
+				case KEY_RIGHT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
+				case KEY_ALT:			keyboard_modifiers |= KEYBOARD_MODIFIER_ALT; break;
+				case KEY_SYMBOL:		keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL; break;
 				
 				default:
 					// Normal key
@@ -272,7 +272,7 @@ void keyboard_update() {
 							charcode = '!' + (keycode - '1');
 						}
 					} else
-					if (keycode == VGL_KEY_ENTER) {
+					if (keycode == KEY_ENTER) {
 						// ENTER to NewLine
 						charcode = '\n';
 					} else {
