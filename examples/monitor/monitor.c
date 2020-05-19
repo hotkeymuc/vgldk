@@ -60,7 +60,7 @@ const word tempAddr = 0xC400;
 //#define MONITOR_CMD_BEEP
 #define MONITOR_CMD_CLS
 #define MONITOR_CMD_DUMP
-//#define MONITOR_CMD_ECHO
+#define MONITOR_CMD_ECHO
 //#define MONITOR_CMD_HELP
 #define MONITOR_CMD_LOOP
 #define MONITOR_CMD_PORT
@@ -159,7 +159,7 @@ int cmd_echo(int argc, char *argv[]) {
 	
 	for(i = 1; i < argc; i++) {
 		if (i > 1) printf(" ");
-		printf("%s", argv[i]);
+		printf(argv[i]);
 	}
 	printf("\n");
 	return 0;
@@ -187,10 +187,9 @@ int cmd_loop(int argc, char *argv[]) {
 		eval(argc-1, &argv[1]);
 		
 		c = inkey();
+		if (c == 'q') break;
 		#ifdef KEY_ESCAPE
 		if (c == KEY_ESCAPE) break;
-		#else
-		if (c == 'q') break;
 		#endif
 		
 	}
@@ -395,7 +394,14 @@ int eval(int argc, char *argv[]) {
 	
 	// Parse/run
 	//printf("argc=%d\n", argc);
-	//for(i = 0; i < argc; i++) printf("args[%d]=\"%s\"\n", i, argv[i]);
+	
+	/*
+	printf("argc="); printf_d(argc); printf("\n");
+	for(i = 0; i < argc; i++) {
+		//printf("args[%d]=\"%s\"\n", i, argv[i]);
+		printf("args["); printf_d(i); printf("]=\""); printf(argv[i]); printf("\"\n");
+	}
+	*/
 	
 	/*
 	// Hard-coded commands
@@ -423,7 +429,7 @@ int eval(int argc, char *argv[]) {
 	}
 	
 	//printf("\"%s\"?\n", argv[0]);
-	putchar('"'); printf(argv[0]); printf('"?');
+	putchar('"'); printf(argv[0]); printf("\"?\n");
 	return ERR_COMMAND_UNKNOWN;
 }
 
@@ -503,6 +509,7 @@ void parse(char *s) {
 		if ((c == 0x20) && (isQuote == 0)) {
 			*ac++ = 0x00;	// Terminate arg at space and continue with next argv
 			argv[argc] = ac;
+			if (argc >= MAX_ARGS) break;
 			argc++;
 		} else {
 			// Add character to arg
@@ -513,7 +520,7 @@ void parse(char *s) {
 	}
 	
 	// Handle input
-	r = eval(argc, argv);
+	r = eval(argc, &argv[0]);
 	
 	// Handle return value
 	if (r != 0) {
@@ -523,8 +530,8 @@ void parse(char *s) {
 }
 
 
+char cmd_arg[MAX_INPUT];
 void main() __naked {
-	char arg[MAX_INPUT];
 	
 	clear();
 	
@@ -538,8 +545,12 @@ void main() __naked {
 		
 		// Prompt for input
 		prompt();
-		gets(arg);
-		parse(arg);
+		gets(cmd_arg);
+		
+		//@BUG: When the next line is removed, behaviour changes and the string is limited to 8 chars!??!
+		//putchar('"'); printf(s); putchar('"'); printf("\n");
+		
+		parse(cmd_arg);
 		
 	}
 	// Exited...
