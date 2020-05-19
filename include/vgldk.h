@@ -30,6 +30,8 @@ typedef unsigned char byte;
 typedef unsigned short word;
 #define true 1
 #define false 0
+#define NULL ((void *)0)
+//(void *) NULL=0;
 
 #ifndef VGLDK_SERIES
 	#error "VGLDK_SERIES must be defined"

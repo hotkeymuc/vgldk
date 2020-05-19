@@ -6,7 +6,7 @@
 
 #include <vgldk.h>
 
-#include <stdio.h>	// for printf() putchar() gets() getchar()
+#include <stdiomin.h>	// for printf() putchar() gets() getchar()
 #include <ports.h>
 
 #define HEX_USE_DUMP
@@ -55,13 +55,13 @@ const word tempAddr = 0xC400;
 
 
 // Features to include
-#define MONITOR_HELP	// Include help functionality
+//#define MONITOR_HELP	// Include help functionality
 
 //#define MONITOR_CMD_BEEP
 #define MONITOR_CMD_CLS
 #define MONITOR_CMD_DUMP
-#define MONITOR_CMD_ECHO
-#define MONITOR_CMD_HELP
+//#define MONITOR_CMD_ECHO
+//#define MONITOR_CMD_HELP
 #define MONITOR_CMD_LOOP
 #define MONITOR_CMD_PORT
 #define MONITOR_CMD_PAUSE
@@ -210,11 +210,14 @@ int cmd_in(int argc, char *argv[]) {
 	v = port_in(p);
 	//printf("0x%02X = 0x%02X / %d\n", p, v, v);
 	
-	printf("%02X:0x%02X ", p, v);
+	//printf("%02X:0x%02X ", p, v);
+	printf_x2(p); putchar(':'); printf("0x"); printf_x2(v); putchar(' ');
+	
 	for(p = 0; p < 8; p++) {
 		if ((v & (1 << (7-p))) > 0) putchar('1'); else putchar('0');
 	}
-	printf(" %d\n", v);
+	//printf(" %d\n", v);
+	putchar(' '); printf_d(v); printf("\n");
 	
 	return 0;
 }
@@ -252,7 +255,7 @@ int cmd_ver(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
 	//printf("%s\n", VERSION);
-	printf("%s", VERSION);
+	printf(VERSION);
 	#ifdef VGLDK_SERIES
 		#define xstr(s) str(s)
 		#define str(s) #s
@@ -419,7 +422,8 @@ int eval(int argc, char *argv[]) {
 		}
 	}
 	
-	printf("\"%s\"?\n", argv[0]);
+	//printf("\"%s\"?\n", argv[0]);
+	putchar('"'); printf(argv[0]); printf('"?');
 	return ERR_COMMAND_UNKNOWN;
 }
 
@@ -487,7 +491,7 @@ void parse(char *s) {
 				//@FIXME: Implement looking up vars
 				// Temporarily terminate arg/varNameP (to be used as varName)
 				*ac = 0;
-				ac = varValP + sprintf(varValP, "%s=%d", varNameP, 1234);	// Just output its name
+				//ac = varValP + sprintf(varValP, "%s=%d", varNameP, 1234);	// Just output its name
 				
 				isVar = 0;
 			}
@@ -513,13 +517,16 @@ void parse(char *s) {
 	
 	// Handle return value
 	if (r != 0) {
-		printf("Exit code %d\n", r);
+		//printf("Exit code %d\n", r);
+		printf("Exit code "); printf_d(r); printf("\n");
 	}
 }
 
 
 void main() __naked {
 	char arg[MAX_INPUT];
+	
+	clear();
 	
 	// Banner
 	cmd_ver(0, NULL);

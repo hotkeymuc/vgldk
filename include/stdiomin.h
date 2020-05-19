@@ -40,17 +40,18 @@ void printf(char *pc) {
 	while(*pc) putchar(*pc++);
 }
 
-void printf_d(char *pc, byte d) {
+//void printf_d(char *pc, byte d) {
+void printf_d(byte d) {
 	byte i;
 	
-	printf(pc);
+	//printf(pc);
 	i = 100;
 	while(i > 0) {
 		putchar('0' + ((d / i) % 10));
 		i /= 10;
 	}
 	
-	printf("\n");
+	//printf("\n");
 }
 
 

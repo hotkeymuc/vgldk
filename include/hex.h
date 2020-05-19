@@ -126,14 +126,16 @@ void dump(word a, byte len) {
 	
 	l = 0;
 	while (l < len) {
-		printf("%04X|", a);
+		//printf("%04X|", a);
+		printf_x4(a); putchar('|');
 		
 		lLine = l;
 		o = (byte *)a;
 		for (i = 0; i < DUMP_WIDTH; i++) {
 			if (l < len) {
 				b = *o;
-				printf("%02X", b);
+				//printf("%02X", b);
+				printf_x2(b);
 			} else {
 				printf("  ");
 			}
