@@ -68,9 +68,15 @@ CRT_NAME=cart_crt0
 #  8 =  8KB = 0x2000 = AT28C64B:
 # 16 = 16KB = 0x4000 = AT28C128 (?)
 # 32 = 32KB = 0x8000 = AT28C256
-#OUTPUT_CART_SIZE_KB=8
+OUTPUT_CART_SIZE_KB=8
 #OUTPUT_CART_SIZE_KB=16
-OUTPUT_CART_SIZE_KB=32
+#OUTPUT_CART_SIZE_KB=32
+
+# EEPROM options
+#PART=CAT28C64B
+PART=AT28C64B
+#PART=AT28C256
+
 
 # Directories
 #LIB_DIR=`realpath ../include`
@@ -85,6 +91,7 @@ CRT_S_FILE=${LIB_DIR}/arch/${SYS_ID}/${CRT_NAME}.s
 CRT_REL_FILE=${OUT_DIR}/${NAME}.crt0.rel
 OUTPUT_FILE_HEX=${OUT_DIR}/${NAME}.hex
 OUTPUT_FILE_BIN=${OUT_DIR}/${NAME}.bin
+OUTPUT_FILE_BIN64=${OUT_DIR}/${NAME}.64k.bin
 OUTPUT_FILE_CART=${OUT_DIR}/${NAME}.cart.bin
 
 # Emulation options
@@ -118,18 +125,29 @@ ${OUTPUT_FILE_HEX}: ${INPUT_FILE} ${CRT_REL_FILE}
 	-o ${OUTPUT_FILE_HEX} \
 	${CRT_REL_FILE} ${INPUT_FILE}
 
-${OUTPUT_FILE_BIN}: ${OUTPUT_FILE_HEX}
-	#${OBJCOPY} -Iihex -Obinary ${OUTPUT_FILE_HEX} ${OUTPUT_FILE_BIN}
-	makebin -p -s 65536 ${OUTPUT_FILE_HEX} ${OUTPUT_FILE_BIN}
+${OUTPUT_FILE_BIN64}: ${OUTPUT_FILE_HEX}
+	# Build usable cartridge ROM bin file (64K memory dump)
+	#${OBJCOPY} -Iihex -Obinary ${OUTPUT_FILE_HEX} ${OUTPUT_FILE_BIN64}
+	makebin -p -s 65536 ${OUTPUT_FILE_HEX} ${OUTPUT_FILE_BIN64}
 
-${OUTPUT_FILE_CART}: ${OUTPUT_FILE_BIN}
+${OUTPUT_FILE_BIN}: ${OUTPUT_FILE_BIN64}
+	# Extract cartridge section (0x8000 and up)
 	#${DD} bs=1024 count=${OUTPUT_CART_SIZE_KB} skip=32768 iflag=skip_bytes if=$< of=$@
 	${DD} \
-	bs=1024 count=${OUTPUT_CART_SIZE_KB} \
 	skip=32768 \
 	iflag=skip_bytes \
-	if=${OUTPUT_FILE_BIN} \
-	of=${OUTPUT_FILE_CART}
+	bs=1024 count=${OUTPUT_CART_SIZE_KB} \
+	if=${OUTPUT_FILE_BIN64} \
+	of=${OUTPUT_FILE_BIN}
+	
+${OUTPUT_FILE_CART}: ${OUTPUT_FILE_BIN}
+	# Create empty EEPROM binary (full cart size)
+	#dd if=/dev/zero of=${OUTPUT_FILE_CART} bs=$(OUTPUT_CART_SIZE * 1024) count=1
+	#dd if=/dev/zero of=${OUTPUT_FILE_CART} bs=1 count=1 seek=$((OUTPUT_CART_SIZE * 1024 -1 ))
+	dd if=/dev/zero ibs=1k count=${OUTPUT_CART_SIZE} | tr "\000" "\377" >${OUTPUT_FILE_CART} 
+	
+	# Copy bin data into it
+	dd if=${OUTPUT_FILE_BIN} of=${OUTPUT_FILE_CART} conv=notrunc
 
 emu: ${OUTPUT_FILE_CART}
 	${MAME} \
@@ -150,6 +168,10 @@ emu: ${OUTPUT_FILE_CART}
 	# Remove MESS config directory that is created
 	#rm cfg/*.cfg
 	#rmdir cfg
+
+burn: ${OUTPUT_FILE_CART}
+	minipro -p "${PART}" -w ${OUTPUT_FILE_CART}
+	# -s = no warning for file size mismatch
 
 .PHONY: clean
 
