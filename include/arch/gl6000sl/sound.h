@@ -3,7 +3,11 @@
 /*
 V-Tech Genius Leader Sound
 
-2019-07-10 Bernhard "HotKey" Slawik
+Not quite sure about the hardware, yet.
+But it seems the original ROM checks 0xF975, 0xF976, 0xF97B, 0xF97C, 0xF97D to see if the sound is done
+
+
+2020-05-19 Bernhard "HotKey" Slawik
 */
 
 void vgl_sound_off() {

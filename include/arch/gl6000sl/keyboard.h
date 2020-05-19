@@ -217,6 +217,7 @@ void keyboard_update() {
 			//printf("KeyUp%02X", scancode);
 			//putchar('U'); putchar(scancode);
 			
+			// Update modifier status
 			switch (keycode) {
 				case VGL_KEY_LEFT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
 				case VGL_KEY_RIGHT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;

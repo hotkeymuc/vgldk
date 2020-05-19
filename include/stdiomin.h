@@ -59,17 +59,19 @@ void gets(char *pc) {
 	char c;
 	pcs = pc;
 	
-	myscroll_counter = LCD_ROWS - lcd_y - 1;	// Reset scroll counter, i.e. user has enough time to read current page
+	//myscroll_counter = LCD_ROWS - lcd_y - 1;	// Reset scroll counter, i.e. user has enough time to read current page
 	while(1) {
 		c = getchar();
 		if ( (c == 8) || (c == 127) ) {
 			// Backspace/DEL
 			if (pc > pcs) {
 				pc--;
+				/*
 				if (lcd_x > 0) {
 					lcd_x--;
 					vgl_lcd_set_cursor();
 				}
+				*/
 			}
 			continue;
 		}
