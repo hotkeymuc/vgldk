@@ -261,7 +261,7 @@ void keyboard_update() {
 				
 					if (keyboard_modifiers & KEYBOARD_MODIFIER_SYMBOL > 0) {
 						// Symbol
-						charcode = keycode - 'a';
+						charcode = keycode - 'a' + 0x01;
 					} else
 					if (keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT > 0) {
 						// Shift
