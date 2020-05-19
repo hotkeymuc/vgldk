@@ -319,7 +319,8 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			;	tpb20 := 122880	(measured)
 			;	tc = tpb20 - tpi * 0x20
 			;
-			;	0 = tpb40 - tpi * 0x40 - (tpb20 - tpi * 0x20)
+			; Now we have enough data to solve tpi and tc:
+			;	0 = (tpb40 - tpi * 0x40) - (tpb20 - tpi * 0x20)
 			;	0 = tpb40 - tpi * 0x40 - tpb20 + tpi * 0x20
 			;	0 = tpb40-tpb20 - tpi * 0x20
 			;	tpi = (tpb40-tpb20) / 0x20
@@ -338,7 +339,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			;	l = (tpb - tc) / tpi
 			;	l = 24,911
 			;
-			ld	l, #25	; For 9600 baud: 25
+			ld	l, #25	; For 9600 baud: 25 (decimal)
 			
 			_bbtx_delay_loop:
 				dec	l
