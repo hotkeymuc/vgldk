@@ -184,7 +184,7 @@ Intro sound port accesses at 0x2x?:
 
 #include "lcd.h"
 
-#include "ports.h"
+//#include "ports.h"
 
 #include "keyboard.h"
 

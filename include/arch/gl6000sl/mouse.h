@@ -10,19 +10,6 @@ __asm
 	ret
 __endasm;
 }
-void port_out_0x21(byte a) __naked {(void)a;
-__asm
-	; Get parameter from stack into a
-	ld hl,#0x0002
-	add hl,sp
-	ld a,(hl)
-	
-	; Put it to port
-	out	(0x21), a
-	ret
-__endasm;
-}
-
 
 // Mouse at 0x04, 0x05
 byte port_in_0x04() __naked {	// 0x04 = Mouse X
