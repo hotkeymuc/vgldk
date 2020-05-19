@@ -5,40 +5,11 @@
 */
 
 #include <vgldk.h>
-#include <stdio.h>
+#include <stdiomin.h>
 
 void main() __naked {
-	char c;
-	
-	//lcd_init();
-	//vgl_sound_off();
-	
-	/*
-	putchar('H');
-	putchar('e');
-	putchar('l');
-	putchar('l');
-	putchar('o');
-	putchar(' ');
-	putchar('W');
-	putchar('o');
-	putchar('r');
-	putchar('l');
-	putchar('d');
-	*/
 	
 	printf("Hello World!");
 	
-	//gets();
-	//getchar();
-	
-	/*
-	while(1) {
-		//keyboard_update();
-		c = getchar();
-		//printf(c);
-		putchar(c);
-	}
-	*/
 	
 }
