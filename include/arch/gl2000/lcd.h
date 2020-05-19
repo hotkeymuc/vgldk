@@ -23,6 +23,8 @@ TODO:
 #define byte unsigned char
 #define word unsigned short
 
+#define clear lcd_clear
+
 // HDD44780 definitions
 #define LCD_CLEARDISPLAY 0x01
 #define LCD_RETURNHOME 0x02
@@ -428,5 +430,6 @@ void putchar(byte c) {
 	}
 	
 }
+
 
 #endif //__LCD_H
