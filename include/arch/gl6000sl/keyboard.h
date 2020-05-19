@@ -297,28 +297,36 @@ void keyboard_update() {
 	
 }
 
+#define CHARCODE_NONE 0
+char inkey() {
+	char charcode;
+	
+	keyboard_update();
+	
+	if (keyboard_buffer_in != keyboard_buffer_out) {
+		
+		// Get from buffer
+		charcode = keyboard_buffer[keyboard_buffer_out];
+		keyboard_buffer_out = (keyboard_buffer_out + 1) % KEYBOARD_BUFFER_MAX;
+		
+		// Return
+		return charcode;
+	} else {
+		// No key
+		return CHARCODE_NONE;
+	}
+}
+
 
 char getchar() {
 	char charcode;
 	
-	while(1) {
-		
-		keyboard_update();
-		
-		if (keyboard_buffer_in != keyboard_buffer_out) {
-			
-			// Get from buffer
-			charcode = keyboard_buffer[keyboard_buffer_out];
-			keyboard_buffer_out = (keyboard_buffer_out + 1) % KEYBOARD_BUFFER_MAX;
-			
-			// Return
-			return charcode;
-		}
-		
+	while((charcode = inkey()) == CHARCODE_NONE) {
 	}
 	
+	return charcode;
+	
 }
-
 
 
 #endif	//__KEYBOARD_H
