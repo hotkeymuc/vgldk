@@ -7,6 +7,7 @@
 #include <vgldk.h>
 
 #include <stdio.h>	// for printf() putchar() gets() getchar()
+#include <ports.h>
 
 #define HEX_USE_DUMP
 #include <hex.h>
@@ -30,6 +31,19 @@ byte strcmp(const char *cs, const char *ct) {
 	return 0;
 }
 
+byte stricmp1(char a, char b) {
+	if ((a >= 'a') && (a <= 'z')) a -= ('a' - 'A');
+	if ((b >= 'a') && (b <= 'z')) b -= ('a' - 'A');
+	if (a != b) return 1;
+	return 0;
+}
+byte stricmp(const char *cs, const char *ct) {
+	while ((*cs != 0) && (*ct != 0)) {
+		if (stricmp1(*cs++, *ct++)) return 1;
+	}
+	if (stricmp1(*cs, *ct)) return 1;
+	return 0;
+}
 
 const char VERSION[] = "Monitor 1.0";
 const word tempAddr = 0xC400;
@@ -121,7 +135,17 @@ int cmd_dump(int argc, char *argv[]) {
 		
 		c = getchar();
 		if ((c == 'q') || (c == 'Q')) break;
+		else if ((c == 'r')) a = a;
 		else if ((c == 'u') || (c == 'u')) a -= l;
+		#ifdef KEY_REPEAT
+		else if (c == KEY_REPEAT) a = a;
+		#endif
+		#ifdef KEY_ESCAPE
+		else if (c == KEY_ESCAPE) break;
+		#endif
+		#ifdef KEY_UP
+		else if (c == KEY_UP) a -= l;
+		#endif
 		else a += l;
 	}
 	
@@ -156,10 +180,18 @@ int cmd_help(int argc, char *argv[]);	// Forward declaration, since "help" needs
 
 #ifdef MONITOR_CMD_LOOP
 int cmd_loop(int argc, char *argv[]) {
+	char c;
 	
-	while(inkey() != 27) {
+	while(1) {
 		
 		eval(argc-1, &argv[1]);
+		
+		c = inkey();
+		#ifdef KEY_ESCAPE
+		if (c == KEY_ESCAPE) break;
+		#else
+		if (c == 'q') break;
+		#endif
 		
 	}
 	
@@ -178,11 +210,11 @@ int cmd_in(int argc, char *argv[]) {
 	v = port_in(p);
 	//printf("0x%02X = 0x%02X / %d\n", p, v, v);
 	
-	printf("0x%02X = 0x%02X / ", p, v);
+	printf("%02X:0x%02X ", p, v);
 	for(p = 0; p < 8; p++) {
 		if ((v & (1 << (7-p))) > 0) putchar('1'); else putchar('0');
 	}
-	printf(" / %d\n", v);
+	printf(" %d\n", v);
 	
 	return 0;
 }
@@ -219,7 +251,15 @@ int cmd_pause(int argc, char *argv[]) {
 int cmd_ver(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
-	printf("%s\n", VERSION);
+	//printf("%s\n", VERSION);
+	printf("%s", VERSION);
+	#ifdef VGLDK_SERIES
+		#define xstr(s) str(s)
+		#define str(s) #s
+		printf(" for SERIES " xstr(VGLDK_SERIES) );
+	#endif
+	printf("\n");
+	
 	return 0;
 }
 #endif
@@ -374,7 +414,7 @@ int eval(int argc, char *argv[]) {
 	
 	// Internal commands
 	for(i = 0; i < (sizeof(COMMANDS) / sizeof(t_commandEntry)); i++) {
-		if (strcmp(argv[0], COMMANDS[i].name) == 0) {
+		if (stricmp(argv[0], COMMANDS[i].name) == 0) {
 			return COMMANDS[i].call(argc, argv);
 		}
 	}
@@ -482,14 +522,7 @@ void main() __naked {
 	char arg[MAX_INPUT];
 	
 	// Banner
-	//ver(0, NULL);
-	printf("%s", VERSION);
-	#ifdef VGLDK_SERIES
-		#define xstr(s) str(s)
-		#define str(s) #s
-		printf(" for SERIES " xstr(VGLDK_SERIES) );
-	#endif
-	printf("\n");
+	cmd_ver(0, NULL);
 	
 	
 	// Command line loop
