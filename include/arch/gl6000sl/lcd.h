@@ -13,6 +13,7 @@ const word lcd_addr = 0xe000;
 byte lcd_x = 0;
 byte lcd_y = 0;
 
+#define clear lcd_clear
 
 
 #include "font_console_8x8.h"
@@ -150,29 +151,15 @@ void drawString(byte x, byte y, char *s) {
 	}
 }
 
-void putchar(byte c) {
-	byte x;
+//#define LCD_SCROLL_AMOUNT 1
+#define LCD_SCROLL_AMOUNT 8
+void lcd_scroll(int dy) {
+	//byte x;	// Enough for one line
+	word x;	// For more than one line
 	byte *p;
 	
-	if (c == '\r') {
-		lcd_x = 0;
-		c = 0;
-	}
-	else
-	if (c == '\n') {
-		lcd_x = 0;
-		lcd_y += font_h;
-		c = 0;
-	}
-	
-	if (lcd_x + font_w >= lcd_w) {
-		lcd_x = 0;
-		lcd_y += font_h;
-	}
-	
-	
-	// Scroll one line at a time until it fits
-	while (lcd_y + font_h >= lcd_h) {
+	//while (lcd_y + font_h >= lcd_h) {
+	while(dy >= 0) {
 		// Minimal
 		//lcd_y = 0;
 		
@@ -183,8 +170,8 @@ void putchar(byte c) {
 		push hl
 		
 		// Scroll one line
-		ld bc, #((LCD_W * (LCD_H - 1)) / 8)	// Number of bytes to scroll (i.e. whole screen minus one line)
-		ld hl, #(LCD_ADDR + (LCD_W / 8))	//#0xE01E	// Offset of 2nd line, i.e. LCD_ADDR + bytes-per-line
+		ld bc, #((LCD_W * (LCD_H - LCD_SCROLL_AMOUNT)) / 8)	// Number of bytes to scroll (i.e. whole screen minus x lines)
+		ld hl, #(LCD_ADDR + (LCD_W / 8) * LCD_SCROLL_AMOUNT)	//#0xE01E	// Offset of 2nd line, i.e. LCD_ADDR + bytes-per-line * x
 		ld de, #LCD_ADDR	//#0xE000	// Offset of 1st line
 		ldir	// Copy BC bytes from HL to DE
 		
@@ -195,15 +182,45 @@ void putchar(byte c) {
 		
 		
 		// Clear last line
-		p = (byte *)(LCD_ADDR + (LCD_W * (LCD_H - 1)) / 8);
-		for(x = 0; x < (LCD_W / 8); x++) {
+		p = (byte *)(LCD_ADDR + (LCD_W * (LCD_H - LCD_SCROLL_AMOUNT)) / 8);
+		for(x = 0; x < (LCD_W / 8) * LCD_SCROLL_AMOUNT; x++) {
 			*p++ = 0x00;	// white
 			//*p++ = 0xff;	// black
 		}
 		
-		lcd_y--;
+		dy -= LCD_SCROLL_AMOUNT;
+		lcd_y-= LCD_SCROLL_AMOUNT;
+	}
+}
+
+void putchar(byte c) {
+	
+	if (c == '\r') {
+		lcd_x = 0;
+		c = 0;	// Stop handling it
+	} else
+	if (c == '\n') {
+		lcd_x = 0;
+		lcd_y += font_h;
+		c = 0;	// Stop handling it
+	} else
+	if (c == '\b') {
+		if (lcd_x > font_w)
+			lcd_x -= font_w;
+		drawGlyph(lcd_x, lcd_y, ' ');
+		c = 0;	// Stop handling it
 	}
 	
+	if (lcd_x + font_w >= lcd_w) {
+		lcd_x = 0;
+		lcd_y += font_h;
+	}
+	
+	
+	if (lcd_y + font_h >= lcd_h) {
+		// We are at end of screen
+		lcd_scroll((lcd_y + font_h) - lcd_h);
+	}
 	
 	
 	if (c > 0) {
