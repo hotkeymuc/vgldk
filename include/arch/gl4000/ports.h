@@ -1,5 +1,5 @@
-#ifndef __PORTS_H
-#define __PORTS_H
+#ifndef __PORTS4000_H
+#define __PORTS4000_H
 /*
 VTech Genius Leader Ports
 
@@ -225,4 +225,4 @@ void vgl_shutdown() {
 
 }
 
-#endif // __PORTS_H
+#endif // __PORTS4000_H
