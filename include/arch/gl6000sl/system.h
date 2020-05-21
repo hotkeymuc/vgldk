@@ -20,12 +20,12 @@ What's known so far (mostly from MAME's "prestige" driver):
 			IN 0x21
 				bit 3 (0x08) = Left Mouse button
 				bit 4 (0x10) = Right Mouse button
-				
-				bit 6 = busy?	(see ROM 0x7E2C)
+				bit 5 (0x20) = CAPS LOCK light?
+				bit 6 (0x40) = busy?	(see ROM 0x7E2C)
 				bit 7 (0x80) = cable connected? (0x00=yes, 0x80=no) 	(see ROM 0x7DAC)
 			
 			OUT 0x21, bit 6, bit 7 or 0xE0 (default)
-				bit 6 (0x20) = CAPS LOCK light
+				bit 5 (0x20) = CAPS LOCK light
 			
 			OUT 0x20, DATA	-> Prepare bits for output	(see ROM 0x7DCB)
 			OUT 0x22, 0xFF / 0x00 (default)	-> Latch/strobe bits onto port	(see ROM 0x7DCD)

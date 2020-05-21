@@ -4,7 +4,17 @@
 V-Tech Genius Leader Sound
 
 Not quite sure about the hardware, yet.
-But it seems the original ROM checks 0xF975, 0xF976, 0xF97B, 0xF97C, 0xF97D to see if the sound is done
+It might be a TMS5220 by the looks of port accesses.
+
+What I am seeing in my traces:
+	port 0x10	(4 and 0 are written there - clock?)
+	port 0x60	(checked regularly)
+	port 0x62	
+There is also an interrupt (RST7 i guess) which also accesses these ports
+	-> using IRQ?
+
+Interesting memory regions that seem to be connected to sound/music:
+	0xF975, 0xF976, 0xF97B, 0xF97C, 0xF97D
 
 
 2020-05-19 Bernhard "HotKey" Slawik
