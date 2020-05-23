@@ -41,6 +41,7 @@ Here it is again, in order:
 
 2017-01-08 Bernhard "HotKey" Slawik (Z88DK)
 2019-07-11 Bernhard "HotKey" Slawik (SDCC)
+2020-05-22 Bernhard "HotKey" Slawik (VGLDK/GL6000SL)
 
 */
 
@@ -356,24 +357,16 @@ __asm
 	push	de
 	
 	; Get timings for inter-bit-delay
-	; By trial and error: 9600 baud: D=0x03, E=0x12
+	; By trial and error (GL4000): 9600 baud: D=0x03, E=0x12
 	ld	d, #0x03
-	ld	e, #0x12
+	ld	e, #0x13
 	
 	
 	_brx_byte_start:
-	ld	c, #0					; This holds the result
-	
-	
-	; Wait for start bit (blocking)
-	;_brx_wait_loop:
-	;	in	a, (0x21)	; Get printer status
-	;	cp	#0x7f
-	;jr	z, _brx_wait_loop
 	
 	; Wait for start bit (less blocking)
-	ld	b, #0x08		; ...with timeout
-	;ld	b, #0x20		; ...with timeout
+	;ld	b, #0x08		; ...with short timeout
+	ld	b, #0xf0		; ...with timeout
 	_brx_wait_loop:
 		dec b
 		;ld a, b
@@ -383,23 +376,46 @@ __asm
 		in	a, (0x21)	; Get printer status
 		cp #0x80
 		; This sets C: if set: Pin "0"
-	jr	nc, _brx_wait_loop	; if C set = A<0x80 = Pin is LOW = Cable disconnected or "0" is being tansmitted
+	jr	nc, _brx_wait_loop	; if C set = A<0x80 = Pin is LOW = "0" is being tansmitted
+	
+	
+	;@MARK: Start bit edge
+	;ld	a, #0xff	; Prep all bits for sending
+	;out	(0x22), a
+	
+	; For timing debugging: Set STROBE HIGH
+	;ld	a, #0xff
+	;out	(0x20), a
 	
 	
 	; Wait half of the start bit...
 	call	_brx_delayEdge
 	
 	
+	;@MARK: Start bit center
+	
+	
 	ld	b, #8					; 8 bits is what we want
+	ld	c, #0					; This holds the result
+	
 	_brx_loop:
+		
+		;@MARK: Still in pevious bit
+		; For timing debugging: Set STROBE LOW
+		;ld	a, #0x00
+		;out	(0x20), a
 		
 		; Wait for next bit
 		call	_brx_delay
 		
+		;@MARK: data bit center
+		;ld	a, #0xff
+		;out	(0x20), a
+		
 		in	a, (0x21)			; Get port status
 		
 		; Extract the state of the BUSY line (parallel port pin 11, the other serial terminal is connected to that line)
-		cp	#0x80	; when transmitting a bit, the 7th bit (0x80) goes low
+		cp	#0x80	; when transmitting a LOW, the 7th bit (0x80) goes low
 		jp	c, _brx_got_0		; the received bit is 0
 		jp	_brx_got_1
 		
@@ -424,22 +440,29 @@ __asm
 	; All data bits were handled
 	
 	; Epilogue
-	; Wait 1 bit
+	; Wait 1 bit, so we end up in the middle of the stop bit (LOW)
 	call _brx_delay
 	
+	;@MARK: Expected stop bit center
+	; For timing debugging: Set STROBE HIGH
+	;ld	a, #0xff
+	;out	(0x20), a
+	
+	
+	
 	; Wait for stop bit to actually occur
-	ld	b, #0x08		; ...with timeout
+	;ld	b, #0x08		; ...with timeout
+	ld	b, #0x20		; ...with timeout
 	
 	_brx_wait_stopBit_loop:
 		dec b
 		;ld a, b
 		;cp a, #0
-		jp z, _brx_timeout2	; Timeout!
+		jp z, _brx_timeout2	; Timeout while waiting for stop!
 		
 		in	a, (0x21)
 		cp	#0x80
-		
-	jr	c, _brx_wait_stopBit_loop
+	jr c, _brx_wait_stopBit_loop
 	
 	
 	; The stop bit should now be happening.
@@ -457,6 +480,7 @@ __asm
 		ld	l, e
 		srl	h
 		srl	h
+		srl	l
 		srl	l
 		srl	l
 		
@@ -499,6 +523,12 @@ __asm
 		jp _brx_end
 	
 	_brx_byte_end:
+	
+		;@MARK: Actual end of byte
+		; For timing debugging: Set STROBE LOW
+		;ld	a, #0x00
+		;out	(0x20), a
+	
 		; Set return value L to the character stored in C
 		ld	h, #0
 		ld	l, c
