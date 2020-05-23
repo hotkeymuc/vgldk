@@ -89,34 +89,14 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 		
 		push af	; AF is not exchanged by EXX
 		
-		; Start with initial LOW level (like in previous stop bit)
+		; Start with initial HIGH level (like in previous stop bit)
 		; so that the start bit makes a distinct transition
-		call _bbtx_set_LOW
-		
-		
-		;;DEBUG: Show the length (max 9) and wait for keypress
-		;push bc
-		;push hl
-		;push af
-		;
-		;ld a, b
-		;add a, #0x30	; '0'+
-		;push af
-		;inc sp	; only 8 bit on stack
-		;call _putchar
-		;inc sp
-		;
-		;call _getchar
-		;
-		;pop af
-		;pop hl
-		;pop bc
-		;;DEBUG end
+		call _bbtx_set_HIGH
 		
 		
 		ld	a, b	; Length in B: check it...
 		cp #0
-		jp	z, _bbtx_end			; ...exit if it is zero (i.e. nothing to send)
+		jp	z, _bbtx_end			; ...exit if it is zero (i.e. nothing to send left)
 		
 		
 		; Loop over data...
@@ -131,32 +111,11 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			;jr	z, _bbtx_end			; ...exit if it is so (zero terminated string)
 			
 			
-			;;DEBUG: Show each byte and wait for keypress
-			;push bc
-			;push hl
-			;push af
-			;
-			;ld a, c
-			;;add a, #0x30	; '0'+
-			;push af
-			;inc sp	; only 8 bit on stack
-			;call _putchar
-			;inc sp
-			;
-			;call _getchar
-			;
-			;pop af
-			;pop hl
-			;pop bc
-			;;DEBUG end
-			
-			
-			
-			; Send all 8 data bits of C
+			; Send 8 bits of data (data is in C)
 			ld	b, #8					; 8 Bits to send
 			
-			; Send start bit (logical "0", HIGH level)
-			call	_bbtx_set_HIGH
+			; Send start bit (logical "0", LOW level)
+			call	_bbtx_set_LOW
 			call	_bbtx_delay
 			
 			; Calibrated NOP slide (12) for start bit at 9600 baud
@@ -182,8 +141,8 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 				srl	c					; Shift down to put next bit to LSB; the bit that was lost is now in CARRY
 			djnz	_bbtx_bit_loop		; Repeat B times
 			
-			; Send stop bit(s) (logical "1", LOW level)
-			call	_bbtx_set_LOW
+			; Send stop bit(s) (logical "1", HIGH level)
+			call	_bbtx_set_HIGH
 			call	_bbtx_delay
 			
 			; Normally some nops should be here. But I am pretty certain it takes enough clock cylcles to fetch the next byte
@@ -205,21 +164,21 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			; Try to keep the control flow of "1" and "0" about the same CPU cycle length!
 			
 			bit	0, c				; Check LSB of C (if it is 0, ZERO flag is set)
-			jr	nz, _bbtx_set_LOW	; ...it is 1: Send LOW level
-			jr	_bbtx_set_HIGH		; ...it is 0: Send HIGH level
+			jr	z, _bbtx_set_LOW	; ...it is 0: Send LOW level
+			jr	_bbtx_set_HIGH		; ...it is 1: Send HIGH level
 		ret							; Unknown state - should never happen
 		
-		; For some reason setting LOW takes longer than HIGH.
+		; For some reason setting HIGH takes longer than LOW.
 		; So we need to calibrate both cases using "NOP slides"
 		
-		_bbtx_set_HIGH:					; Send HIGH level / logical "0"
+		_bbtx_set_LOW:					; Send LOW level / logical "0"
 			ld	a, #0x20				; Disable latch?
 			out	(0x23), a
 			
 			ld	a, #0xff	; Select all bits to send?
 			out	(0x22), a
 			
-			ld	a, #0x00				; Set all D0-D7 to HIGH
+			ld	a, #0x00				; Set all D0-D7 to LOW
 			out	(0x20), a
 			
 			ld	a, #0x60				; Send all data bits to the pins
@@ -229,9 +188,10 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			and	#0xbf					; STROBE LOW...
 			out	(0x21), a
 			
-			; Calibrated NOP slide for HIGH
+			; Calibrated NOP slide for LOW
 			; 3 nops: 92us
 			; 6 nops: 98us
+			; 9 nops: 104us OK!
 			nop
 			nop
 			nop
@@ -246,7 +206,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			out	(0x21), a
 		ret
 		
-		_bbtx_set_LOW:					; Send LOW level / logical "1"
+		_bbtx_set_HIGH:					; Send HIGH level / logical "1"
 			ld	a, #0x20				; Disable latch?
 			out	(0x23), a
 			
@@ -263,9 +223,10 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			and	#0xbf					; STROBE LOW...
 			out	(0x21), a
 			
-			; Calibrated NOP slide for LOW
+			; Calibrated NOP slide for HIGH
 			; 0 nops: 92us
 			; 3 nops: 98us
+			; 6 nops: 104us OK!
 			nop
 			nop
 			nop
@@ -332,14 +293,14 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 		
 		
 		_bbtx_end:
-			; Leave with level LOW (stop bit level)
-			call _bbtx_set_LOW
+			; Leave with level HIGH (stop bit level)
+			call _bbtx_set_HIGH
 			
 			exx		; Back to original BC, DE, HL
 			pop af	; AF was not exchanged by EXX
-			ei
+			ei		; @FIXME: Maybe they should not be enabled!
 			
-			ret		; Only if declared as "__naked"
+			ret		; Only needed if declared as "__naked"
 			
 	__endasm;
 }
@@ -368,10 +329,10 @@ void serial_puts(const char *s) {
 byte serial_isReady() __naked {
 __asm
 	in	a, (0x21)	; Get printer status
-	;cp	#0x7f
-	;bit 7, a	; bit 7 (0x80) is set (Z not set) when cable is connected
+	; 0xFF = Pin BUSY is HIGH
+	;bit 7, a	; bit 7 is set (+0x80) when Pin is HIGH = cable is connected or "1" is being transmitted
 	cp #0x80
-	jr	c, _serial_isReady_not
+	jr	c, _serial_isReady_not	; C set = A<0x80 = Pin is LOW = Cable disconnected or "1" is being tansmitted
 
 _serial_isReady_yes:
 	ld	l, #1
@@ -421,7 +382,8 @@ __asm
 		
 		in	a, (0x21)	; Get printer status
 		cp #0x80
-	jr	c, _brx_wait_loop
+		; This sets C: if set: Pin "0"
+	jr	nc, _brx_wait_loop	; if C set = A<0x80 = Pin is LOW = Cable disconnected or "0" is being tansmitted
 	
 	
 	; Wait half of the start bit...
