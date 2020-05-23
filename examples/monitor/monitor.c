@@ -14,7 +14,7 @@ const word tempAddr = 0xC400;
 // Setup
 #define MAX_ARGS 8
 #define MAX_INPUT 64
-
+char cmd_arg[MAX_INPUT];
 
 
 // Features to include
@@ -301,14 +301,30 @@ int cmd_serial_test(int argc, char *argv[]) {
 	return 0;
 }
 int cmd_serial_get(int argc, char *argv[]) {
-	int c = 0;
+	int c;
 	
 	(void)argc;
 	(void)argv;
 	
 	//printf("Not yet implemented\n");
-	c = serial_getchar();
+	c = -1;
+	while(c < 0) {
+		c = serial_getchar();
+	}
 	printf_x2(c);
+	
+	return 0;
+}
+int cmd_serial_gets(int argc, char *argv[]) {
+	char *buffer;
+	
+	(void)argc;
+	(void)argv;
+	
+	buffer = &cmd_arg[0];
+	//printf("Not yet implemented\n");
+	serial_gets(buffer);
+	printf(buffer);
 	
 	return 0;
 }
@@ -433,6 +449,11 @@ const t_commandEntry COMMANDS[] = {
 	{"sget", cmd_serial_get
 		#ifdef MONITOR_HELP
 		, "SoftSerial get"
+		#endif
+	},
+	{"sgets", cmd_serial_gets
+		#ifdef MONITOR_HELP
+		, "SoftSerial gets"
 		#endif
 	},
 	{"sput", cmd_serial_put
@@ -635,7 +656,7 @@ void parse(char *s) {
 }
 
 
-char cmd_arg[MAX_INPUT];
+
 void main() __naked {
 	
 	clear();
