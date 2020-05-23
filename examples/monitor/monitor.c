@@ -6,12 +6,45 @@
 
 #include <vgldk.h>
 
-#include <stdiomin.h>	// for printf() putchar() gets() getchar()
+
+
+const char VERSION[] = "Monitor 1.0";
+const word tempAddr = 0xC400;
+
+// Setup
+#define MAX_ARGS 8
+#define MAX_INPUT 64
+
+
+
+// Features to include
+//#define MONITOR_HELP	// Include help functionality (needs quite some space for strings...)
+#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
+
+//#define MONITOR_CMD_BEEP
+#define MONITOR_CMD_CLS
+#define MONITOR_CMD_DUMP
+#define MONITOR_CMD_ECHO
+//#define MONITOR_CMD_HELP
+#define MONITOR_CMD_INTERRUPTS
+#define MONITOR_CMD_LOOP
+#define MONITOR_CMD_PORT
+#define MONITOR_CMD_PAUSE
+#ifdef MONITOR_SOFTSERIAL
+	#define MONITOR_CMD_SOFTSERIAL
+#endif
+#define MONITOR_CMD_VER
+
+// Definitions
+#define ERR_COMMAND_UNKNOWN -4
+#define ERR_MISSING_ARGUMENT -5
+#define ERR_NOT_IMPLEMENTED -6
+
+
+
 #include <ports.h>
 
-#define HEX_USE_DUMP
-#include <hex.h>
-
+#include <stdiomin.h>	// for printf() putchar() gets() getchar()
 //#include <stdlib.h>	// for atoi()
 int atoi(const char *a) {
 	int i;
@@ -45,32 +78,8 @@ byte stricmp(const char *cs, const char *ct) {
 	return 0;
 }
 
-const char VERSION[] = "Monitor 1.0";
-const word tempAddr = 0xC400;
-
-// Setup
-#define MAX_ARGS 8
-#define MAX_INPUT 64
-
-
-
-// Features to include
-//#define MONITOR_HELP	// Include help functionality
-
-//#define MONITOR_CMD_BEEP
-#define MONITOR_CMD_CLS
-#define MONITOR_CMD_DUMP
-#define MONITOR_CMD_ECHO
-//#define MONITOR_CMD_HELP
-#define MONITOR_CMD_LOOP
-#define MONITOR_CMD_PORT
-#define MONITOR_CMD_PAUSE
-#define MONITOR_CMD_VER
-
-// Definitions
-#define ERR_COMMAND_UNKNOWN -4
-#define ERR_MISSING_ARGUMENT -5
-#define ERR_NOT_IMPLEMENTED -6
+#define HEX_USE_DUMP
+#include <hex.h>
 
 
 
@@ -178,6 +187,29 @@ int cmd_help(int argc, char *argv[]);	// Forward declaration, since "help" needs
 // implemented after declaration of COMMANDS[]
 #endif
 
+#ifdef MONITOR_CMD_INTERRUPTS
+int cmd_di(int argc, char *argv[]) {
+	(void)argc;
+	(void)argv;
+	
+	__asm
+		di
+	__endasm;
+	
+	return 0;
+}
+int cmd_ei(int argc, char *argv[]) {
+	(void)argc;
+	(void)argv;
+	
+	__asm
+		ei
+	__endasm;
+	
+	return 0;
+}
+#endif
+
 #ifdef MONITOR_CMD_LOOP
 int cmd_loop(int argc, char *argv[]) {
 	char c;
@@ -249,6 +281,49 @@ int cmd_pause(int argc, char *argv[]) {
 }
 #endif
 
+
+#ifdef MONITOR_CMD_SOFTSERIAL
+#include <softserial.h>
+
+int cmd_serial_test(int argc, char *argv[]) {
+	int c = 0;
+	
+	(void)argc;
+	(void)argv;
+	
+	
+	
+	c = serial_isReady();
+	printf("isReady=");
+	printf_x2(c);
+	printf("\n");
+	
+	return 0;
+}
+int cmd_serial_get(int argc, char *argv[]) {
+	int c = 0;
+	
+	(void)argc;
+	(void)argv;
+	
+	//printf("Not yet implemented\n");
+	c = serial_getchar();
+	printf_x2(c);
+	
+	return 0;
+}
+int cmd_serial_put(int argc, char *argv[]) {
+	int i;
+	
+	for(i = 1; i < argc; i++) {
+		if (i > 1) serial_putchar(' ');
+		serial_puts(argv[i]);
+	}
+	//printf("\n");
+	return 0;
+}
+#endif
+
 #ifdef MONITOR_CMD_VER
 int cmd_ver(int argc, char *argv[]) {
 	(void) argc; (void) argv;
@@ -310,6 +385,18 @@ const t_commandEntry COMMANDS[] = {
 		#endif
 	},
 	#endif
+	#ifdef MONITOR_CMD_INTERRUPTS
+	{"di" , cmd_di
+		#ifdef MONITOR_HELP
+		, "Disable interrupts"
+		#endif
+	},
+	{"ei" , cmd_ei
+		#ifdef MONITOR_HELP
+		, "Enable interrupts"
+		#endif
+	},
+	#endif
 	#ifdef MONITOR_CMD_LOOP
 	{"loop" , cmd_loop
 		#ifdef MONITOR_HELP
@@ -337,6 +424,24 @@ const t_commandEntry COMMANDS[] = {
 		#endif
 	},
 	#endif
+	#ifdef MONITOR_CMD_SOFTSERIAL
+	{"stest", cmd_serial_test
+		#ifdef MONITOR_HELP
+		, "SoftSerial test"
+		#endif
+	},
+	{"sget", cmd_serial_get
+		#ifdef MONITOR_HELP
+		, "SoftSerial get"
+		#endif
+	},
+	{"sput", cmd_serial_put
+		#ifdef MONITOR_HELP
+		, "SoftSerial put"
+		#endif
+	},
+	#endif
+	
 	#ifdef MONITOR_CMD_VER
 	{"ver"  , cmd_ver
 		#ifdef MONITOR_HELP
