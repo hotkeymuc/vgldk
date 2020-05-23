@@ -1,6 +1,9 @@
 /*
 Genius Leader 6000SL / Prestige printer
 
+Read port 0x10:
+	???
+
 Write port 0x20:
 	Data to be set to the pins
 
@@ -12,12 +15,13 @@ Write port 0x22
 	0xff is written here before setting a new output data byte
 
 Write 0x23:
+	0x20: Latch BUSY state to port 0x21??????
 	0x40: Latch data from port 0x20 to pins
 
 Read port 0x21:
 	0x40: printer busy (0x00=yes, 0x40=no)
 	0x80: cable connected? (0x00=yes, 0x80=no)
-
+			Softserial TX/Strobe or busy in (0x00 when not connected or when TX is sending)
 
 
 Dump of printing a character:
@@ -30,7 +34,7 @@ W 20 48	// Actual data byte "h"
 W 23 60	// latch data onto pins (&0x40 = 0x40)
 R 21:7F	// Read old status
 W 21 3F	// STROBE on (0x40 = 0x00)
-W 21 7F	// Strobe off (0x40 = 0x40)
+W 21 7F	// STROBE off (0x40 = 0x40)
 W 23 20	// Latch off (0x40 = 0x00)
 
 2020-05-21 Bernhard "HotKey" Slawik

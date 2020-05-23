@@ -3,14 +3,20 @@
 /*
 V-Tech Genius Leader Sound
 
-Not quite sure about the hardware, yet.
-It might be a TMS5220 by the looks of port accesses.
+@FIXME: Not yet implemented!
 
-What I am seeing in my traces:
+
+Not quite sure about the hardware, yet.
+It might be a TI TMS5220 LPC speech chip.
+Alexandre Botzung suggests it might be a TI TSP50C0x.
+
+
+In my traces I am seeing those port accesses:
 	port 0x10	(4 and 0 are written there - clock?)
 	port 0x60	(checked regularly)
 	port 0x62	
-There is also an interrupt (RST7 i guess) which also accesses these ports
+
+? There is also an interrupt (RST7 i guess) which also accesses these ports
 	-> using IRQ?
 
 Interesting memory regions that seem to be connected to sound/music:

@@ -45,50 +45,6 @@ Here it is again, in order:
 */
 
 
-// Hardware helpers
-/*
-byte port_in_0x10() __naked {
-__asm
-	in	a, (0x10)	; Get printer DATA
-	ld	l, a
-	ret
-__endasm;
-}
-byte port_in_0x11() __naked {
-	// port 0x11: 0x7F=idle, 0x5f=connected
-__asm
-	in	a, (0x11)	; Get printer status
-	ld	l, a
-	ret
-__endasm;
-}
-byte port_in_0x12() __naked {
-__asm
-	in	a, (0x12)	; Get VGL status (CAPS, STOBE, ...)
-	ld	l, a
-	ret
-__endasm;
-}
-void inline port_out_0x10(byte c) {
-(void)c;	// Suppress warning "unreferenced"
-__asm
-	out	(#0x10), a	; Set printer DATA
-__endasm;
-}
-void inline port_out_0x11(byte c) {
-(void)c;	// Suppress warning "unreferenced"
-__asm
-	out	(#0x11), a	; Set printer status
-__endasm;
-}
-void inline port_out_0x12(byte c) {
-(void)c;	// Suppress warning "unreferenced"
-__asm
-	out	(#0x12), a	; Set VGL status (CAPS, STOBE, ...)
-__endasm;
-}
-*/
-
 /*
 void serial_init() {
 	// Init the serial port
@@ -194,6 +150,8 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			;pop bc
 			;;DEBUG end
 			
+			
+			
 			; Send all 8 data bits of C
 			ld	b, #8					; 8 Bits to send
 			
@@ -255,44 +213,68 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 		; So we need to calibrate both cases using "NOP slides"
 		
 		_bbtx_set_HIGH:					; Send HIGH level / logical "0"
-			ld	a, #0xff				; Set all D0-D7 to HIGH
-			out	(0x10), a
+			ld	a, #0x20				; Disable latch?
+			out	(0x23), a
 			
-			ld	a, #0xff				; Send all data bits to the pins
-			out	(0x11), a
+			ld	a, #0xff	; Select all bits to send?
+			out	(0x22), a
 			
-			in	a, (0x12)
-			or	#0x04					; STROBE LOW...
-			out	(0x12), a
+			ld	a, #0x00				; Set all D0-D7 to HIGH
+			out	(0x20), a
 			
-			; Calibrated NOP slide (5) for HIGH
+			ld	a, #0x60				; Send all data bits to the pins
+			out	(0x23), a
+			
+			in	a, (0x21)
+			and	#0xbf					; STROBE LOW...
+			out	(0x21), a
+			
+			; Calibrated NOP slide for HIGH
+			; 3 nops: 92us
+			; 6 nops: 98us
+			nop
+			nop
+			nop
+			nop
 			nop
 			nop
 			nop
 			nop
 			nop
 			
-			and	#0xfb					; STROBE HIGH... (takes >50us to reach HIGH)
-			out	(0x12), a
+			or	#0x40					; STROBE HIGH... (takes >50us to reach HIGH)
+			out	(0x21), a
 		ret
 		
 		_bbtx_set_LOW:					; Send LOW level / logical "1"
-			ld	a, #0x00				; Set all D0-D7 to LOW
-			out	(0x10), a
+			ld	a, #0x20				; Disable latch?
+			out	(0x23), a
 			
-			ld	a, #0xff				; Send all data bits to the pins
-			out	(0x11), a
+			ld	a, #0xff	; Select all bits to send?
+			out	(0x22), a
 			
-			in	a, (0x12)
-			or	#0x04					; STROBE LOW...
-			out	(0x12), a
+			ld	a, #0xff				; Set all D0-D7 to LOW
+			out	(0x20), a
 			
-			; Calibrated NOP slide (2) for LOW
+			ld	a, #0x60				; Send all data bits to the pins
+			out	(0x23), a
+			
+			in	a, (0x21)
+			and	#0xbf					; STROBE LOW...
+			out	(0x21), a
+			
+			; Calibrated NOP slide for LOW
+			; 0 nops: 92us
+			; 3 nops: 98us
+			nop
+			nop
+			nop
+			nop
 			nop
 			nop
 			
-			and	#0xfb					; STROBE HIGH... (takes >50us to reach HIGH)
-			out	(0x12), a
+			or	#0x40					; STROBE HIGH... (takes >50us to reach HIGH)
+			out	(0x21), a
 		ret
 		
 		
@@ -385,9 +367,11 @@ void serial_puts(const char *s) {
 
 byte serial_isReady() __naked {
 __asm
-	in	a, (0x11)	; Get printer status
-	cp	#0x5f
-	jr	nz, _serial_isReady_not
+	in	a, (0x21)	; Get printer status
+	;cp	#0x7f
+	;bit 7, a	; bit 7 (0x80) is set (Z not set) when cable is connected
+	cp #0x80
+	jr	c, _serial_isReady_not
 
 _serial_isReady_yes:
 	ld	l, #1
@@ -422,8 +406,8 @@ __asm
 	
 	; Wait for start bit (blocking)
 	;_brx_wait_loop:
-	;	in	a, (0x11)	; Get printer status
-	;	cp	#0x5f
+	;	in	a, (0x21)	; Get printer status
+	;	cp	#0x7f
 	;jr	z, _brx_wait_loop
 	
 	; Wait for start bit (less blocking)
@@ -435,9 +419,9 @@ __asm
 		;cp a, #0
 		jp z, _brx_timeout	; Timeout!
 		
-		in	a, (0x11)	; Get printer status
-		cp	#0x5f
-	jr	z, _brx_wait_loop
+		in	a, (0x21)	; Get printer status
+		cp #0x80
+	jr	c, _brx_wait_loop
 	
 	
 	; Wait half of the start bit...
@@ -450,11 +434,11 @@ __asm
 		; Wait for next bit
 		call	_brx_delay
 		
-		in	a, (0x11)			; Get port status
+		in	a, (0x21)			; Get port status
 		
 		; Extract the state of the BUSY line (parallel port pin 11, the other serial terminal is connected to that line)
-		cp	#0x7f
-		jp	z, _brx_got_0		; the received bit is 0
+		cp	#0x80	; when transmitting a bit, the 7th bit (0x80) goes low
+		jp	c, _brx_got_0		; the received bit is 0
 		jp	_brx_got_1
 		
 		
@@ -490,9 +474,10 @@ __asm
 		;cp a, #0
 		jp z, _brx_timeout2	; Timeout!
 		
-		in	a, (0x11)
-		cp	#0x5f
-	jr	nz, _brx_wait_stopBit_loop
+		in	a, (0x21)
+		cp	#0x80
+		
+	jr	c, _brx_wait_stopBit_loop
 	
 	
 	; The stop bit should now be happening.
