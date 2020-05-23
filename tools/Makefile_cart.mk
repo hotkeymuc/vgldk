@@ -170,8 +170,8 @@ emu: ${OUTPUT_FILE_CART}
 	#rmdir cfg
 
 burn: ${OUTPUT_FILE_CART}
+	# Use -s = no warning for file size mismatch
 	minipro -p "${PART}" -w ${OUTPUT_FILE_CART}
-	# -s = no warning for file size mismatch
 
 .PHONY: clean
 
