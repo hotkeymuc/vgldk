@@ -119,7 +119,7 @@ ${OUTPUT_FILE_HEX}: ${INPUT_FILE} ${CRT_REL_FILE}
 	${MKDIR_P} ${OUT_DIR}
 	${CC} -mz80 --no-std-crt0 --vc \
 	--code-loc ${LOC_CODE} --data-loc ${LOC_DATA} \
-	--lib-path ${LIB_DIR} -I ${INC_DIR} \
+	--lib-path ${LIB_DIR} -I ${INC_DIR} -I ${INC_DIR}/arch/${SYS_ID} \
 	-D VGLDK_SERIES=${VGLDK_SERIES} \
 	-D VGLDK_DIRECTIO=${VGLDK_DIRECTIO} \
 	-o ${OUTPUT_FILE_HEX} \
@@ -144,7 +144,7 @@ ${OUTPUT_FILE_CART}: ${OUTPUT_FILE_BIN}
 	# Create empty EEPROM binary (full cart size)
 	#dd if=/dev/zero of=${OUTPUT_FILE_CART} bs=$(OUTPUT_CART_SIZE * 1024) count=1
 	#dd if=/dev/zero of=${OUTPUT_FILE_CART} bs=1 count=1 seek=$((OUTPUT_CART_SIZE * 1024 -1 ))
-	dd if=/dev/zero ibs=1k count=${OUTPUT_CART_SIZE} | tr "\000" "\377" >${OUTPUT_FILE_CART} 
+	dd if=/dev/zero ibs=1k count=${OUTPUT_CART_SIZE_KB} | tr "\000" "\377" >${OUTPUT_FILE_CART} 
 	
 	# Copy bin data into it
 	dd if=${OUTPUT_FILE_BIN} of=${OUTPUT_FILE_CART} conv=notrunc
