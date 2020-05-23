@@ -350,7 +350,8 @@ int serial_getchar() __naked {
 // If in "less blocking" mode, it returns "0" if no data was detected. In blocking mode all data is received
 // Returns -1 for timeout
 __asm
-	di				; Full attention!
+	;di				; Full attention!
+	
 	;push	hl
 	push	af
 	push	bc
@@ -368,16 +369,20 @@ __asm
 	;ld	b, #0x08		; ...with short timeout
 	ld	b, #0xf0		; ...with timeout
 	_brx_wait_loop:
+		in	a, (0x21)	; Get printer status
+		cp #0x80		; This sets C: if set: Pin "0"
+		jr c, _brx_bits_start
+		
+		nop
+		
 		dec b
-		;ld a, b
-		;cp a, #0
+		ld a, b
+		cp #0
 		jp z, _brx_timeout	; Timeout!
 		
-		in	a, (0x21)	; Get printer status
-		cp #0x80
-		; This sets C: if set: Pin "0"
-	jr	nc, _brx_wait_loop	; if C set = A<0x80 = Pin is LOW = "0" is being tansmitted
+	jr _brx_wait_loop	; if C set = A<0x80 = Pin is LOW = "0" is being tansmitted
 	
+	_brx_bits_start:
 	
 	;@MARK: Start bit edge
 	;ld	a, #0xff	; Prep all bits for sending
@@ -539,7 +544,7 @@ __asm
 		pop	af
 		;pop	hl
 	
-	ei
+	;ei
 	ret
 	
 __endasm;
