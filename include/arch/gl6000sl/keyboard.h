@@ -297,9 +297,9 @@ void keyboard_update() {
 	
 }
 
-#define CHARCODE_NONE 0
-char inkey() {
-	char charcode;
+#define KEY_CHARCODE_NONE 0
+byte keyboard_inkey() {
+	byte charcode;
 	
 	keyboard_update();
 	
@@ -313,20 +313,22 @@ char inkey() {
 		return charcode;
 	} else {
 		// No key
-		return CHARCODE_NONE;
+		return KEY_CHARCODE_NONE;
 	}
 }
 
 
-char getchar() {
-	char charcode;
+byte keyboard_getchar() {
+	byte charcode;
 	
-	while((charcode = inkey()) == CHARCODE_NONE) {
+	while((charcode = keyboard_inkey()) == KEY_CHARCODE_NONE) {
 	}
 	
 	return charcode;
 	
 }
 
+//#define getchar keyboard_getchar
+//#define inkey keyboard_inkey
 
 #endif	//__KEYBOARD_H

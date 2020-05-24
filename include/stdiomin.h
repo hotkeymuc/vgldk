@@ -2,29 +2,11 @@
 #define __STDIOMIN_H
 
 /*
-Absolute bare minimum stdio functions
+Some bare minimum stdio functions
 */
 
-/*
-byte myscroll_counter;
-void myscroll() {
-	// Scroll callback that pauses every page
-	
-	while(lcd_y >= LCD_ROWS) {
-		
-		if (myscroll_counter >= LCD_ROWS) {
-			// Sleep on scroll
-			vgl_sound_note(12*5, 100);
-			getchar();
-			myscroll_counter = 0;
-		}
-		
-		lcd_y--;
-		vgl_lcd_scroll();
-		myscroll_counter++;
-	}
-}
-*/
+//byte stdio_echo;	// Moved to vgldk.h
+
 
 //#include <stdio.h>	// for printf() putchar() gets() getchar()
 void printf(char *pc) {
@@ -77,6 +59,8 @@ void gets(char *pc) {
 			continue;
 		}
 		
+		// Local echo
+		//if (stdio_echo)
 		putchar(c);
 		
 		if ((c == '\n') || (c == '\r') || (c == 0)) {

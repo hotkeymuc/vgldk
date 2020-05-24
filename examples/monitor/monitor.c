@@ -4,8 +4,8 @@
 	2020-05-19 Bernhard "HotKey" Slawik
 */
 
+#define VGLDK_VARIABLE_STDIO	// Allow changing putchar/getchar at runtime. Needed for serial I/O function
 #include <vgldk.h>
-
 
 
 const char VERSION[] = "Monitor 1.0";
@@ -32,6 +32,7 @@ char cmd_arg[MAX_INPUT];
 #define MONITOR_CMD_PAUSE
 #ifdef MONITOR_SOFTSERIAL
 	#define MONITOR_CMD_SOFTSERIAL
+	#define MONITOR_SOFTSERIAL_AUTOSTART
 #endif
 #define MONITOR_CMD_VER
 
@@ -218,11 +219,15 @@ int cmd_loop(int argc, char *argv[]) {
 		
 		eval(argc-1, &argv[1]);
 		
-		c = inkey();
+		
+		//c = inkey();
+		c = getchar();
+		
 		if (c == 'q') break;
 		#ifdef KEY_ESCAPE
 		if (c == KEY_ESCAPE) break;
 		#endif
+		
 		
 	}
 	
@@ -291,8 +296,6 @@ int cmd_serial_test(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
 	
-	
-	
 	c = serial_isReady();
 	printf("isReady=");
 	printf_x2(c);
@@ -300,17 +303,36 @@ int cmd_serial_test(int argc, char *argv[]) {
 	
 	return 0;
 }
+
+#ifdef VGLDK_VARIABLE_STDIO
+int cmd_serial_io(int argc, char *argv[]) {
+	(void)argc;
+	(void)argv;
+	
+	// Use serial as stdio
+	p_stdin = &serial_getchar;
+	p_stdout = &serial_putchar;
+	
+	//@FIXME/BUG: At the moment serial_gets() works great, while gets() via p_stdin produces a lot of errors (due to instant echo feedback?)
+	
+	//stdio_echo = 0;
+	
+	return 0;
+}
+#endif
 int cmd_serial_get(int argc, char *argv[]) {
 	int c;
 	
 	(void)argc;
 	(void)argv;
 	
-	//printf("Not yet implemented\n");
+	//c = serial_getchar();
 	c = -1;
-	while(c < 0) {
-		c = serial_getchar();
+	while (c < 0) {
+		c = serial_getchar_nonblocking();
+		//printf_d(c);
 	}
+	
 	printf_x2(c);
 	
 	return 0;
@@ -322,7 +344,6 @@ int cmd_serial_gets(int argc, char *argv[]) {
 	(void)argv;
 	
 	buffer = &cmd_arg[0];
-	//printf("Not yet implemented\n");
 	serial_gets(buffer);
 	printf(buffer);
 	
@@ -446,6 +467,13 @@ const t_commandEntry COMMANDS[] = {
 		, "SoftSerial test"
 		#endif
 	},
+	#ifdef VGLDK_VARIABLE_STDIO
+	{"sio", cmd_serial_io
+		#ifdef MONITOR_HELP
+		, "Switch stdio to serial"
+		#endif
+	},
+	#endif
 	{"sget", cmd_serial_get
 		#ifdef MONITOR_HELP
 		, "SoftSerial get"
@@ -661,9 +689,20 @@ void main() __naked {
 	
 	clear();
 	
+	#ifdef MONITOR_SOFTSERIAL_AUTOSTART
+	if (serial_isReady()) {
+		// If serial cable is connected: Jump right into serial mode
+		
+		#ifdef VGLDK_VARIABLE_STDIO
+		printf("Switch to serial I/O?");
+		if (getchar() == 'y')
+			cmd_serial_io(0, NULL);
+		#endif
+	}
+	#endif
+	
 	// Banner
 	cmd_ver(0, NULL);
-	
 	
 	// Command line loop
 	running = true;
@@ -674,7 +713,7 @@ void main() __naked {
 		gets(cmd_arg);
 		
 		//@BUG: When the next line is removed, behaviour changes and the string is limited to 8 chars!??!
-		//putchar('"'); printf(s); putchar('"'); printf("\n");
+		//putchar('"'); printf(cmd_arg); putchar('"'); printf("\n");
 		
 		parse(cmd_arg);
 		

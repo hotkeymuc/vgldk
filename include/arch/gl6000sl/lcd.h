@@ -193,7 +193,7 @@ void lcd_scroll(int dy) {
 	}
 }
 
-void putchar(byte c) {
+void lcd_putchar(byte c) {
 	
 	if (c == '\r') {
 		lcd_x = 0;
@@ -231,5 +231,6 @@ void putchar(byte c) {
 	
 }
 
+//#define putchar lcd_putchar
 
 #endif	// __LCD_H

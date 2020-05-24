@@ -176,7 +176,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			ld	a, #0x20				; Disable latch?
 			out	(0x23), a
 			
-			ld	a, #0xff	; Select all bits to send?
+			ld	a, #0xff				; Select all bits to send?
 			out	(0x22), a
 			
 			ld	a, #0x00				; Set all D0-D7 to LOW
@@ -185,6 +185,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			ld	a, #0x60				; Send all data bits to the pins
 			out	(0x23), a
 			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
 			in	a, (0x21)
 			and	#0xbf					; STROBE LOW...
 			out	(0x21), a
@@ -203,6 +204,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			nop
 			nop
 			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
 			or	#0x40					; STROBE HIGH... (takes >50us to reach HIGH)
 			out	(0x21), a
 		ret
@@ -211,15 +213,17 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			ld	a, #0x20				; Disable latch?
 			out	(0x23), a
 			
-			ld	a, #0xff	; Select all bits to send?
+			ld	a, #0xff				; Select all bits to send?
 			out	(0x22), a
 			
 			ld	a, #0xff				; Set all D0-D7 to LOW
 			out	(0x20), a
 			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
 			ld	a, #0x60				; Send all data bits to the pins
 			out	(0x23), a
 			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
 			in	a, (0x21)
 			and	#0xbf					; STROBE LOW...
 			out	(0x21), a
@@ -235,6 +239,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			nop
 			nop
 			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
 			or	#0x40					; STROBE HIGH... (takes >50us to reach HIGH)
 			out	(0x21), a
 		ret
@@ -345,7 +350,7 @@ _serial_isReady_not:
 __endasm;
 }
 
-int serial_getchar() __naked {
+int serial_getchar_nonblocking() __naked {
 // Return byte
 // If in "less blocking" mode, it returns "0" if no data was detected. In blocking mode all data is received
 // Returns -1 for timeout
@@ -359,6 +364,7 @@ __asm
 	
 	; Get timings for inter-bit-delay
 	; By trial and error (GL4000): 9600 baud: D=0x03, E=0x12
+	; By trial and error (GL6000SL): 9600 baud: D=0x03, E=0x13
 	ld	d, #0x03
 	ld	e, #0x13
 	
@@ -550,15 +556,30 @@ __asm
 __endasm;
 }
 
+byte serial_getchar() {
+	int c;
+	
+	// Wait until a byte is there
+	while(1) {
+		c = serial_getchar_nonblocking();
+		if (c <= 0) continue;
+		
+		return (byte)(c & 0xff);
+	}
+	//return c;
+}
+
 byte *serial_gets(byte *serial_get_buf) {
 	int c;
+	//byte c;
 	byte *b;
 	
 	b = serial_get_buf;
 	while(1) {
-		c = serial_getchar();
+		c = serial_getchar_nonblocking();
+		if (c <= 0) continue;	// < 0 means "no data"
 		
-		if (c < 0) continue;	// < 0 means "no data"
+		//c = serial_getchar();
 		
 		// Check for end-of-line character(s)
 		if ((c == 0x0a) || (c == 0x0d)) break;

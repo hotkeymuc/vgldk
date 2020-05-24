@@ -212,6 +212,19 @@ void vgldk_init() {
 	*/
 	__endasm;
 	
+	#ifdef VGLDK_VARIABLE_STDIO
+		// Set hardware stdio as the default
+		p_stdout = &lcd_putchar;
+		p_stdin = &keyboard_getchar;
+		//stdio_echo = 1;
+	#else
+		// Define hardware stdio as the one and only implementation
+		#define putchar lcd_putchar
+		#define getchar keyboard_getchar
+		//#define inkey keyboard_inkey
+		//stdio_echo = 1;
+	#endif
+	
 	lcd_init();
 	
 	lcd_clear();

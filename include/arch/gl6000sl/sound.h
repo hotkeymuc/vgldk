@@ -23,6 +23,43 @@ Interesting memory regions that seem to be connected to sound/music:
 	0xF975, 0xF976, 0xF97B, 0xF97C, 0xF97D
 
 
+- - - - - - - - - - - - - - - - - - - - 
+From TI TSP50C0X manual 6-44:
+"
+Slave Mode
+Setting bit 6 of the mode register high places the TSP50C0x/1x in the slave
+mode. This specialized mode is intended for applications in which the
+TSP50C0x/1x device needs to be controlled by a master microprocessor.
+When in slave mode, the functionality of the following ports is modified:
+
+PB0 becomes a chip enable strobe. It is normally held high. When it is taken
+low, data is read from or written to the PA0- PA7 pins depending on the value
+of PB1.
+
+PB1 becomes a read/write select input. If PB1 is low, data is written to the
+TSP50C0x/1x when PB0 goes low. If PB1 is high, data may be read from the
+TSP50C0x/1x when PB0 goes low.
+
+Port A becomes a general bidirectional port controlled by PB0 and PB1. Pin
+PA7 is used as a busy signal. If bit 7 in the output latch is set high by the
+software, PA7 of the output latch is reset to a low state when PB0 goes low to
+write data to the TSP50C0x/1x.
+
+Because the PA7 output latch is used as a busy flag, leaving only PA0- PA6
+for data, normally only seven bits of data may be exchanged between the
+master and the slave in any one read operation from the TSP50C0x/1x. In write
+operations to the TSP50C0x/1x, all 8 pins of port A can be used to transfer
+data.
+
+During read operations from the slave TSP50C0x/1x, the master is
+responsible for maintaining its outputs connected to the TSP50C0x/1x port A
+in a high-impedance state. Otherwise, bus contention results.
+The TSP50C0x/1x I/O ports must be configured in input mode for slave mode
+to work properly. Pin PA7 may be put in output mode, if desired. It then
+functions as a handshaking line rather than a polled handshake bit.
+"
+- - - - - - - - - - - - - - - - - - - - 
+
 2020-05-19 Bernhard "HotKey" Slawik
 */
 
