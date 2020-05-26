@@ -19,7 +19,7 @@ Some bare minimum stdio functions
 	t_getchar *p_stdin_getchar;
 	//t_gets *p_stdin_gets;
 	//t_inkey *p_stdin_inkey;
-	//byte stdio_echo;
+	byte stdio_echo;
 	
 	// Proxy functions
 	void putchar(char c) {
@@ -45,7 +45,8 @@ Some bare minimum stdio functions
 		
 		//p_stdin_gets = (t_gets *)&VGLDK_STDIN_GETS;
 		//p_stdin_inkey = (t_inkey *)&VGLDK_STDIN_INKEY;
-		//stdio_echo = 1;
+		
+		stdio_echo = 1;
 	}
 	
 #else
@@ -57,7 +58,7 @@ Some bare minimum stdio functions
 	//#define inkey VGLDK_STDIN_INKEY
 	
 	#define stdio_init() ;	// Not needed
-	//stdio_echo = 1;
+	#define stdio_echo 1
 #endif
 
 
@@ -113,8 +114,8 @@ char *gets(char *pc) {
 		}
 		
 		// Local echo
-		//if (stdio_echo)
-		putchar(c);
+		if (stdio_echo)
+			putchar(c);
 		
 		if ((c == '\n') || (c == '\r') || (c == 0)) {
 			// End of string

@@ -209,6 +209,23 @@ int cmd_ei(int argc, char *argv[]) {
 	
 	return 0;
 }
+
+int cmd_ints(int argc, char *argv[]) {
+	int i;
+	(void)argc;
+	(void)argv;
+	
+	cmd_ei(0, NULL);
+	for(i = 0; i < 0x80; i++) {
+		__asm
+			nop
+		__endasm;
+	}
+	cmd_di(0, NULL);
+	
+	return 0;
+}
+
 #endif
 
 #ifdef MONITOR_CMD_LOOP
@@ -315,6 +332,8 @@ int cmd_serial_io(int argc, char *argv[]) {
 	
 	//p_stdin_gets = (t_gets *)&serial_gets;
 	//p_stdin_inkey = (t_inkey *)&serial_inkey;
+	
+	stdio_echo = 0;	// Serial works better without gets echo
 	
 	/*
 	while(1) {
@@ -438,6 +457,11 @@ const t_commandEntry COMMANDS[] = {
 	{"ei" , cmd_ei
 		#ifdef MONITOR_HELP
 		, "Enable interrupts"
+		#endif
+	},
+	{"ints" , cmd_ints
+		#ifdef MONITOR_HELP
+		, "Let ints happen"
 		#endif
 	},
 	#endif
@@ -716,8 +740,12 @@ void main() __naked {
 		
 		#ifdef VGLDK_VARIABLE_STDIO
 		printf("Switch to serial I/O?");
-		if (getchar() == 'y')
+		if (getchar() == 'y') {
+			printf("Y\n");
 			cmd_serial_io(0, NULL);
+		} else {
+			printf("N\n");
+		}
 		#endif
 	}
 	#endif
