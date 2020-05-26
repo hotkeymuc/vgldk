@@ -5,7 +5,60 @@
 Some bare minimum stdio functions
 */
 
-//byte stdio_echo;	// Moved to vgldk.h
+#ifdef VGLDK_VARIABLE_STDIO
+	// Allow custom stdio at runtime
+	
+	// Types of IO callbacks
+	typedef void (t_putchar)(char);
+	typedef char (t_getchar)(void);
+	//typedef p_char (t_gets)(char *);
+	//typedef int (t_inkey)(void);
+	
+	// Callback variables
+	t_putchar *p_stdout_putchar;
+	t_getchar *p_stdin_getchar;
+	//t_gets *p_stdin_gets;
+	//t_inkey *p_stdin_inkey;
+	//byte stdio_echo;
+	
+	// Proxy functions
+	void putchar(char c) {
+		(*p_stdout_putchar)(c);
+	}
+	char getchar() {
+		return (*p_stdin_getchar)();
+	}
+	/*
+	char *gets(char *s) {
+		return (*p_stdin_gets)(s);
+	}
+	int inkey() {
+		return (*p_stdin_inkey)();
+	}
+	
+	char *stdio_gets(char *pc);	// Forward
+	*/
+	void stdio_init() {
+		// Set hardware stdio as the default
+		p_stdout_putchar = (t_putchar *)&VGLDK_STDOUT_PUTCHAR;
+		p_stdin_getchar = (t_getchar *)&VGLDK_STDIN_GETCHAR;
+		
+		//p_stdin_gets = (t_gets *)&VGLDK_STDIN_GETS;
+		//p_stdin_inkey = (t_inkey *)&VGLDK_STDIN_INKEY;
+		//stdio_echo = 1;
+	}
+	
+#else
+	// Define hardware stdio as the one and only implementation
+	#define putchar VGLDK_STDOUT_PUTCHAR
+	#define getchar VGLDK_STDIN_GETCHAR
+	
+	//#define gets VGLDK_STDIN_GETS	//stdio_gets
+	//#define inkey VGLDK_STDIN_INKEY
+	
+	#define stdio_init() ;	// Not needed
+	//stdio_echo = 1;
+#endif
 
 
 //#include <stdio.h>	// for printf() putchar() gets() getchar()
@@ -37,7 +90,7 @@ void printf_d(byte d) {
 }
 
 
-void gets(char *pc) {
+char *gets(char *pc) {
 	char *pcs;
 	char c;
 	pcs = pc;
@@ -68,12 +121,13 @@ void gets(char *pc) {
 			
 			// Terminate string
 			*pc = 0;
-			return;
+			return pcs;
 		}
 		
 		// Add char
 		*pc++ = c;
 	}
+	//return pcs;
 }
 
 

@@ -28,6 +28,8 @@
 //#define word unsigned short
 typedef unsigned char byte;
 typedef unsigned short word;
+typedef byte * p_byte;
+typedef char * p_char;
 #define true 1
 #define false 0
 #define NULL ((void *)0)
@@ -37,24 +39,6 @@ typedef unsigned short word;
 	#error "VGLDK_SERIES must be defined"
 #endif
 
-#ifdef VGLDK_VARIABLE_STDIO
-	// Allow custom stdio at runtime
-	
-	typedef void (t_putchar)(byte);
-	typedef byte (t_getchar)(void);
-	
-	t_putchar *p_stdout;
-	t_getchar *p_stdin;
-	//byte stdio_echo;
-	
-	// Move to stdio?
-	void putchar(char c) {
-		(*p_stdout)(c);
-	}
-	char getchar() {
-		return (*p_stdin)();
-	}
-#endif
 
 // #include <arch/#VGLDK_ARCH.h>
 #if VGLDK_SERIES == 1000

@@ -67,20 +67,24 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 	
 	
 	__asm
-		di
+		;di
 		
-		exx	; Switch to secondary BC, DE and HL
+		;exx	; Switch to secondary BC, DE and HL
+		push af
+		push bc
+		push de
+		;push hl
 		
 		
 		; Param "l" into B
-		ld	hl, #4+0
+		ld	hl, #4+6
 		add	hl, sp
 		ld	b, (hl)
 		
 		;; Param "buffer" to HL
 		;pop hl
 		;push hl
-		ld	hl, #2+0
+		ld	hl, #2+6
 		add	hl, sp
 		ld	e, (hl)
 		inc	hl
@@ -88,7 +92,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 		ex de, hl
 		
 		
-		push af	; AF is not exchanged by EXX
+		;push af	; AF is not exchanged by EXX
 		
 		; Start with initial HIGH level (like in previous stop bit)
 		; so that the start bit makes a distinct transition
@@ -173,13 +177,14 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 		; So we need to calibrate both cases using "NOP slides"
 		
 		_bbtx_set_LOW:					; Send LOW level / logical "0"
+			
 			ld	a, #0x20				; Disable latch?
 			out	(0x23), a
 			
 			ld	a, #0xff				; Select all bits to send?
 			out	(0x22), a
 			
-			ld	a, #0x00				; Set all D0-D7 to LOW
+			ld	a, #0x00				; Set all data pins D0-D7 to LOW
 			out	(0x20), a
 			
 			ld	a, #0x60				; Send all data bits to the pins
@@ -207,16 +212,18 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			;@FIXME: I think this can be removed (but pad with NOPs!)
 			or	#0x40					; STROBE HIGH... (takes >50us to reach HIGH)
 			out	(0x21), a
+			
 		ret
 		
 		_bbtx_set_HIGH:					; Send HIGH level / logical "1"
+			
 			ld	a, #0x20				; Disable latch?
 			out	(0x23), a
 			
 			ld	a, #0xff				; Select all bits to send?
 			out	(0x22), a
 			
-			ld	a, #0xff				; Set all D0-D7 to LOW
+			ld	a, #0xff				; Set all data pins D0-D7 to HIGH
 			out	(0x20), a
 			
 			;@FIXME: I think this can be removed (but pad with NOPs!)
@@ -242,6 +249,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			;@FIXME: I think this can be removed (but pad with NOPs!)
 			or	#0x40					; STROBE HIGH... (takes >50us to reach HIGH)
 			out	(0x21), a
+			
 		ret
 		
 		
@@ -302,9 +310,12 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			; Leave with level HIGH (stop bit level)
 			call _bbtx_set_HIGH
 			
-			exx		; Back to original BC, DE, HL
+			;exx		; Back to original BC, DE, HL
+			;pop hl
+			pop de
+			pop bc
 			pop af	; AF was not exchanged by EXX
-			ei		; @FIXME: Maybe they should not be enabled!
+			;ei		; @FIXME: Maybe they should not be enabled!
 			
 			ret		; Only needed if declared as "__naked"
 			
@@ -369,11 +380,14 @@ __asm
 	ld	e, #0x13
 	
 	
+	;@FIXME: Prepare printer port for receiving?
+	
+	
 	_brx_byte_start:
 	
 	; Wait for start bit (less blocking)
-	;ld	b, #0x08		; ...with short timeout
-	ld	b, #0xf0		; ...with timeout
+	ld	b, #0x08		; ...with short timeout
+	;ld	b, #0xf0		; ...with timeout
 	_brx_wait_loop:
 		in	a, (0x21)	; Get printer status
 		cp #0x80		; This sets C: if set: Pin "0"
@@ -462,8 +476,8 @@ __asm
 	
 	
 	; Wait for stop bit to actually occur
-	;ld	b, #0x08		; ...with timeout
-	ld	b, #0x20		; ...with timeout
+	ld	b, #0x08		; ...with timeout
+	;ld	b, #0x20		; ...with timeout
 	
 	_brx_wait_stopBit_loop:
 		dec b
@@ -576,10 +590,10 @@ byte *serial_gets(byte *serial_get_buf) {
 	
 	b = serial_get_buf;
 	while(1) {
+		//c = serial_getchar();
+		
 		c = serial_getchar_nonblocking();
 		if (c <= 0) continue;	// < 0 means "no data"
-		
-		//c = serial_getchar();
 		
 		// Check for end-of-line character(s)
 		if ((c == 0x0a) || (c == 0x0d)) break;

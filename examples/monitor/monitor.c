@@ -310,16 +310,23 @@ int cmd_serial_io(int argc, char *argv[]) {
 	(void)argv;
 	
 	// Use serial as stdio
-	p_stdin = &serial_getchar;
-	p_stdout = &serial_putchar;
+	p_stdout_putchar = (t_putchar *)&serial_putchar;
+	p_stdin_getchar = (t_getchar *)&serial_getchar;
 	
-	//@FIXME/BUG: At the moment serial_gets() works great, while gets() via p_stdin produces a lot of errors (due to instant echo feedback?)
+	//p_stdin_gets = (t_gets *)&serial_gets;
+	//p_stdin_inkey = (t_inkey *)&serial_inkey;
 	
-	//stdio_echo = 0;
-	
+	/*
+	while(1) {
+		serial_gets(cmd_arg);
+		//putchar('"'); printf(cmd_arg); putchar('"'); printf("\n");
+		parse(cmd_arg);
+	}
+	*/
 	return 0;
 }
 #endif
+
 int cmd_serial_get(int argc, char *argv[]) {
 	int c;
 	
@@ -608,6 +615,15 @@ void parse(char *s) {
 	
 	argc = 0;
 	sc = &s[0];
+	
+	// Skip empty space lead-in
+	while(*sc == ' ') {
+		sc++;
+	}
+	
+	// Ignore comments - ignore as a whole
+	if (*sc == '#') return;
+	
 	ac = &arg[0];
 	
 	argv[0] = ac;
@@ -687,6 +703,11 @@ void parse(char *s) {
 
 void main() __naked {
 	
+	#ifdef VGLDK_VARIABLE_STDIO
+		// Variable STDIO must be initialized
+		stdio_init();
+	#endif
+	
 	clear();
 	
 	#ifdef MONITOR_SOFTSERIAL_AUTOSTART
@@ -712,9 +733,7 @@ void main() __naked {
 		prompt();
 		gets(cmd_arg);
 		
-		//@BUG: When the next line is removed, behaviour changes and the string is limited to 8 chars!??!
 		//putchar('"'); printf(cmd_arg); putchar('"'); printf("\n");
-		
 		parse(cmd_arg);
 		
 	}

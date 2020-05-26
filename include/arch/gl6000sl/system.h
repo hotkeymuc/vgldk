@@ -167,26 +167,19 @@ Intro sound port accesses at 0x2x?:
 	
 
 
-
 2020-05-14 Bernhard "HotKey" Slawik
 */
 
-//#define VGL_GETCHAR
-//#define VGL_PUTCHAR
-//#define VGL_USE_SOUND
-//#include <vgl.h>
-//#include <vgl_lcd.h>
-//
-//#include <stdio.h>
-
-//typedef unsigned char byte;
-//typedef unsigned short word;
-
 #include "lcd.h"
-
-//#include "ports.h"
-
 #include "keyboard.h"
+
+// Publish callbacks for STDIO
+#define VGLDK_STDOUT_PUTCHAR lcd_putchar
+#define VGLDK_STDIN_GETCHAR keyboard_getchar
+
+//#define VGLDK_STDIN_GETS stdio_gets
+//#define VGLDK_STDIN_INKEY keyboard_inkey
+
 
 void vgldk_init() {
 	__asm
@@ -212,24 +205,12 @@ void vgldk_init() {
 	*/
 	__endasm;
 	
-	#ifdef VGLDK_VARIABLE_STDIO
-		// Set hardware stdio as the default
-		p_stdout = &lcd_putchar;
-		p_stdin = &keyboard_getchar;
-		//stdio_echo = 1;
-	#else
-		// Define hardware stdio as the one and only implementation
-		#define putchar lcd_putchar
-		#define getchar keyboard_getchar
-		//#define inkey keyboard_inkey
-		//stdio_echo = 1;
-	#endif
-	
 	lcd_init();
 	
 	lcd_clear();
 	
 	keyboard_init();
+	
 	
 	//main();
 	__asm
