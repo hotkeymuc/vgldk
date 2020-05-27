@@ -375,7 +375,7 @@ void lcd_scroll_cb_scroll() {
 }
 */
 
-void putchar(byte c) {
+void lcd_putchar(byte c) {
 	byte o;
 	
 	if (c == '\r') {

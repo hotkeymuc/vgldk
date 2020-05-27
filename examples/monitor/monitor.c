@@ -19,7 +19,7 @@ char cmd_arg[MAX_INPUT];
 
 // Features to include
 //#define MONITOR_HELP	// Include help functionality (needs quite some space for strings...)
-#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
+//#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
 
 //#define MONITOR_CMD_BEEP
 #define MONITOR_CMD_CLS

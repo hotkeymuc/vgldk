@@ -26,6 +26,13 @@ volatile __at (0xdce4) unsigned char KEY_CURRENT;	// Holds the current key code 
 #include "keyboard.h"
 #include "sound.h"
 
+// Publish callbacks for STDIO
+#define VGLDK_STDOUT_PUTCHAR lcd_putchar
+#define VGLDK_STDIN_GETCHAR keyboard_getchar
+
+//#define VGLDK_STDIN_GETS stdio_gets
+//#define VGLDK_STDIN_INKEY keyboard_inkey
+
 void vgldk_init() {
 	lcd_init();
 	vgl_sound_off();

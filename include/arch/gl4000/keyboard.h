@@ -4,7 +4,7 @@
 VTech Genius Leader Keyboard
 
 //@TODO: Handling of keyboard should happen inside an interrupt handler!
-//@TODO: store 16 bytes of last state to allow key-rollover
+//@TODO: Handle roll-over like in GL6000SL's implementation
 
 2019-11-03 Bernhard "HotKey" Slawik
 */
@@ -51,7 +51,7 @@ const char vgl_key_map2[8*8] = {
 
 //byte vgl_keys_state[16];
 
-byte inkey() {
+byte keyboard_inkey() {
 	
 	//@TODO: Re-activate the second matrix (function keys)
 	
@@ -141,7 +141,7 @@ byte inkey() {
 
 
 // Return "true" if a key is pressed
-byte checkkey() {
+byte keyboard_checkkey() {
 	
 	byte b1;
 	//byte b2;
@@ -160,20 +160,20 @@ byte checkkey() {
 }
 
 
-char getchar_last = 0;
-char getchar() {
+char keyboard_getchar_last = 0;
+char keyboard_getchar() {
 	char c;
 	
 	//while (checkkey()) {}
 	//c = getchar_blocking();
 	
 	while(1) {
-		c = inkey();
-		if (c == 0) getchar_last = 0;
-		if (c != getchar_last) break;
+		c = keyboard_inkey();
+		if (c == 0) keyboard_getchar_last = 0;
+		if (c != keyboard_getchar_last) break;
 	}
 	
-	getchar_last = c;
+	keyboard_getchar_last = c;
 	return c;
 }
 
