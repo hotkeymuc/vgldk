@@ -63,10 +63,8 @@ TODO:
 #define LCD_5x10DOTS 0x04
 #define LCD_5x8DOTS 0x00
 
-#ifndef LCD_CONTROL_PORT
-	#define LCD_CONTROL_PORT 0x0a
-	#define LCD_DATA_PORT 0x0b
-#endif
+#define LCD_CONTROL_PORT 0x20	// 0x0a
+#define LCD_DATA_PORT 0x21	// 0x0b
 
 /*
 // MODEL2000

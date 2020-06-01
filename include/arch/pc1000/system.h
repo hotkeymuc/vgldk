@@ -7,7 +7,9 @@ Header for
 	(CompuSavant?)
 
 
-@FIXME: This is not working correctly, yet! LCD is broken
+
+@FIXME: This system architecture is not working correctly, yet!
+	LCD is broken
 
 
 for use with SDCC compiler
