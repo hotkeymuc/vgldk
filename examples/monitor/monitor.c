@@ -13,13 +13,13 @@ const word tempAddr = 0xC400;
 
 // Setup
 #define MAX_ARGS 8
-#define MAX_INPUT 64
+#define MAX_INPUT 128	//64
 char cmd_arg[MAX_INPUT];
 
 
 // Features to include
 //#define MONITOR_HELP	// Include help functionality (needs quite some space for strings...)
-//#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
+#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
 
 //#define MONITOR_CMD_BEEP
 #define MONITOR_CMD_CLS
@@ -28,6 +28,8 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_CMD_HELP
 #define MONITOR_CMD_INTERRUPTS
 #define MONITOR_CMD_LOOP
+#define MONITOR_CMD_PEEKPOKE
+//#define MONITOR_CMD_PAUSE
 #define MONITOR_CMD_PORT
 #define MONITOR_CMD_PAUSE
 #ifdef MONITOR_SOFTSERIAL
@@ -79,10 +81,36 @@ byte stricmp(const char *cs, const char *ct) {
 	return 0;
 }
 
-#define HEX_USE_DUMP
+
+
+
+
+void printf_bin(byte v) {
+	byte p;
+	
+	for(p = 0; p < 8; p++) {
+		if ((v & (1 << (7-p))) > 0) putchar('1'); else putchar('0');
+	}
+}
+
+
+#ifdef MONITOR_CMD_DUMP
+  #define HEX_USE_DUMP
+  #define HEX_DUMP_WIDTH 8 //((DISPLAY_COLS-6)/3)
+#endif
 #include <hex.h>
-
-
+void printf_byte_pretty(byte v) {
+	
+	// Hex
+	printf("0x"); printf_x2(v);
+	
+	// Binary
+	putchar(' '); printf_bin(v);
+	
+	// Decimal
+	//printf(" %d\n", v);
+	putchar(' '); printf_d(v);
+}
 
 // Internal command call definition
 typedef int (*t_commandCall)(int argc, char *argv[]);
@@ -132,6 +160,7 @@ int cmd_cls(int argc, char *argv[]) {
 #endif
 
 #ifdef MONITOR_CMD_DUMP
+
 int cmd_dump(int argc, char *argv[]) {
 	word a;
 	char c;
@@ -139,14 +168,14 @@ int cmd_dump(int argc, char *argv[]) {
 	
 	a = (argc < 2) ? tempAddr : hextow(argv[1]);
 	
-	l = 8;
+	l = (argc < 3) ? (4 * DISPLAY_ROWS) : hextob(argv[2]);
 	while(a < 0xffff) {
 		dump(a, l);
 		
 		c = getchar();
-		if ((c == 'q') || (c == 'Q')) break;
+		if ((c == 'f') || (c == 'q') || (c == 'F') || (c == 'Q')) break;
 		else if ((c == 'r')) a = a;
-		else if ((c == 'u') || (c == 'u')) a -= l;
+		else if ((c == 'b') || (c == 'u') || (c == 'B') || (c == 'U')) a -= l;
 		#ifdef KEY_REPEAT
 		else if (c == KEY_REPEAT) a = a;
 		#endif
@@ -252,6 +281,106 @@ int cmd_loop(int argc, char *argv[]) {
 }
 #endif
 
+#ifdef MONITOR_CMD_PAUSE
+int cmd_pause(int argc, char *argv[]) {
+	(void) argc; (void) argv;
+	
+	//printf("Press any key");
+	//beep();
+	getchar();
+	//clear();
+	return 0;
+}
+#endif
+
+#ifdef MONITOR_CMD_PEEKPOKE
+int cmd_peek(int argc, char *argv[]) {
+	
+	word a;
+	byte v;
+	byte l;
+	
+	if (argc < 2) {
+		return ERR_MISSING_ARGUMENT;
+	}
+	
+	a = hextow(argv[1]);
+	
+	printf_x4(a);
+	putchar(':');
+	
+	if (argc > 2) {
+		// Peek multiple
+		l = hextob(argv[2]);
+		while (l > 0) {
+			v = *((byte *)a);
+			printf_x2(v);
+			l--;
+			a++;
+		}
+		
+	} else {
+		// Peek one (pretty)
+		
+		v = *((byte *)a);
+		printf_byte_pretty(v);
+	}
+	
+	printf("\n");
+	
+	return 0;
+}
+int cmd_poke(int argc, char *argv[]) {
+	word a;
+	byte v;
+	byte *b;
+	
+	if (argc < 3) {
+		return ERR_MISSING_ARGUMENT;
+	}
+	
+	a = hextow(argv[1]);
+	//v = hextow(argv[2]);
+	//*((byte *)a) = v;
+	
+	// Allow multiple
+	b = argv[2];
+	do {
+		v = hextob(b);
+		*((byte *)a) = v;
+		b+=2;
+		a++;
+	} while (*b != 0);
+	
+	return 0;
+}
+word temp;
+int cmd_call(int argc, char *argv[]) {
+	word a;
+	
+	if (argc < 2) {
+		return ERR_MISSING_ARGUMENT;
+	}
+	
+	a = hextow(argv[1]);
+	temp = a;
+	
+	__asm
+		ld	hl, (_temp)
+		
+		; Trickery: Use "call" to call a label that does not return. That way the "jp" magically becomes a "call"!
+		call	_call_encap	; Call but do not ret there, so PC+3 gets on stack!
+		jp	_call_end		; The "jp" below should return to this instruction
+		_call_encap:
+			jp	(hl)	; This actually becomes a fake "call"
+			; Do not ret! This is intentionally left blank
+		_call_end:
+	__endasm;
+	
+	return 0;
+}
+#endif
+
 #ifdef MONITOR_CMD_PORT
 int cmd_in(int argc, char *argv[]) {
 	byte p;
@@ -264,13 +393,10 @@ int cmd_in(int argc, char *argv[]) {
 	//printf("0x%02X = 0x%02X / %d\n", p, v, v);
 	
 	//printf("%02X:0x%02X ", p, v);
-	printf_x2(p); putchar(':'); printf("0x"); printf_x2(v); putchar(' ');
-	
-	for(p = 0; p < 8; p++) {
-		if ((v & (1 << (7-p))) > 0) putchar('1'); else putchar('0');
-	}
-	//printf(" %d\n", v);
-	putchar(' '); printf_d(v); printf("\n");
+	printf_x2(p);
+	putchar(':');
+	printf_byte_pretty(v);
+	printf("\n");
 	
 	return 0;
 }
@@ -286,19 +412,6 @@ int cmd_out(int argc, char *argv[]) {
 	
 	port_out(p, v);
 	
-	return 0;
-}
-#endif
-
-
-#ifdef MONITOR_CMD_PAUSE
-int cmd_pause(int argc, char *argv[]) {
-	(void) argc; (void) argv;
-	
-	//printf("Press any key");
-	//beep();
-	getchar();
-	//clear();
 	return 0;
 }
 #endif
@@ -489,6 +602,23 @@ const t_commandEntry COMMANDS[] = {
 	{"pause", cmd_pause
 		#ifdef MONITOR_HELP
 		, "Wait for key"
+		#endif
+	},
+	#endif
+	#ifdef MONITOR_CMD_PEEKPOKE
+	{"peek", cmd_peek
+		#ifdef MONITOR_HELP
+		, "View mem"
+		#endif
+	},
+	{"poke", cmd_poke
+		#ifdef MONITOR_HELP
+		, "Modfiy mem"
+		#endif
+	},
+	{"call", cmd_call
+		#ifdef MONITOR_HELP
+		, "Call mem"
 		#endif
 	},
 	#endif
