@@ -4,6 +4,7 @@
 /*
 
 System header for the VTech Genius LEADER 6000SL / PreComputer Prestige
+also works for the 7007SL
 
 
 What's known so far (mostly from MAME's "prestige" driver):
@@ -170,6 +171,10 @@ Intro sound port accesses at 0x2x?:
 2020-05-14 Bernhard "HotKey" Slawik
 */
 
+// It is graphical, so there is no distinct number
+// LEt's chose some sensefull values
+#define DISPLAY_COLS 40
+#define DISPLAY_ROWS 10
 #include "lcd.h"
 #include "keyboard.h"
 
