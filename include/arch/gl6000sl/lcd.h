@@ -211,13 +211,13 @@ void lcd_putchar(byte c) {
 		c = 0;	// Stop handling it
 	}
 	
-	if (lcd_x + font_w >= lcd_w) {
+	if (lcd_x + font_w > lcd_w) {
 		lcd_x = 0;
 		lcd_y += font_h;
 	}
 	
 	
-	if (lcd_y + font_h >= lcd_h) {
+	if (lcd_y + font_h > lcd_h) {
 		// We are at end of screen
 		lcd_scroll((lcd_y + font_h) - lcd_h);
 	}
