@@ -110,7 +110,9 @@ word gethex(byte digits) {
 
 #ifdef HEX_USE_DUMP
 // Some memory dump helpers
-#define DUMP_WIDTH 4
+#ifndef HEX_DUMP_WIDTH
+	#define HEX_DUMP_WIDTH 4
+#endif
 void dump(word a, byte len) {
 	byte i;
 	byte b;
@@ -131,7 +133,7 @@ void dump(word a, byte len) {
 		
 		lLine = l;
 		o = (byte *)a;
-		for (i = 0; i < DUMP_WIDTH; i++) {
+		for (i = 0; i < HEX_DUMP_WIDTH; i++) {
 			if (l < len) {
 				b = *o;
 				//printf("%02X", b);
@@ -145,7 +147,7 @@ void dump(word a, byte len) {
 		putchar('|');
 		l = lLine;
 		o = (byte *)a;
-		for (i = 0; i < DUMP_WIDTH; i++) {
+		for (i = 0; i < HEX_DUMP_WIDTH; i++) {
 			if (l < len) {
 				b = *o;
 				if (b < 0x20)	putchar('.');
@@ -154,7 +156,7 @@ void dump(word a, byte len) {
 			l++;
 			o++;
 		}
-		a += DUMP_WIDTH;
+		a += HEX_DUMP_WIDTH;
 		printf("\n");
 	}
 	
