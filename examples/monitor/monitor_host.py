@@ -187,13 +187,39 @@ class Hardware:
 			l = self.readline()
 			if l is not None:
 				#self.serial_handle_frame(l)
-				put('Serial got "%s"' % l)
+				self.put('<<< "%s"' % l)
 			else:
 				# Idle
 				time.sleep(0.01)
 		
 	
-	# Specific functions
+	# Monitor specific functions
+	
+	def wait_for_monitor(self):
+		"Wait for prompt on beginning, activate console"
+		self.put('Waiting for monitor...')
+		while True:
+			if (self.ser.in_waiting == 0):
+				time.sleep(0.5)
+			else:
+				s = self.readline()
+				if (s.startswith('CR to activate')):
+					break
+		self.put('Activating console...')
+		self.write('\n')
+		
+		# Get banner
+		s = self.readline()
+		
+		self.wait_for_prompt()
+		self.put('Connected to monitor!')
+		
+	def wait_for_prompt(self):
+		while True:
+			s = self.readline()
+			if s == '>':
+				return True
+	
 	def ver(self):
 		comp.write('ver\n')
 		s = comp.readline()
@@ -321,13 +347,18 @@ if __name__ == '__main__':
 	comp = Hardware(port=port, baud=baud)
 	comp.open()
 	
+	comp.wait_for_monitor()
+	
+	
+	
 	#comp.write('ver\n')
 	#s = comp.readline()
 	#put(s)
 	#put('Version: "%s"' % comp.ver())
 	#put(hexdump([ ord(b) for b in 'Hello world! This is hexdump']))
 	
-	#comp
+	"""
+	### Scan all banks and dump memory
 	#put(hexdump(comp.peek(0x8000, 16), 0xd000))
 	#comp.dump(0x0000, 32)
 	for i in range(0x100):
@@ -349,7 +380,7 @@ if __name__ == '__main__':
 	
 	#comp.poke(0xd000, [1,2,3,4,5,6,7])
 	#comp.dump(0xd000)
-	
+	"""
 	
 	#put('Sending "in 05"...')
 	"""

@@ -856,6 +856,7 @@ void parse(char *s) {
 
 
 void main() __naked {
+	int c;
 	
 	#ifdef VGLDK_VARIABLE_STDIO
 		// Variable STDIO must be initialized
@@ -866,9 +867,27 @@ void main() __naked {
 	
 	#ifdef MONITOR_SOFTSERIAL_AUTOSTART
 	if (serial_isReady()) {
-		// If serial cable is connected: Jump right into serial mode
+		// If serial cable is connected: Ask for which I/O to use
 		
 		#ifdef VGLDK_VARIABLE_STDIO
+		printf("CR to activate\n");
+		serial_puts("CR to activate\n");
+		
+		while(1) {
+			c = serial_getchar_nonblocking();
+			if ((c == 10) || (c == 13)) {
+				printf("Serial mode\n");
+				cmd_serial_io(0, NULL);
+				break;
+			}
+			c = keyboard_inkey();
+			if ((c == 10) || (c == 13)) {
+				printf("OK\n");
+				break;
+			}
+		}
+		
+		/*
 		printf("Switch to serial I/O?");
 		if (getchar() == 'y') {
 			printf("Y\n");
@@ -876,7 +895,9 @@ void main() __naked {
 		} else {
 			printf("N\n");
 		}
+		*/
 		#endif
+		
 	}
 	#endif
 	
