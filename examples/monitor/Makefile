@@ -6,6 +6,6 @@ NAME=monitor
 #VGLDK_SERIES=4000
 VGLDK_SERIES=6000
 
-include ../../tools/Makefile_cart.mk
+include ../../tools/Makefile.mk
 
 all: cart
