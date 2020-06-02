@@ -11,5 +11,5 @@ void main() __naked {
 	
 	printf("Hello World!");
 	
-	
+	while(1) { }
 }

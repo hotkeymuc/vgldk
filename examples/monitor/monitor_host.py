@@ -37,7 +37,7 @@ SERIAL_TIMEOUT = 0.1
 
 
 # General
-SHOW_TRAFFIC = not True
+SHOW_TRAFFIC = True
 
 
 def put(txt):
@@ -287,12 +287,17 @@ class Hardware:
 			r.append(v)
 		
 		return r
+	
 	def dump(self, a, l=16):
 		put(hexdump(comp.peek(a, l), a))
 		
 	def poke(self, a, data):
 		comp.write('poke %04x %s\n' % (a, ''.join(['%02x'%b for b in data]) ))
 		comp.readline()
+	
+	def call(self, a):
+		comp.write('call %04x\n' % a)
+		#comp.readline()
 	
 
 def hexdump(data, addr=0x0000, width=16):
@@ -348,6 +353,36 @@ if __name__ == '__main__':
 	comp.open()
 	
 	comp.wait_for_monitor()
+	
+	
+	# Upload an app
+	put('Uploading app...')
+	app_addr = 0xc800	# LOC_DATA
+	app_addr_start = 0xd6ad	# Location of vgldk_init()
+	with open('../hello/out/hello.app.c800.bin', 'rb') as h:
+		data = h.read()
+	
+	app_data = data[app_addr:]
+	l = len(app_data)
+	put('App size: %d bytes' % l)
+	
+	chunk_size = 48
+	o = 0
+	addr = app_addr
+	while (o < l):
+		chunk = app_data[o:o+chunk_size]
+		put('Pushing %d / %d bytes...' % (o, l))
+		#hex = ''.join(['%02x'%b for b in chunk])
+		#r = 'poke %04x %s' % (addr, hex)
+		#put(r)
+		comp.poke(addr, chunk)
+		
+		addr += chunk_size
+		o += chunk_size
+	
+	put('Calling...')
+	#comp.call(app_addr)
+	comp.call(app_addr_start)
 	
 	
 	
