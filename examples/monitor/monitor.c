@@ -458,19 +458,23 @@ int cmd_serial_io(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
 	
-	// Use serial as stdio
-	p_stdout_putchar = (t_putchar *)&serial_putchar;
-	p_stdin_getchar = (t_getchar *)&serial_getchar;
-	
-	//p_stdin_gets = (t_gets *)&serial_gets;
-	//p_stdin_inkey = (t_inkey *)&serial_inkey;
-	
-	stdio_echo = 0;	// Serial works better without gets echo
+	if (p_stdout_putchar != (t_putchar *)&serial_putchar) {
+		// Use serial as stdio
+		p_stdout_putchar = (t_putchar *)&serial_putchar;
+		p_stdin_getchar = (t_getchar *)&serial_getchar;
+		
+		//p_stdin_gets = (t_gets *)&serial_gets;
+		//p_stdin_inkey = (t_inkey *)&serial_inkey;
+		
+		stdio_echo = 0;	// Serial works better without gets echo
+	} else {
+		// Back to normal
+		stdio_init();
+	}
 	
 	/*
 	while(1) {
 		serial_gets(cmd_arg);
-		//putchar('"'); printf(cmd_arg); putchar('"'); printf("\n");
 		parse(cmd_arg);
 	}
 	*/
