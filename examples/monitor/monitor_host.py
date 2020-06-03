@@ -206,11 +206,14 @@ class Hardware:
 				if (s.startswith('CR to activate')):
 					break
 		self.put('Activating console...')
-		self.write('\n')
+		while True:
+			self.write('\n')
+			
+			# Get banner
+			s = self.readline()
+			if (s != ''): break
 		
-		# Get banner
-		s = self.readline()
-		
+		self.put('Waiting for prompt...')
 		self.wait_for_prompt()
 		self.put('Connected to monitor!')
 		
@@ -358,7 +361,9 @@ if __name__ == '__main__':
 	# Upload an app
 	put('Uploading app...')
 	app_addr = 0xc800	# LOC_DATA
-	app_addr_start = 0xd6ad	# Location of vgldk_init()
+	app_addr_start = app_addr	#0xd6ad	# Location of vgldk_init()
+	#app_addr_start = 0xd6ad	# Just for testing (known entry point)
+	
 	with open('../hello/out/hello.app.c800.bin', 'rb') as h:
 		data = h.read()
 	
@@ -366,7 +371,7 @@ if __name__ == '__main__':
 	l = len(app_data)
 	put('App size: %d bytes' % l)
 	
-	chunk_size = 48
+	chunk_size = 56	# Keep it < monitor's MAX_INPUT-6/2
 	o = 0
 	addr = app_addr
 	while (o < l):
@@ -383,7 +388,8 @@ if __name__ == '__main__':
 	put('Calling...')
 	#comp.call(app_addr)
 	comp.call(app_addr_start)
-	
+	for i in range(10):
+		s = comp.readline()
 	
 	
 	#comp.write('ver\n')

@@ -39,9 +39,22 @@ typedef char * p_char;
 	#error "VGLDK_SERIES must be defined"
 #endif
 
+/*
+// Try having this function be the first define in the whole code segment
+// So one can can just jump to the first byte to get things rolling
+void vgldk_init();	// Forward
+void vgldk_entry() __naked {
+	__asm
+		jp	vgldk_init
+	__endasm;
+}
+*/
+
 
 // #include <arch/#VGLDK_ARCH.h>
-#if VGLDK_SERIES == 1000
+#if VGLDK_SERIES == 0
+	#include "arch/plain/system.h"
+#elif VGLDK_SERIES == 1000
 	#include "arch/pc1000/system.h"
 #elif VGLDK_SERIES == 2000
 	#include "arch/gl2000/system.h"

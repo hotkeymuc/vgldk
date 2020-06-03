@@ -40,9 +40,12 @@ Some bare minimum stdio functions
 	*/
 	void stdio_init() {
 		// Set hardware stdio as the default
-		p_stdout_putchar = (t_putchar *)&VGLDK_STDOUT_PUTCHAR;
-		p_stdin_getchar = (t_getchar *)&VGLDK_STDIN_GETCHAR;
-		
+		#ifdef VGLDK_STDOUT_PUTCHAR
+			p_stdout_putchar = (t_putchar *)&VGLDK_STDOUT_PUTCHAR;
+		#endif
+		#ifdef VGLDK_STDIN_GETCHAR
+			p_stdin_getchar = (t_getchar *)&VGLDK_STDIN_GETCHAR;
+		#endif
 		//p_stdin_gets = (t_gets *)&VGLDK_STDIN_GETS;
 		//p_stdin_inkey = (t_inkey *)&VGLDK_STDIN_INKEY;
 		

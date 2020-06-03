@@ -13,7 +13,7 @@ const word tempAddr = 0xC400;
 
 // Setup
 #define MAX_ARGS 8
-#define MAX_INPUT 128	//64
+#define MAX_INPUT 255	//128	//64
 char cmd_arg[MAX_INPUT];
 
 
@@ -354,7 +354,9 @@ int cmd_poke(int argc, char *argv[]) {
 	
 	return 0;
 }
+
 word temp;
+typedef int (t_plain_vgldkinit)(void *, void *);
 int cmd_call(int argc, char *argv[]) {
 	word a;
 	
@@ -365,6 +367,22 @@ int cmd_call(int argc, char *argv[]) {
 	a = hextow(argv[1]);
 	temp = a;
 	
+	#ifdef VGLDK_VARIABLE_STDIO
+		// Just call it and let the compiler/linker take care of the stack
+		return (*(t_plain_vgldkinit *)temp)(p_stdout_putchar, p_stdin_getchar);
+	
+		/*
+		// Push STDIO pointers to stack
+		// Apps with plain architecture will get those as parameters.
+		// Others can just ignore them (but will mess up the stack on return)
+		__asm
+			ld	hl, (_p_stdout_putchar)
+			push	hl
+			ld	hl, (_p_stdin_getchar)
+			push	hl
+		__endasm;
+		*/
+	#else
 	__asm
 		ld	hl, (_temp)
 		
@@ -376,6 +394,7 @@ int cmd_call(int argc, char *argv[]) {
 			; Do not ret! This is intentionally left blank
 		_call_end:
 	__endasm;
+	#endif
 	
 	return 0;
 }
@@ -810,6 +829,15 @@ void parse(char *s) {
 			if (isQuote == 1) isQuote = 0;
 			else isQuote = 1;
 		} else
+		if (c == ';') {
+			// Execute and start over
+			*ac++ = 0x00;	// Terminate string
+			r = eval(argc, &argv[0]);
+			// Start over
+			sc++;
+			parse(sc);
+			return;
+		}
 		if (c == '%') {
 			if (isVar == 0) {
 				isVar = 1;

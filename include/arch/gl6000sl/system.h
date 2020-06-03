@@ -172,7 +172,7 @@ Intro sound port accesses at 0x2x?:
 */
 
 // It is graphical, so there is no distinct number
-// LEt's chose some sensefull values
+// Let's chose some average values
 #define DISPLAY_COLS 40
 #define DISPLAY_ROWS 10
 #include "lcd.h"
@@ -186,7 +186,7 @@ Intro sound port accesses at 0x2x?:
 //#define VGLDK_STDIN_INKEY keyboard_inkey
 
 
-void vgldk_init() {
+void vgldk_init() __naked {
 	__asm
 	di
 	

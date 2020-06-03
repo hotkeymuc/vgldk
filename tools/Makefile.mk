@@ -5,6 +5,7 @@
 
 ifndef VGLDK_SERIES
 $(error VGLDK_SERIES is not set)
+	#VGLDK_SERIES=0
 	#VGLDK_SERIES=1000
 	#VGLDK_SERIES=2000
 	#VGLDK_SERIES=4000
@@ -42,7 +43,7 @@ endif
 #
 
 #ifeq (${VGLDK_SERIES},0)
-#	SYS_ID=app
+#	ARCH_ID=app
 #	EMU_SYS=gl4004
 #	CRT_NAME=app_crt0
 #	
@@ -54,8 +55,21 @@ endif
 #	endif
 #endif
 
+ifeq (${VGLDK_SERIES},0)
+	ARCH_ID=plain
+	EMU_SYS=gl6000sl
+	#EMU_SYS=gl7007sl
+	
+	CRT_NAME=plain_crt0
+	ifndef LOC_CODE
+		LOC_CODE=c800
+	endif
+	ifndef LOC_DATA
+		LOC_DATA=c000
+	endif
+endif
 ifeq (${VGLDK_SERIES},1000)
-	SYS_ID=pc1000
+	ARCH_ID=pc1000
 	EMU_SYS=pc1000
 	
 	ifndef LOC_CODE
@@ -66,24 +80,24 @@ ifeq (${VGLDK_SERIES},1000)
 	endif
 endif
 ifeq (${VGLDK_SERIES},2000)
-	SYS_ID=gl2000
+	ARCH_ID=gl2000
 	EMU_SYS=gl2000
 endif
 ifeq (${VGLDK_SERIES},3000)
-	SYS_ID=gl3000s
+	ARCH_ID=gl3000s
 	EMU_SYS=gl3000s
 endif
 ifeq (${VGLDK_SERIES},4000)
-	SYS_ID=gl4000
+	ARCH_ID=gl4000
 	EMU_SYS=gl4000
 	#EMU_SYS=gl4004
 endif
 ifeq (${VGLDK_SERIES},5000)
-	SYS_ID=gl5000
+	ARCH_ID=gl5000
 	EMU_SYS=gl5000
 endif
 ifeq (${VGLDK_SERIES},6000)
-	SYS_ID=gl6000sl
+	ARCH_ID=gl6000sl
 	EMU_SYS=gl6000sl
 	#EMU_SYS=gl7007sl
 endif
@@ -94,11 +108,11 @@ endif
 # Defaults
 #
 
-ifndef SYS_ID
-	SYS_ID=gl${VGLDK_SERIES}
+ifndef ARCH_ID
+	ARCH_ID=gl${VGLDK_SERIES}
 endif
 ifndef EMU_SYS
-	EMU_SYS=${SYS_ID}
+	EMU_SYS=${ARCH_ID}
 endif
 ifndef LOC_CODE
 	LOC_CODE=8010
@@ -129,7 +143,7 @@ PART=AT28C64B
 # Directories
 #LIB_DIR=`realpath ../include`
 INC_DIR=../../include
-ARCH_DIR=${INC_DIR}/arch/${SYS_ID}
+ARCH_DIR=${INC_DIR}/arch/${ARCH_ID}
 LIB_DIR=${INC_DIR}
 OUT_DIR=out
 EMU_ROM_DIR="/z/apps/_emu/_roms"
