@@ -394,9 +394,9 @@ int cmd_call(int argc, char *argv[]) {
 			; Do not ret! This is intentionally left blank
 		_call_end:
 	__endasm;
+	return 0;
 	#endif
 	
-	return 0;
 }
 #endif
 
@@ -836,10 +836,15 @@ void parse(char *s) {
 		if (c == ';') {
 			// Execute and start over
 			*ac++ = 0x00;	// Terminate string
+			
+			// Execute
 			r = eval(argc, &argv[0]);
-			// Start over
+			
+			// Recurse
 			sc++;
 			parse(sc);
+			
+			// And stop
 			return;
 		}
 		if (c == '%') {

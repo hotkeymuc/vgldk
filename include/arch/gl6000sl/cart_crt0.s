@@ -95,7 +95,7 @@ init:
 	;	rst	0x08
 	;	ret
 
-_exit::
+;_exit::
 	;call 0x0164 ; V-Tech 4000 Shutdown animation (German)
 	
 	;; Exit - special code to the emulator
