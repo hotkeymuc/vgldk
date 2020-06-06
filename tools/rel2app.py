@@ -13,7 +13,7 @@ Made for my "V-Tech Genius Leader" projects using SDCC
 """
 
 WRITE_APP_BIN = True	# Write the relocatable binary to a .bin file
-WRITE_APP_H = True	# Write out the APP_BIN as an includable .h header file
+WRITE_APP_H = False	# Write out the APP_BIN as an includable .h header file
 WRITE_RELOCATED = False	# Attempt a re-location here in python
 
 # Which symbol names should be included in the .app file?

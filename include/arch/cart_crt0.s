@@ -1,4 +1,5 @@
 ;; crt0 for a Z80 based VTech Genius LEADER / PreComputer
+;; See default crt0 at /usr/share/sdcc/lib/src/z80/crt0.s
 
 ;; SDCC asm syntax: https://github.com/darconeous/sdcc/blob/master/sdas/doc/asmlnk.txt
 ;; vgl info: /z/data/_code/_c/z88dk.git/libsrc/_DEVELOPMENT/target/vgl

@@ -197,6 +197,7 @@ class Hardware:
 	
 	def wait_for_monitor(self):
 		"Wait for prompt on beginning, activate console"
+		"""
 		self.put('Waiting for monitor...')
 		while True:
 			if (self.ser.in_waiting == 0):
@@ -205,16 +206,18 @@ class Hardware:
 				s = self.readline()
 				if (s.startswith('CR to activate')):
 					break
+		"""
+		
 		self.put('Activating console...')
 		while True:
 			self.write('\n')
 			
 			# Get banner
 			s = self.readline()
-			if (s != ''): break
+			if (s == '>'): break
 		
-		self.put('Waiting for prompt...')
-		self.wait_for_prompt()
+		#self.put('Waiting for prompt...')
+		#self.wait_for_prompt()
 		self.put('Connected to monitor!')
 		
 	def wait_for_prompt(self):
@@ -234,7 +237,7 @@ class Hardware:
 		self.write('in %s\n' % ps)
 		s = self.readline()
 		if (len(s) < 7):
-			put('Erroneous answer (too short)')
+			self.put('Erroneous answer (too short)')
 			return 0xff
 		
 		# Strip prompt
@@ -242,7 +245,7 @@ class Hardware:
 		
 		# Check answer
 		if (s[0:2] != ps):
-			put('Erroneous answer: Answer "%s" does not match port "%s".' % (s, ps))
+			self.put('Erroneous answer: Answer "%s" does not match port "%s".' % (s, ps))
 			return 0xff
 		
 		vs = s[5:7]
@@ -269,7 +272,7 @@ class Hardware:
 		comp.write('peek %04x %02x\n' % (a, l))
 		s = comp.readline()
 		#put(s)
-		while (s[0] == '>'): s = s[1:]
+		while (len(s) > 0) and (s[0] == '>'): s = s[1:]
 		
 		if len(s) < 7:
 			raise Exception('Erroneous peek result (too short)')
@@ -301,6 +304,36 @@ class Hardware:
 	def call(self, a):
 		comp.write('call %04x\n' % a)
 		#comp.readline()
+	
+	def upload(self, filename, app_addr):
+		# Upload an app
+		self.put('Uploading app "%s"...' % filename)
+		#app_addr = 0xc800	# LOC_DATA
+		app_addr_start = app_addr	#0xd6ad	# Location of vgldk_init()
+		#app_addr_start = 0xd6ad	# Just for testing (known entry point)
+		
+		with open(filename, 'rb') as h:
+			data = h.read()
+		
+		app_data = data[app_addr:]
+		l = len(app_data)
+		self.put('App size: %d bytes' % l)
+		
+		chunk_size = 56	# Keep it < monitor's MAX_INPUT-6/2
+		o = 0
+		addr = app_addr
+		while (o < l):
+			chunk = app_data[o:o+chunk_size]
+			self.put('Pushing %d / %d bytes...' % (o, l))
+			#hex = ''.join(['%02x'%b for b in chunk])
+			#r = 'poke %04x %s' % (addr, hex)
+			#put(r)
+			self.poke(addr, chunk)
+			
+			addr += chunk_size
+			o += chunk_size
+		
+		self.put('Upload OK.')
 	
 
 def hexdump(data, addr=0x0000, width=16):
@@ -358,38 +391,11 @@ if __name__ == '__main__':
 	comp.wait_for_monitor()
 	
 	
-	# Upload an app
-	put('Uploading app...')
-	app_addr = 0xc800	# LOC_DATA
-	app_addr_start = app_addr	#0xd6ad	# Location of vgldk_init()
-	#app_addr_start = 0xd6ad	# Just for testing (known entry point)
-	
-	with open('../hello/out/hello.app.c800.bin', 'rb') as h:
-		data = h.read()
-	
-	app_data = data[app_addr:]
-	l = len(app_data)
-	put('App size: %d bytes' % l)
-	
-	chunk_size = 56	# Keep it < monitor's MAX_INPUT-6/2
-	o = 0
-	addr = app_addr
-	while (o < l):
-		chunk = app_data[o:o+chunk_size]
-		put('Pushing %d / %d bytes...' % (o, l))
-		#hex = ''.join(['%02x'%b for b in chunk])
-		#r = 'poke %04x %s' % (addr, hex)
-		#put(r)
-		comp.poke(addr, chunk)
-		
-		addr += chunk_size
-		o += chunk_size
-	
-	put('Calling...')
-	#comp.call(app_addr)
-	comp.call(app_addr_start)
-	for i in range(10):
-		s = comp.readline()
+	#comp.upload('../hello/out/hello.app.c800.bin', 0xc800)
+	#put('Calling...')
+	#comp.call(0xc800)
+	#for i in range(10):
+	#	s = comp.readline()
 	
 	
 	#comp.write('ver\n')
@@ -398,11 +404,14 @@ if __name__ == '__main__':
 	#put('Version: "%s"' % comp.ver())
 	#put(hexdump([ ord(b) for b in 'Hello world! This is hexdump']))
 	
-	"""
+	
 	### Scan all banks and dump memory
 	#put(hexdump(comp.peek(0x8000, 16), 0xd000))
+	
+	#comp.dump(0x8000, 64)	# 55 AA 59 45 ...
+	
 	#comp.dump(0x0000, 32)
-	for i in range(0x100):
+	for i in range(0x40, 0x100):
 		put('Bank 0x%02X:' % i)
 		comp.port_out(0x50, i)
 		comp.dump(0x0000, 128)
@@ -416,12 +425,14 @@ if __name__ == '__main__':
 		#comp.port_out(0x53, i)	# RAM!
 		#comp.dump(0xc000, 128)
 		
-		#comp.port_out(0x54, i)
+		#comp.port_out(0x54, i)	# RAM2!
 		#comp.dump(0xf000, 128)
+		
+		#comp.port_out(0x55, i)	# Magic...
 	
 	#comp.poke(0xd000, [1,2,3,4,5,6,7])
 	#comp.dump(0xd000)
-	"""
+	
 	
 	#put('Sending "in 05"...')
 	"""

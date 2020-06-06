@@ -51,7 +51,8 @@ void vgldk_entry() __naked {
 */
 
 
-// #include <arch/#VGLDK_ARCH.h>
+// #include <arch/#VGLDK_ARCH/system.h>
+// #include <system.h>
 #if VGLDK_SERIES == 0
 	#include "arch/plain/system.h"
 #elif VGLDK_SERIES == 1000
