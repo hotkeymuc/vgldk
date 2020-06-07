@@ -139,11 +139,12 @@ endif
 
 
 # Directories
-#LIB_DIR = `realpath ../include`
+OUT_DIR = out
+TOOLS_DIR = ../../tools
+#INC_DIR = `realpath ../include`
 INC_DIR = ../../include
 ARCH_DIR = $(INC_DIR)/arch/$(ARCH_ID)
 LIB_DIR = $(INC_DIR)
-OUT_DIR = out
 EMU_ROM_DIR = /z/apps/_emu/_roms
 
 
@@ -168,12 +169,14 @@ SDASZ80 = sdasz80
 OBJCOPY = objcopy
 DD = dd
 MAME = mame
-#REL2APP = python ../../tools/rel2app.py
+MINIPRO = minipro
+#REL2APP = python $(TOOLS_DIR)/rel2app.py
+SEND2MONITOR = python $(TOOLS_DIR)/send2monitor.py
 
 # Targets
 .PHONY: info clean emu burn
 
-all: cart
+all: info
 
 info:
 	@echo Compiling \"$(NAME)\"
@@ -187,10 +190,9 @@ create_out_dir:
 	@if ! [ -d $(OUT_DIR) ]; then $(MKDIR_P) $(OUT_DIR); fi
 
 cart:: VGLDK_TARGET = cart
-cart:: info create_out_dir $(OUTPUT_FILE_CART)
+cart:: info $(OUTPUT_FILE_CART)
 	@echo Cartridge file $(OUTPUT_FILE_CART) was created.
 
-app:: VGLDK_TARGET = app
 app:: VGLDK_SERIES = 0
 app:: ARCH_ID = plain
 app:: CRT_NAME = plain_crt0
@@ -198,13 +200,13 @@ app:: CRT_SIZE = 0
 app:: CRT_S_FILE = $(ARCH_DIR)/$(CRT_NAME).s
 app:: CRT_REL_FILE = $(OUT_DIR)/$(NAME).$(CRT_NAME).rel
 #app:: LOC_CODE = $(ADDR_RAM)
-app:: info create_out_dir $(OUTPUT_FILE_APP)
+app:: info $(OUTPUT_FILE_APP)
 	@#$(REL2APP) $(OUTPUT_FILE_REL)
 	@#$(REL2APP) $(OUT_DIR)/$(NAME)
 	@echo App file $(OUTPUT_FILE_APP) was created.
 
 
-$(CRT_REL_FILE): $(CRT_S_FILE)
+$(CRT_REL_FILE): create_out_dir $(CRT_S_FILE)
 	# Compile CRT0 $< to $@
 	$(SDASZ80) -o $(CRT_REL_FILE) $(CRT_S_FILE)
 
@@ -246,6 +248,9 @@ $(OUTPUT_FILE_APP): $(OUTPUT_FILE_HEX_BIN)
 
 
 # Helpers
+clean:
+	rm -f $(OUT_DIR)/$(NAME).*
+
 emu: $(OUTPUT_FILE_CART)
 	# Start MAME using the cartridge file \"$(OUTPUT_FILE_CART)\"
 	$(MAME) \
@@ -266,8 +271,7 @@ emu: $(OUTPUT_FILE_CART)
 burn: $(OUTPUT_FILE_CART)
 	# Burn image "$(OUTPUT_FILE_CART)" to (E)EPROM of type "$(CART_PART)"
 	@# Use -s = no warning for file size mismatch
-	minipro -p "$(CART_PART)" -w $(OUTPUT_FILE_CART)
+	$(MINIPRO) -p "$(CART_PART)" -w $(OUTPUT_FILE_CART)
 
-clean:
-	rm -f $(OUT_DIR)/$(NAME).*
-
+upload: $(OUTPUT_FILE_APP)
+	$(SEND2MONITOR) --dest=$(LOC_CODE) $(OUTPUT_FILE_APP)
