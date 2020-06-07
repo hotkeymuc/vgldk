@@ -7,17 +7,24 @@
 #		make cart VGLDK_SERIES=4000
 #			Compile a cartridge ROM targeting a specific model
 #		
-#		make app VGLDK_SERIES=0 LOC_CODE=0xc800 LOC_DATA=0xc200
-#			Compile a small loadable app at given memory location
-#		
 #		make emu
 #			Emulate the cartridge
 #		
 #		make burn
 #			Burn the cartridge using MiniPro
+#		
+#		make app VGLDK_SERIES=0 LOC_CODE=0xc800 LOC_DATA=0xc200
+#			Compile a small loadable app at/for given memory location
+#		
+#		make upload
+#			Upload the app binary via serial to a machine running monitor.c
+#
 
+
+# Main file must be specified
 #NAME = test
 
+# A target architecture must be specified
 #ifndef VGLDK_SERIES
 #$(error VGLDK_SERIES is not set)
 #	#VGLDK_SERIES = 0

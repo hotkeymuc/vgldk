@@ -12,7 +12,9 @@ VGLDK_SERIES = 6000
 #LOC_CODE = 0xc800
 #LOC_DATA = 0xc100
 
-include ../../tools/Makefile.mk
-
-#all: cart
+all: cart
+#all: app
 #all: emu
+#all: burn
+
+include ../../tools/Makefile.mk

@@ -354,28 +354,6 @@ if __name__ == '__main__':
 	filename = None
 	dest = DEST_DEFAULT
 	
-	"""
-	argv = sys.argv[1:]
-	try:
-		opts, args = getopt.getopt(argv, 'p:b:h', ['port=','baud=', 'help'])
-	except getopt.GetoptError:
-		show_help()
-		sys.exit(2)
-	
-	for opt, arg in opts:
-		if opt in ('-h', '--help'):
-			show_help()
-			sys.exit(0)
-		elif opt in ('-p', '--port'):
-			port = arg
-		elif opt in ('-b', '--baud'):
-			baud = int(arg)
-		else:
-			put('Unhandled: opt="%s", arg="%s"' % (opt, arg))
-	
-	if len(args) > 0:
-		filename = args[0]
-	"""
 	
 	parser = OptionParser(
 		description='Upload a binary file to a computer running monitor.c',
@@ -413,9 +391,13 @@ if __name__ == '__main__':
 	comp.upload(filename, dest)
 	
 	put('Calling 0x%04X...' % dest)
+	# Call right away (having serial I/O as stdio)
 	#comp.call(dest)
-	comp.write('sio;call %04x\n' % dest)	# Switch from serial I/O back to REAL I/O and call
 	
+	# Switch from serial I/O back to REAL I/O and call
+	comp.write('sio;call %04x\n' % dest)
+	
+	# Flush some residual output
 	for i in range(10):
 		s = comp.readline()
 	
