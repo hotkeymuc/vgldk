@@ -7,9 +7,12 @@
 #include <vgldk.h>
 #include <stdiomin.h>
 
-void main() __naked {
+//void main() __naked {
+int main() {
 	
-	printf("Hello World!");
+	printf("Hello World!\n");
 	
-	while(1) { }
+	//while(1) { }
+	//return;
+	return 4;
 }
