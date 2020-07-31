@@ -1,5 +1,9 @@
 #!/bin/sh
 # Custom Makefile
+# I am trying out different approaches to allow spanning a program across multiple memory banks
+#
+# Caution: This creates a new "fake ROM" for MAME in the subdirectory "roms"
+# The ROM zip file for the targeted machine will get OVERWRITTEN.
 
 # Command line tools setup
 MKDIR_P='mkdir -p'
@@ -9,9 +13,10 @@ OBJCOPY='objcopy'
 DD='dd'
 MAME='mame'
 MINIPRO='minipro'
-REL2APP='python3 $(TOOLS_DIR)/rel2app.py'
-NOI2H='./noi2h.py'
-SEND2MONITOR='python $(TOOLS_DIR)/send2monitor.py'
+TOOLS_DIR='../../tools'
+REL2APP='python3 ${TOOLS_DIR}/rel2app.py'
+NOI2H=${TOOLS_DIR}/noi2h.py
+SEND2MONITOR='python ${TOOLS_DIR}/send2monitor.py'
 
 # Directories
 #OUT_DIR=`realpath out`
@@ -26,7 +31,7 @@ ARCH_DIR='${INC_DIR}/arch/${ARCH_ID}'
 EMU_ROM_DIR='roms'
 
 
-# Explanation
+# Some variables
 #	
 #	ADDR_CART = 0x8000
 #		Where the cartridge ROM will reside at
@@ -225,7 +230,7 @@ function build_rom {
 		rm ${OUTPUT_FILE_SYSROMZIP}
 	fi
 	
-	echo Creating fake ROM image for MAME "${OUTPUT_FILE_SYSROMZIP}"...
+	echo Creating fake ROM image for MAME \"${OUTPUT_FILE_SYSROMZIP}\"...
 	
 	echo "This is a fake system ROM auto-created by VGLDK make." > ${OUTPUT_FILE_INFO}
 	cp ${BIN_FILE} ${OUTPUT_FILE_SYSROM}
@@ -315,6 +320,8 @@ cat out/main.seg0a.bin out/main.seg0b.bin out/main.seg1.bin out/main.seg2.bin > 
 
 # Bundle
 build_rom out/main.segs.bin
+
 # Emu
+echo Please ignore warnings about \"WRONG CHECKSUMS\" because we just created that fake ROM
 emu ${CART_FILE}
 
