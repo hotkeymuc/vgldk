@@ -5,19 +5,20 @@
 */
 
 
+#include "common.h"
+#include "segment1_addr.h"
+#include "segment2_addr.h"
+
+
 //@TODO: Include the "CRT0 surrogate" to vgldk.h
 
 // CRT0 surrogate: The following block does what is usually done by a CRT0.s file
 //extern void vgldk_init();	// Forward declaration to suppress compiler warnings
 void main0();	// Forward declaration to suppress compiler warnings
 
-#include "common.h"
-#include "segment1_addr.h"
-#include "segment2_addr.h"
-
 
 void CRT0_ROM() __naked {
-	// This is the system ROM header
+	// This is the system ROM header (for 4000 at least)
 	__asm
 		di
 		ld	sp, #0xdff0	; Load StackPointer to 0xdff0
