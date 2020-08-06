@@ -34,7 +34,7 @@ char cmd_arg[MAX_INPUT];
 #define MONITOR_CMD_PAUSE
 #ifdef MONITOR_SOFTSERIAL
 	#define MONITOR_CMD_SOFTSERIAL
-	#define MONITOR_SOFTSERIAL_AUTOSTART
+	//#define MONITOR_SOFTSERIAL_AUTOSTART
 #endif
 #define MONITOR_CMD_VER
 
@@ -107,9 +107,11 @@ void printf_byte_pretty(byte v) {
 	// Binary
 	putchar(' '); printf_bin(v);
 	
+	/*
 	// Decimal
 	//printf(" %d\n", v);
 	putchar(' '); printf_d(v);
+	*/
 }
 
 // Internal command call definition
@@ -886,14 +888,19 @@ void parse(char *s) {
 	// Handle return value
 	if (r != 0) {
 		//printf("Exit code %d\n", r);
-		printf("Exit code "); printf_d(r); printf("\n");
+		//printf("Exit code "); printf_d(r); printf("\n");
+		printf("Exit code ");
+		printf("0x"); printf_x2(r);
+		printf("\n");
 	}
 }
 
 
 
 void main() __naked {
+	#ifdef MONITOR_SOFTSERIAL_AUTOSTART
 	int c;
+	#endif
 	
 	#ifdef VGLDK_VARIABLE_STDIO
 		// Variable STDIO must be initialized

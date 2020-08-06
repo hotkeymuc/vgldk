@@ -137,8 +137,8 @@ CART_SIZE_KB = 8
 
 # EEPROM burning options
 ifeq ($(CART_SIZE_KB),8)
-	#CART_PART = CAT28C64B
-	CART_PART = AT28C64B
+	CART_PART = CAT28C64B
+	#CART_PART = AT28C64B
 endif
 ifeq ($(CART_SIZE_KB),32)
 	CART_PART = AT28C256
@@ -200,11 +200,12 @@ cart:: VGLDK_TARGET = cart
 cart:: info $(OUTPUT_FILE_CART)
 	@echo Cartridge file $(OUTPUT_FILE_CART) was created.
 
-app:: VGLDK_SERIES = 0
-app:: ARCH_ID = plain
+app:: VGLDK_SERIES ?= 0
+#app:: ARCH_ID = plain
 app:: CRT_NAME = plain_crt0
 app:: CRT_SIZE = 0
-app:: CRT_S_FILE = $(ARCH_DIR)/$(CRT_NAME).s
+#app:: CRT_S_FILE = $(ARCH_DIR)/$(CRT_NAME).s
+app:: CRT_S_FILE = $(INC_DIR)/arch/plain/plain_crt0.s
 app:: CRT_REL_FILE = $(OUT_DIR)/$(NAME).$(CRT_NAME).rel
 #app:: LOC_CODE = $(ADDR_RAM)
 app:: info $(OUTPUT_FILE_APP)

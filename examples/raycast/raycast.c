@@ -1,15 +1,15 @@
 /*
-	A cheap ass raytracer
+	A crappy ass raycaster
 	- no rotations
 	- no perspective
 	- no trigonometry
 	- no perspective correction
 	
-	2020-01-22 Bernhard "HotKey" Slawik
+	2020-07-07 Bernhard "HotKey" Slawik
 */
 
-#define TEXT_MODE
-//#define GFX_MODE
+//#define TEXT_MODE
+#define GFX_MODE
 
 
 #define lcd_MINIMAL	// Use minimal text mode (no scrolling)
@@ -113,7 +113,7 @@ void drawCol(int x, int z) {
 	//#define SCREEN_W 240
 	#define SCREEN_W 30
 	#define SCREEN_H 100
-	#define MAX_DEPTH 8
+	#define MAX_DEPTH 16
 void drawVLine(int x, int y1, int h) {
 	byte *p;
 	int y;
@@ -130,7 +130,7 @@ void drawCol(int x, int z) {
 	if (z > MAX_DEPTH-1) z = MAX_DEPTH-1;	// z clip
 	
 	//drawVLine(x, SCREEN_H/2 - z*2, z*4);
-	drawVLine(x, z * 10, SCREEN_H - z*20);
+	drawVLine(x, z * (SCREEN_H / (MAX_DEPTH*2)), SCREEN_H - z * (SCREEN_H / MAX_DEPTH));
 	
 }
 #endif
@@ -138,7 +138,9 @@ void drawCol(int x, int z) {
 int player_x = LEVEL_W/2;
 int player_z = LEVEL_H/2;
 
-const int fov = MAX_DEPTH;
+#define FOV MAX_DEPTH
+
+#define OVERSAMPLE 1
 
 void drawScreen() {
 	int ix;
@@ -151,11 +153,11 @@ void drawScreen() {
 	lcd_clear();
 	
 	for(ix = 0; ix < SCREEN_W; ix++) {
-		dx = -(fov / 2) + (fov * ix) / (SCREEN_W-1);
-		dz = -MAX_DEPTH;
+		dx = OVERSAMPLE * -(FOV / 2) + (OVERSAMPLE * FOV * ix) / (SCREEN_W-1);
+		dz = OVERSAMPLE * -MAX_DEPTH;
 		for(iz = 0; iz < MAX_DEPTH; iz++) {
-			x = player_x + (dx * iz) / (MAX_DEPTH-1);
-			z = player_z + (dz * iz) / (MAX_DEPTH-1);
+			x = player_x + (dx * iz) / (OVERSAMPLE * MAX_DEPTH-1);
+			z = player_z + (dz * iz) / (OVERSAMPLE * MAX_DEPTH-1);
 			if (x < 0) break;
 			if (x >= LEVEL_W) break;
 			if (z < 0) break;

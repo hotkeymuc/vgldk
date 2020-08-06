@@ -591,7 +591,6 @@ byte *serial_gets(byte *serial_get_buf) {
 	b = serial_get_buf;
 	while(1) {
 		//c = serial_getchar();
-		
 		c = serial_getchar_nonblocking();
 		if (c <= 0) continue;	// < 0 means "no data"
 		

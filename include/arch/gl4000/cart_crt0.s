@@ -138,5 +138,3 @@ gsinit_next:
 
 ;	.area   _GSFINAL
 ;	ret
-
-

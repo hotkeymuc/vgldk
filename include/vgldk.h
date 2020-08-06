@@ -6,8 +6,10 @@
 	VGLDK
 	=====
 	
-	A Software Development Kit for the VTech "Genius LEADER" series of learning computers
-	Copyright (C) 2017 Bernhard "HotKey" Slawik
+	A Software Development Kit for the "VTech Genius LEADER" series of learning computers
+	(aka "VTech PreComputer" aka "YENO MisterX")
+	
+	2017 Bernhard "HotKey" Slawik
 	
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by

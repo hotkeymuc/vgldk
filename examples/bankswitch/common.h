@@ -1,5 +1,7 @@
 /*
-Defines for files that want to make use of the "common" segment
+
+Defines that all segments need
+
 */
 
 /*

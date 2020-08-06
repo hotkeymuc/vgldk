@@ -34,6 +34,7 @@ import os
 SERIAL_PORT = '/dev/ttyUSB0'
 SERIAL_BAUD = 9600	# Software Serial currrently only supports 9600 baud (fixed)
 SERIAL_TIMEOUT = 0.1
+SERIAL_TIMEOUT_SHORT = 0.05
 DEST_DEFAULT = 0xc800
 
 
@@ -197,16 +198,23 @@ class Hardware:
 		#self.put('Waiting for prompt...')
 		#self.wait_for_prompt()
 		self.put('Connected to monitor!')
+		time.sleep(0.1)
 		
 	def wait_for_prompt(self):
+		
+		self.ser.timeout = SERIAL_TIMEOUT_SHORT
 		while True:
 			s = self.readline()
-			if s == '>':
-				return True
+			if s.endswith('>'):
+				break
+			self.write('\n')
+		
+		self.ser.timeout = SERIAL_TIMEOUT
+		return True
 	
 	def ver(self):
-		comp.write('ver\n')
-		s = comp.readline()
+		self.write('ver\n')
+		s = self.readline()
 		return s.strip()
 	
 	def port_in(self, p):
@@ -238,17 +246,18 @@ class Hardware:
 	
 	def ints(self):
 		# Let interrupts happen
-		#comp.write('ei\ndi\n')
-		comp.write('ints\n')
-		comp.readline()
-		comp.write('\n')
-		comp.readline()
-		comp.readline()
+		#self.write('ei\ndi\n')
+		self.write('ints\n')
+		self.readline()
+		self.write('\n')
+		self.readline()
+		self.readline()
 		
 	
 	def peek(self, a, l=1):
-		comp.write('peek %04x %02x\n' % (a, l))
-		s = comp.readline()
+		self.ser.timeout = SERIAL_TIMEOUT
+		self.write('peek %04x %02x\n' % (a, l))
+		s = self.readline()
 		#put(s)
 		while (len(s) > 0) and (s[0] == '>'): s = s[1:]
 		
@@ -273,18 +282,27 @@ class Hardware:
 		return r
 	
 	def dump(self, a, l=16):
-		put(hexdump(comp.peek(a, l), a))
+		put(hexdump(self.peek(a, l), a))
 		
 	def poke(self, a, data):
 		if PYTHON3:
-			comp.write('poke %04x %s\n' % (a, ''.join(['%02x'%b for b in data]) ))
+			self.write('poke %04x %s\n' % (a, ''.join(['%02x'%b for b in data]) ))
 		else:
-			comp.write('poke %04x %s\n' % (a, ''.join(['%02x'%ord(b) for b in data]) ))
-		comp.readline()
+			self.write('poke %04x %s\n' % (a, ''.join(['%02x'%ord(b) for b in data]) ))
+		
+		#time.sleep(0.1)
+		#r = self.readline()
+		#if r == '>': return True
+		#put('Returned "%s"!' % str(r))
+		#return False
+		#self.wait_for_prompt()
+		#return True
+		return True
+		
 	
 	def call(self, a):
-		comp.write('call %04x\n' % a)
-		#comp.readline()
+		self.write('call %04x\n' % a)
+		#self.readline()
 	
 	def upload(self, filename, dest_addr, src_addr=0):
 		# Upload an app
@@ -294,7 +312,7 @@ class Hardware:
 		#app_addr_start = 0xd6ad	# Just for testing (known entry point)
 		
 		with open(filename, 'rb') as h:
-			data = h.read()
+			data = [ b for b in h.read() ]
 		
 		# Extract portion
 		app_data = data[src_addr:]
@@ -302,17 +320,54 @@ class Hardware:
 		l = len(app_data)
 		self.put('App size: %d bytes' % l)
 		
-		chunk_size = 56	# Keep it < monitor's MAX_INPUT-6/2
+		#chunk_size = 56	# Keep it < monitor's MAX_INPUT-10/2
+		#chunk_size = 32	# Keep it < monitor's MAX_INPUT-10/2
+		chunk_size = 24	# Keep it < monitor's MAX_INPUT-10/2
+		#chunk_size = 16	# Keep it < monitor's MAX_INPUT-10/2
+		#chunk_size = 8	# Keep it < monitor's MAX_INPUT-10/2
+		
 		o = 0
 		addr = dest_addr
 		while (o < l):
+			
 			chunk = app_data[o:o+chunk_size]
 			self.put('Pushing %d / %d bytes...' % (o, l))
 			#hex = ''.join(['%02x'%b for b in chunk])
 			#r = 'poke %04x %s' % (addr, hex)
 			#put(r)
-			self.poke(addr, chunk)
 			
+			
+			success = False
+			while not success:
+				
+				#self.write('\n')
+				#self.wait_for_prompt()
+				#time.sleep(0.1)
+				
+				success = self.poke(addr, chunk)
+				#time.sleep(0.1)
+				
+				self.wait_for_prompt()
+				if not success:
+					continue
+				
+				#time.sleep(0.1)
+				
+				#	self.wait_for_monitor()
+				success = False
+				try:
+					check = self.peek(addr, len(chunk))
+					self.wait_for_prompt()
+					if check == chunk:
+						success = True
+						break
+					else:
+						put('Expected	%s\nbut got 	%s!' % (str(chunk), str(check)))
+						#@TODO: Increment as much as possible
+				except Exception:
+					put('Error')
+				
+				
 			addr += chunk_size
 			o += chunk_size
 		
@@ -387,6 +442,9 @@ if __name__ == '__main__':
 	comp.open()
 	
 	comp.wait_for_monitor()
+	
+	comp.write('di\n')
+	comp.wait_for_prompt()
 	
 	comp.upload(filename, dest)
 	

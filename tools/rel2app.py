@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/python3
 """
 rel2app
 =======
@@ -28,9 +28,11 @@ SHOW_USAGES = not True	# Log all uses
 DUMP_SYMBOLS = not True	# Show all symbols after parsing
 
 
-LOC_CODE = 0x0000	# Should be same as compiler option --code-loc
-LOC_DATA = 0xc000	# Should be same as compiler option --data-loc
+#LOC_CODE = 0x0000	# Should be same as compiler option --code-loc
+#LOC_DATA = 0xc000	# Should be same as compiler option --data-loc
 
+AREA_NAME_CODE = '_CODE'
+AREA_NAME_DATA = '_DATA'
 AREA_NAME_EXT = 'ext'	# Name for symbols wihtout an explicit area
 AREA_HEADER_BYTE_CODE = 0xC0
 AREA_HEADER_BYTE_DATA = 0xDA
@@ -79,15 +81,16 @@ class Symbol:
 
 class Area:
 	"One area of symbols within a .rel file"
-	def __init__(self, name=AREA_NAME_EXT, size=0):
+	def __init__(self, name=AREA_NAME_EXT, size=0, area_num=0):
 		self.name = name
 		self.size = size
 		self.symbols = []
+		self.area_num = area_num
 		self.index = 0 # For Ref's which we have to count manually...
 		
 		self.header_byte = 0x00
-		if (name == '_CODE'): self.header_byte = AREA_HEADER_BYTE_CODE
-		elif (name == '_DATA'): self.header_byte = AREA_HEADER_BYTE_DATA
+		if (name == AREA_NAME_CODE): self.header_byte = AREA_HEADER_BYTE_CODE
+		elif (name == AREA_NAME_DATA): self.header_byte = AREA_HEADER_BYTE_DATA
 		elif (name == AREA_NAME_EXT): self.header_byte = AREA_HEADER_BYTE_EXT
 	
 	def add_symbol(self, sym):
@@ -153,33 +156,39 @@ class Area:
 	def __repr__(self):
 		return 'Area "%s", size=%d / 0x%04X' % (self.name, self.size, self.size)
 
-def process_rel(filename_base):
+def process_rel(filename_base, filename_bin_linked=None):
 	"Parse the given .rel file (without extension) and create a loadable app from it"
 	
 	filename_rel = filename_base + '.rel'
-	filename_bin_linked = filename_base + '.bin'
-	filename_bin_relocated = filename_base + '.relocated.bin'
-	filename_app_bin = filename_base + '.app.bin'
-	filename_app_h = filename_base + '.app.h'
+	
+	if filename_bin_linked is None:
+		filename_bin_linked = filename_base + '.bin'
+	
+	#filename_bin_relocated = filename_base + '.relocated.bin'	#@FIXME: Relocation currently broken
+	
 	
 	### Load the linked binary (to get some auto-generated calls)
 	linked_bin_data = []
 	with open(filename_bin_linked, 'rb') as h:
 		linked_bin_d = h.read()
 		for c in linked_bin_d:
-			linked_bin_data.append(ord(c))
+			#linked_bin_data.append(ord(c))	# Python2
+			linked_bin_data.append(c)	# Python3
 	
 	rel_bin_data = []
 	current_addr = 0x0000	# Offset of last text line (to keep "T" and "R" in sync)
 	
 	areas = dict()
-	current_area = Area(name=AREA_NAME_EXT)	# Global/ext area
+	current_area = Area(name=AREA_NAME_EXT, area_num=-1)	# Global/ext area
 	areas[current_area.name] = current_area
 	
 	
 	put('Parsing .rel file "%s"...' % filename_rel)
 	
+	area_num = 0
+	line_num = 0
 	for l in open(filename_rel, 'r'):
+		line_num += 1
 		l = l.strip()
 		if len(l) < 1: continue
 		if SHOW_ALL_LINES: put('\t"%s"' % l)
@@ -192,12 +201,16 @@ def process_rel(filename_base):
 			# flags=parts[5]
 			# addr=parts[7]
 			
-			current_area = Area(name=area_name, size=area_size)
+			put('Adding area #%d: "%s"' % (area_num, area_name))
+			
+			current_area = Area(name=area_name, size=area_size, area_num=area_num)
 			if SHOW_ADDS:
-				put('Adding %s' % str(current_area))
+				put('Adding area %s' % str(current_area))
+			
 			
 			#areas.append(current_area)
 			areas[current_area.name] = current_area
+			area_num += 1
 			
 		elif (l[0] == 'S'):
 			# SYMBOL
@@ -247,7 +260,7 @@ def process_rel(filename_base):
 				rel_ofs = int(parts[o+1], 16)
 				rel_index = int(parts[o+2], 16) + 0x100 * int(parts[o+3], 16)	# 0000 = CODE, 0001 = DATA, ...
 				
-				#put('Relocation: type=%02X at buffer offset %d, area=%04X' % (rel_type, rel_ofs, rel_index))
+				#put('Relocation: type=%02X at offset=%d, area=%04X' % (rel_type, rel_ofs, rel_index))
 				
 				# R points to the actual hex tuple in previous line. We need to change that to absolute binary offset
 				rel_ofs_abs = current_addr + rel_ofs - 2
@@ -259,7 +272,7 @@ def process_rel(filename_base):
 				# Also get the address the linker put in the actual binary (interesting for auto-generated code that is not included in the .rel!)
 				linked_addr = linked_bin_data[rel_ofs_abs] + 0x100 * linked_bin_data[rel_ofs_abs+1]
 				
-				#put('Relocation: rel_type=%02X, rel_index=%d at binary offset %d / 0x%04X: org_addr=%04X, linked_addr=%04X' % (rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr))
+				put('Relocation in line %d: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X' % (line_num, rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr))
 				
 				### Resolve to area, symbol and offset (by using the known R-data and "address")
 				
@@ -269,13 +282,23 @@ def process_rel(filename_base):
 				u = None
 				if (rel_type == 0x00):
 					
+					
+					#@FIXME: The rel_index should look up the known area by this index! (see area.area_num)
+					#@FIXME: Use rel_index to look up the area!
+					
 					if (rel_index == 0):	# Calling a function in program's scope (by address)
-						a = areas['_CODE']
+						a = areas[AREA_NAME_CODE]
 					elif (rel_index == 1):	# Accessing a variable (by address)
-						a = areas['_DATA']
+						a = areas[AREA_NAME_DATA]
+					#elif (rel_index == 2):	# Accessing an address directly?
 					else:
-						put('Referencing unknown rel_index %d!' % rel_index)
-						sys.exit(2)
+						#@FIXME: Use rel_index to look up the area!
+						put('Unhandled relocation in line %d: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X' % (line_num, rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr))
+						put('...because areas are currently hard-linked to an index: 0=CODE and 1=DATA. Other rel_indices are not supported at the moment.')
+						#put('Referencing unknown rel_index (i.e. area) %d in line %d!' % (rel_index, line_num))
+						#sys.exit(2)
+						put('Skipping!')
+						break
 					
 					sym, sym_ofs = a.symbol_by_address(org_addr)
 					sym.linked_addr = linked_addr - sym_ofs	# Update linked address
@@ -291,8 +314,13 @@ def process_rel(filename_base):
 					u = Usage(bin_ofs=rel_ofs_abs, sym_ofs=sym_ofs)
 				
 				else:
-					put('Unknown rel_type 0x%02X' % (rel_type))
-					sys.exit(5)
+					#@FIXME: Handle other cases! (e.g. rel_type=9)
+					put('Unhandled relocation in line %d: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X' % (line_num, rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr))
+					put('...because unknown rel_type 0x%02X in line %d' % (rel_type, line_num))
+					#sys.exit(5)
+					put('Skipping!')
+					break
+					
 				
 				if SHOW_USAGES:
 					put('Usage of symbol "%s" (%s, addr=0x%04X, linked_addr=0x%04X), sym_ofs=%d at binary position %d / 0x%04X' % (sym.name, a.name, sym.addr, sym.linked_addr, u.sym_ofs, rel_ofs_abs, rel_ofs_abs))
@@ -319,14 +347,22 @@ def process_rel(filename_base):
 	
 	if DUMP_SYMBOLS:
 		put('Symbols:')
-		for area_name, a in areas.iteritems():
+		#for area_name, a in areas.iteritems():	# Python2
+		for area_name, a in areas.items():	# Python3
 			put('\t* %s' % str(a))
 			for sym in a.symbols:
 				put('\t\t* %s' % str(sym))
 				
 			
-		
 	
+	put('Done processing "%s".' % (filename_base))
+	return areas, rel_bin_data, linked_bin_data
+
+
+def write_app(filename_base, areas, linked_bin_data):
+	
+	filename_app_bin = filename_base + '.app.bin'
+	filename_app_h = filename_base + '.app.h'
 	
 	### Create .app structure
 	app_data = []
@@ -361,7 +397,8 @@ def process_rel(filename_base):
 	put('Writing relocation information...')
 	# Count actually used symbols
 	areas_used = 0
-	for area_name, a in areas.iteritems():
+	#for area_name, a in areas.iteritems():	# Python2
+	for area_name, a in areas.items():	# Python3
 		# Count syms used in this area
 		syms_used = 0
 		for sym in a.symbols:
@@ -372,7 +409,8 @@ def process_rel(filename_base):
 	write_word(areas_used)	# Number of (actual used) areas
 	
 	# Write out all used areas
-	for area_name, a in areas.iteritems():
+	#for area_name, a in areas.iteritems():	# Python2
+	for area_name, a in areas.items():	# Python3
 		
 		# Count syms used in this area (again...)
 		syms_used = 0
@@ -505,9 +543,14 @@ if __name__ == '__main__':
 	
 	if (len(sys.argv) > 1):
 		filename_base = sys.argv[1]
+		if (len(sys.argv) > 2):
+			filename_bin_linked = sys.argv[2]
 	else:
 		filename_base = 'out/app_test'
+		filename_bin_linked = None
 	
-	process_rel(filename_base)
+	areas, rel_bin_data, linked_bin_data = process_rel(filename_base, filename_bin_linked)
+	
+	write_app(filename_base=filename_base, areas=areas, linked_bin_data=linked_bin_data)
 	
 	sys.exit(0)

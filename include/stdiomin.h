@@ -81,6 +81,7 @@ void printf(char *pc) {
 
 //void printf_d(char *pc, byte d) {
 void printf_d(byte d) {
+	
 	byte i;
 	
 	//printf(pc);
@@ -91,6 +92,12 @@ void printf_d(byte d) {
 	}
 	
 	//printf("\n");
+	
+	/*
+	putchar('0' + ( d / 100));
+	putchar('0' + ((d % 100) / 10));
+	putchar('0' + ( d % 10));
+	*/
 }
 
 

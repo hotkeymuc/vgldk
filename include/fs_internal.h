@@ -252,6 +252,7 @@ word fs_int_fwrite(void *ptr, word size, byte nmemb, FILE *f) {
 // Publish a FS struct
 const FS fs_internal = {	// Keep in sync with fs.h:FS!
 	fs_int_mount,
+	
 	fs_int_opendir,
 	fs_int_closedir,
 	fs_int_readdir,

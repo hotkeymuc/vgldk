@@ -110,20 +110,24 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 	
 	
 	__asm
-		di
+		;di
 		
-		exx	; Switch to secondary BC, DE and HL
+		;exx	; Switch to secondary BC, DE and HL
+		push af
+		push bc
+		push de
+		;push hl
 		
 		
 		; Param "l" into B
-		ld	hl, #4+0
+		ld	hl, #4+6
 		add	hl, sp
 		ld	b, (hl)
 		
 		;; Param "buffer" to HL
 		;pop hl
 		;push hl
-		ld	hl, #2+0
+		ld	hl, #2+6
 		add	hl, sp
 		ld	e, (hl)
 		inc	hl
@@ -131,7 +135,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 		ex de, hl
 		
 		
-		push af	; AF is not exchanged by EXX
+		;push af	; AF is not exchanged by EXX
 		
 		; Start with initial LOW level (like in previous stop bit)
 		; so that the start bit makes a distinct transition
@@ -255,6 +259,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 		; So we need to calibrate both cases using "NOP slides"
 		
 		_bbtx_set_HIGH:					; Send HIGH level / logical "0"
+			
 			ld	a, #0xff				; Set all D0-D7 to HIGH
 			out	(0x10), a
 			
@@ -277,6 +282,7 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 		ret
 		
 		_bbtx_set_LOW:					; Send LOW level / logical "1"
+			
 			ld	a, #0x00				; Set all D0-D7 to LOW
 			out	(0x10), a
 			
@@ -353,11 +359,14 @@ void serial_put(const byte *serial_put_buf, byte l) __naked {
 			; Leave with level LOW (stop bit level)
 			call _bbtx_set_LOW
 			
-			exx		; Back to original BC, DE, HL
+			;exx		; Back to original BC, DE, HL
+			;pop hl
+			pop de
+			pop bc
 			pop af	; AF was not exchanged by EXX
-			ei
+			;ei		; @FIXME: Maybe they should not be enabled!
 			
-			ret		; Only if declared as "__naked"
+			ret		; Only needed if declared as "__naked"
 			
 	__endasm;
 }
@@ -399,12 +408,13 @@ _serial_isReady_not:
 __endasm;
 }
 
-int serial_getchar() __naked {
+int serial_getchar_nonblocking() __naked {
 // Return byte
 // If in "less blocking" mode, it returns "0" if no data was detected. In blocking mode all data is received
 // Returns -1 for timeout
 __asm
-	di				; Full attention!
+	;di				; Full attention!
+	
 	;push	hl
 	push	af
 	push	bc
@@ -417,8 +427,8 @@ __asm
 	
 	
 	_brx_byte_start:
-	ld	c, #0					; This holds the result
 	
+	ld	c, #0					; This holds the result
 	
 	; Wait for start bit (blocking)
 	;_brx_wait_loop:
@@ -430,16 +440,22 @@ __asm
 	ld	b, #0x08		; ...with timeout
 	;ld	b, #0x20		; ...with timeout
 	_brx_wait_loop:
+		in	a, (0x11)	; Get printer status
+		cp	#0x7f
+		jp z, _brx_bits_start	; if "0" go to byte start
+		
+		nop
+		
+		; Count down
 		dec b
-		;ld a, b
-		;cp a, #0
+		ld a, b
+		cp #0
 		jp z, _brx_timeout	; Timeout!
 		
-		in	a, (0x11)	; Get printer status
-		cp	#0x5f
-	jr	z, _brx_wait_loop
+	jr	_brx_wait_loop
 	
 	
+	_brx_bits_start:
 	; Wait half of the start bit...
 	call	_brx_delayEdge
 	
@@ -562,10 +578,23 @@ __asm
 		pop	af
 		;pop	hl
 	
-	ei
+	;ei
 	ret
 	
 __endasm;
+}
+
+byte serial_getchar() {
+	int c;
+	
+	// Wait until a byte is there
+	while(1) {
+		c = serial_getchar_nonblocking();
+		if (c <= 0) continue;
+		
+		return (byte)(c & 0xff);
+	}
+	//return c;
 }
 
 byte *serial_gets(byte *serial_get_buf) {
@@ -574,9 +603,9 @@ byte *serial_gets(byte *serial_get_buf) {
 	
 	b = serial_get_buf;
 	while(1) {
-		c = serial_getchar();
-		
-		if (c < 0) continue;	// < 0 means "no data"
+		//c = serial_getchar();
+		c = serial_getchar_nonblocking();
+		if (c <= 0) continue;	// < 0 means "no data"
 		
 		// Check for end-of-line character(s)
 		if ((c == 0x0a) || (c == 0x0d)) break;

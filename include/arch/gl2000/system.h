@@ -19,8 +19,8 @@ for use with SDCC compiler
 #define DISPLAY_COLS 20
 #define DISPLAY_ROWS 2
 
-volatile __at (0xdce0) unsigned char KEY_STATUS;	// Controls reading from the keyboard on 2000 (put 0xc0 into it, wait for it to become 0xd0)
-volatile __at (0xdce4) unsigned char KEY_CURRENT;	// Holds the current key code on 2000
+//volatile __at (0xdce0) unsigned char KEY_STATUS;	// Controls reading from the keyboard on 2000 (put 0xc0 into it, wait for it to become 0xd0)
+//volatile __at (0xdce4) unsigned char KEY_CURRENT;	// Holds the current key code on 2000
 
 #include "lcd.h"
 #include "keyboard.h"
