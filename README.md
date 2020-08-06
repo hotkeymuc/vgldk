@@ -6,22 +6,30 @@ This is under construction. For actually working stuff, visit the [Hackaday proj
 
 ## Target platforms
 	pc1000
-		VTech PreComputer 1000
-		YENO Mister X
+		VTech PreComputer 1000 [US/UK]
+		YENO Mister X [DE]
 	gl2000
-		(CompuSavant?)
-		VTech PreComputer 2000
-		VTech Genius LEADER 2000
-		VTech Genius LEADER 2000 Compact
-		VTech Genius LEADER 2000 PLUS
+		VTech PreComputer 2000 [US/UK]
+		VTech Genius LEADER 2000 [DE]
+		VTech Genius LEADER 2000 PLUS [DE]
+		VTech Genius LEADER 2000 Compact [DE]
+		VTech PreComputer THINK BOOK [UK]
 		YENO Mister X2
 	gl4000
-		(CompuSavant?)
-		VTech Genius LEADER 4000 Quadro
-		VTech Genius LEADER 4004 Quadro L
+		VTech PreComputer POWER PAD [UK]
+		VTech Genius LEADER 4000 Quadro [DE]
+		VTech Genius LEADER 4000 Quadro [DE]
+		VTech Genius LEADER 4004 Quadro L [DE]
 	gl6000sl
-		VTech Genius LEADER 6000 SL
+		VTech Genius LEADER 6000 SL [DE]
 		VTech PreComputer Prestige
+	
+	planned:
+	gl7000
+		VTech PC ENDEAVOUR [UK]
+		VTech Genius LEADER 7007 SL [DE]
+		VTech Genius LEADER 8008 CX [DE]
+		(CompuSavant? [FR])
 
 ## Files
 * examples: Some demonstrative use cases
