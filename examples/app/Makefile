@@ -1,5 +1,6 @@
 
-NAME = app_hello
+#NAME = app_hello
+NAME = app_cserial
 
 # For targeting a specific model:
 #VGLDK_SERIES = 1000
@@ -10,7 +11,8 @@ NAME = app_hello
 # For small loadable apps (without their own I/O):
 VGLDK_SERIES = 0
 LOC_CODE = 0xc400
-LOC_DATA = 0xc100
+#LOC_DATA = 0xe000
+LOC_DATA = 0xd000
 
 all: upload
 #all: app
