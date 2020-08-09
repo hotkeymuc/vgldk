@@ -16,6 +16,8 @@ A Z80 at 4~6 MHz is fast enough to read and send data at 9600 baud pretty reliab
 Beware: There is no interrupt, so your program must poll the port as often as possible in order to not miss a byte!
 I therefore strongly advise you to implement error checking and re-sending in your serial protocol.
 
+The stability is also "temperamental"... When trying to receive too many bytes in a row, synchronization breaks.
+At the moment I can receive about 50 bytes at once reliably, but with some more NOP calibration it might get better.
 
 Use the following wiring:
 
@@ -437,8 +439,8 @@ __asm
 	;jr	z, _brx_wait_loop
 	
 	; Wait for start bit (less blocking)
-	ld	b, #0x08		; ...with timeout
-	;ld	b, #0x20		; ...with timeout
+	;ld	b, #0x08		; ...with timeout
+	ld	b, #0x10		; ...with timeout
 	_brx_wait_loop:
 		in	a, (0x11)	; Get printer status
 		cp	#0x7f
@@ -507,8 +509,8 @@ __asm
 		jp z, _brx_timeout2	; Timeout!
 		
 		in	a, (0x11)
-		cp	#0x5f
-	jr	nz, _brx_wait_stopBit_loop
+		cp	#0x7f
+	jr	z, _brx_wait_stopBit_loop
 	
 	
 	; The stop bit should now be happening.
@@ -534,7 +536,7 @@ __asm
 	_brx_delay:
 		push hl
 		; Set the delay. This must be calibrated for the desired baud rate and the CPU speed used
-		; By trial and error: 9600 baud result in a delay of H=0x03, L=0x18
+		; By trial and error: 9600 baud result in a delay of H=0x03, L=0x0x12
 		ld	h, d
 		ld	l, e
 		

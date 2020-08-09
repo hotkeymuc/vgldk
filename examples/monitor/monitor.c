@@ -369,6 +369,8 @@ int cmd_call(int argc, char *argv[]) {
 	a = hextow(argv[1]);
 	temp = a;
 	
+	//@TODO: Push residual arguments on stack (argc-2, argv[2:])
+	
 	#ifdef VGLDK_VARIABLE_STDIO
 		// Just call it and let the compiler/linker take care of the stack
 		return (*(t_plain_vgldkinit *)temp)(p_stdout_putchar, p_stdin_getchar);

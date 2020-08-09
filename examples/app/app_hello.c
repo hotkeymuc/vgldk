@@ -1,46 +1,32 @@
 /*
-	A simple "Hello World" for the VGLDK
+	A simple "Hello World" app for the VGLDK
+	
+	This demonstrates a minimal binary that can be uploaded to a host
+	running monitor.c using a serial connection.
+	
+	To build:
+		make app
+	To upload:
+		make upload
+		(or manually invoke tools/send2monitor.py)
+	
+	To keep apps small, they can re-use the host's I/O:
+	When using VGLDK_VARIABLE_STDIO (e.g. VGLDK_SERIES = 0) then vgldk.h will
+	define a monitor.c compatible app entry point automatically and obtain the
+	host's p_putchar/p_getchar on startup before jumping to main().
+	
+	So: Make sure vgldk.h can define the very first bytes of your app binary!
+	(This also means: use an empty crt0 if possible)
 	
 	2020-01-22 Bernhard "HotKey" Slawik
 */
-
-// Forward declarations
-//int main(int argc, char *argv[]);	// as defined in monitor.c
-//void main() __naked {	
-//int main();
-//void main();
-
-/*
-void app_start() __naked {
-	__asm
-		
-		jp _main;
-	__endasm;
-}
-*/
-
-int app_start(int argc, char *argv[]) {	// as defined in monitor.c
-	
-	(void)argc;
-	(void)argv;
-	
-	
-	__asm
-		call _vgldk_init
-		//call _main;
-	__endasm;
-	
-	
-	return 0x42;
-}
-
-
 
 #include <vgldk.h>
 #include <stdiomin.h>
 
 //void main() __naked {
-void main() {
+//void main() {
+int main() {
 	char c;
 	
 	printf("Hello World!\n");
@@ -53,4 +39,5 @@ void main() {
 	//while(1) { }
 	//return;
 	//return c;
+	return 0x43;
 }

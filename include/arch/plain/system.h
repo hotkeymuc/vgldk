@@ -45,7 +45,8 @@ void vgldk_entry() __naked {
 // Main entry point for callers
 //void vgldk_init(void *v_stdout_putchar, void *v_stdin_getchar) __naked {
 //void vgldk_init() __naked {
-int vgldk_init(void *v_stdout_putchar, void *v_stdin_getchar) {
+//int vgldk_init(void *v_stdout_putchar, void *v_stdin_getchar) {
+int vgldk_init(t_putchar *v_stdout_putchar, t_getchar *v_stdin_getchar) {
 	
 	// Obtain pointers to putchar/getchar from the caller arguments
 	p_stdout_putchar = v_stdout_putchar;

@@ -11,6 +11,11 @@ VTech Genius Leader Keyboard
 
 #include "ports.h"
 
+
+// BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
+// This also makes the parallel port wiggle, so it might interfere with serial/parallel communication!
+#define VGL4000_KEYBOARD_LATCH_0x11
+
 #define VGL_KEYS_MASK_CAPS	0x20
 
 #define KEY_CAPS	'c'
@@ -61,14 +66,14 @@ byte keyboard_inkey() {
 	byte row, col;
 	char r;
 	
-	
+	#ifdef VGL4000_KEYBOARD_LATCH_0x11
 	// BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
 	//port_0x11_out(0xff);
 	__asm
 		ld a, #0xff
 		out (0x11), a
 	__endasm;
-	
+	#endif
 	
 	r = 0;
 	//m = 0x80;
@@ -146,8 +151,10 @@ byte keyboard_checkkey() {
 	byte b1;
 	//byte b2;
 	
+	#ifdef VGL4000_KEYBOARD_LATCH_0x11
 	// Set all mux lines HIGH (although in original firmware, keyboard matrix works without it)
 	port_0x11_out(0xff);
+	#endif
 	
 	port_0x10_out(0xff);
 	b1 = port_0x10_in();

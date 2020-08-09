@@ -33,13 +33,19 @@ import os
 # FTDI
 SERIAL_PORT = '/dev/ttyUSB0'
 SERIAL_BAUD = 9600	# Software Serial currrently only supports 9600 baud (fixed)
-SERIAL_TIMEOUT = 0.1
+SERIAL_TIMEOUT = 0.05
 SERIAL_TIMEOUT_SHORT = 0.05
+
+# Keep it < monitor's MAX_INPUT-10/2
+#UPLOAD_BUFFER_SIZE = 56	# Used to work fine, but doesn't any more
+#UPLOAD_BUFFER_SIZE = 32
+UPLOAD_BUFFER_SIZE = 24
+#UPLOAD_BUFFER_SIZE = 16	# Should work quite reliably
 DEST_DEFAULT = 0xc800
 
 
 # General
-SHOW_TRAFFIC = True
+SHOW_TRAFFIC = not True
 
 
 def put(txt):
@@ -105,7 +111,7 @@ class Hardware:
 				#exclusive=True,
 				#xonxoff=0,
 				#rtscts=0,
-				#inter_byte_timeout=1.0
+				#inter_byte_timeout=0.1
 				)
 			self.put('Open!')
 			self.is_open = True
@@ -187,7 +193,7 @@ class Hardware:
 					break
 		"""
 		
-		self.put('Activating console...')
+		self.put('Activating console... (Issue command "SIO" on monitor if nothing happens)')
 		while True:
 			self.write('\n')
 			
@@ -320,18 +326,15 @@ class Hardware:
 		l = len(app_data)
 		self.put('App size: %d bytes' % l)
 		
-		#chunk_size = 56	# Keep it < monitor's MAX_INPUT-10/2
-		#chunk_size = 32	# Keep it < monitor's MAX_INPUT-10/2
-		chunk_size = 24	# Keep it < monitor's MAX_INPUT-10/2
-		#chunk_size = 16	# Keep it < monitor's MAX_INPUT-10/2
-		#chunk_size = 8	# Keep it < monitor's MAX_INPUT-10/2
+		chunk_size = UPLOAD_BUFFER_SIZE
+		t_start = time.time()
 		
 		o = 0
 		addr = dest_addr
 		while (o < l):
 			
 			chunk = app_data[o:o+chunk_size]
-			self.put('Pushing %d / %d bytes...' % (o, l))
+			self.put('Pushing %.1f%% (%d / %d bytes)...' % (o*100.0/l, o, l))
 			#hex = ''.join(['%02x'%b for b in chunk])
 			#r = 'poke %04x %s' % (addr, hex)
 			#put(r)
@@ -345,15 +348,12 @@ class Hardware:
 				#time.sleep(0.1)
 				
 				success = self.poke(addr, chunk)
-				#time.sleep(0.1)
-				
 				self.wait_for_prompt()
 				if not success:
 					continue
 				
 				#time.sleep(0.1)
 				
-				#	self.wait_for_monitor()
 				success = False
 				try:
 					check = self.peek(addr, len(chunk))
@@ -371,7 +371,9 @@ class Hardware:
 			addr += chunk_size
 			o += chunk_size
 		
-		self.put('Upload OK.')
+		t_end = time.time()
+		t_delta = t_end - t_start
+		self.put('Upload OK (%d bytes in %d seconds = %.2f B/s).' % (l, t_delta, l/t_delta))
 	
 
 def hexdump(data, addr=0x0000, width=16):
@@ -441,13 +443,17 @@ if __name__ == '__main__':
 	comp = Hardware(port=port, baud=baud)
 	comp.open()
 	
+	# Wait for the monitor logo/prompt
 	comp.wait_for_monitor()
 	
+	# Disable interrupts
 	comp.write('di\n')
 	comp.wait_for_prompt()
 	
+	# Upload app binary
 	comp.upload(filename, dest)
 	
+	# Call to function
 	put('Calling 0x%04X...' % dest)
 	# Call right away (having serial I/O as stdio)
 	#comp.call(dest)
