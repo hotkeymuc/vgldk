@@ -53,7 +53,125 @@ void cs_set_low() {
 }
 */
 
-void cs_delay() {
+
+#define cs_get() (cs_port_latch & 0x20)
+/*
+byte cs_get() {
+	return (cs_port_latch & 0x80);
+}
+*/
+
+void cs_rx_delay() {
+	
+	byte i;
+	
+	// cserial.c on GL4000 at 9600 baud: 16-17
+	// cserial.c on GL4000 at 9600 baud with MARK at each bit: 9
+	for(i = 0; i < 17; i++) {
+		__asm
+			nop
+		__endasm;
+	}
+	/*
+	__asm
+		nop
+		nop
+	__endasm;
+	*/
+	
+	/*
+	__asm
+		push hl
+		ld	l, #23	; cserial.c on GL4000: L=23	=> 2200us/8 =>  3630 baud
+		_cs_rx_delay_loop:
+			dec	l
+			jr	nz, _cs_rx_delay_loop
+		pop hl
+	__endasm;
+	*/
+}
+void cs_rx_delayEdge() {
+	byte i;
+	for(i = 0; i < 1; i++) {
+		__asm
+			nop
+		__endasm;
+	}
+}
+
+int cs_receiveByte() {
+	byte i;
+	byte b;
+	
+	// Wait for start bit (low) to happen
+	i = 0;
+	while(cs_get() == 0x00) {
+		// Handle timeout
+		i++;
+		if (i > 250) return -1;
+	}
+	
+	// Start bit is happening
+	// Delay so we hit the center of it
+	cs_rx_delayEdge();
+	
+	//MARK
+	//cs_set_low();
+	//cs_set_high();
+	
+	
+	// Receive bits
+	b = 0;
+	for(i = 0; i < 8; i++) {
+		
+		b >>= 1;
+		
+		cs_rx_delay();
+		
+		// Mark bit
+		//cs_set_low();
+		//cs_set_high();
+		
+		
+		if (cs_get() == 0x00) {
+			// "1"
+			b |= 0x80;
+		} else {
+			// "0"
+			//b &= 0xfe;
+			__asm
+				nop
+				nop
+				nop
+				nop
+				nop
+				nop
+			__endasm;
+		}
+	}
+	
+	// Stop bit should be happening
+	// Wait for stop bit (high) to happen
+	i = 0;
+	while(cs_get() != 0x00) {
+		// Handle timeout
+		i++;
+		if (i > 250) return -2;
+	}
+	
+	// MARK
+	//cs_set_low();
+	//cs_set_high();
+	
+	//cs_rx_delay();
+	
+	return b;
+	
+}
+
+
+
+void cs_tx_delay() {
 	__asm
 		push hl
 		
@@ -82,7 +200,7 @@ void cs_sendByte(byte d) {
 	
 	// Start bit (HIGH)
 	cs_set_high();
-	cs_delay();
+	cs_tx_delay();
 	
 	// Data bits
 	for(b = 0; b < 8; b++) {
@@ -93,21 +211,22 @@ void cs_sendByte(byte d) {
 		}
 		
 		d >>= 1;
-		cs_delay();
+		cs_tx_delay();
 	}
 	
 	// Stop bit
 	cs_set_low();
-	cs_delay();
+	cs_tx_delay();
 }
 
+// Just for testing: Send a byte and wait
 void cs_test(byte d) {
 	byte i;
 	
 	cs_sendByte(d);
 	
 	for(i = 0; i < 0x10; i++) {
-		cs_delay();
+		cs_tx_delay();
 	}
 }
 
@@ -115,11 +234,12 @@ void cs_test(byte d) {
 //void main() {
 int main() {
 	char c;
+	int i;
 	
-	printf("Hello World!\n");
+	printf("cSerial\n");
 	c = getchar();
 	
-	
+	/*
 	printf("Sending...");
 	while(1) {
 		
@@ -131,9 +251,22 @@ int main() {
 		//printf("Key to end");
 		//c = getchar();
 	}
+	*/
 	
-	//while(1) { }
-	//return;
-	//return c;
+	printf("RX...");
+	//cs_set_low();
+	
+	while(1) {
+		
+		i = cs_receiveByte();
+		if (i >= 0) {
+			//printf_d(i);
+			//printf(" ");
+			putchar(i);
+		}
+		
+	}
+	
+	
 	return 0x43;
 }
