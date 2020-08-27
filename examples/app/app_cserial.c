@@ -1,5 +1,5 @@
 /*
-	Trying softserial using pure C
+	Trying softserial on GL4000 using pure C
 	
 	TODO:
 	OK	Re-create TX 9600 baud: L=23, 9569 baud
@@ -10,6 +10,7 @@
 	OK	Determine max. RX baud: ca. 38400 baud
 	OK	Try RX at 19200 baud
 	
+	2020-08-10 Bernhard "HotKey" Slawik
 */
 
 #include <vgldk.h>
