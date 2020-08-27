@@ -28,8 +28,8 @@ typedef FILE *(*t_fopen)(const char *, const char *);
 typedef int (*t_fclose)(FILE *);
 typedef byte (*t_feof)(FILE *);
 typedef int (*t_fgetc)(FILE *);
-typedef word (*t_fread)(void *, word, byte, FILE *);
-typedef word (*t_fwrite)(void *, word, byte, FILE *);
+typedef size_t (*t_fread)(void *, size_t, size_t, FILE *);
+typedef size_t (*t_fwrite)(void *, size_t, size_t, FILE *);
 //@TODO: t_ftell
 //@TODO: t_fseek
 

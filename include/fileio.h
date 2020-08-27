@@ -16,20 +16,25 @@ TODO:
 
 */
 
-#define DRIVE_INDICATOR_CHAR ':'
-#define PATH_DELIMITER '/'
+#include "fs.h"
 
-#define MAX_PATH 32
+#define FILEIO_DRIVE_DELIMITER ':'
+#define FILEIO_PATH_DELIMITER '/'
 
-//@TODO: Move this somehwere else, so it is easier to configure for different uses
-#define MAX_DRIVES 2	// Keep in sync with implementations
+#ifndef FILEIO_MAX_PATH
+	#define FILEIO_MAX_PATH 32	// Maximum number of characters in path names
+#endif
 
-//const FS *drives[] = { (FS *)&fs_internal };
-FS *drives[MAX_DRIVES];	// Keep in sync with implementations
+#ifndef FILEIO_MAX_DRIVES
+	#define FILEIO_MAX_DRIVES 1	// Number of file systems ("drives") available
+#endif
+
 
 //FS *cfs;	// Current file system driver
-char cwd[MAX_PATH];	// Current working directory
+char cwd[FILEIO_MAX_PATH];	// Current working directory
 
+//const FS *drives[] = { (FS *)&fs_internal };
+FS *drives[FILEIO_MAX_DRIVES];	// Keep in sync with implementations
 
 void absPath(const char *relPath, char *ret) {
 	const char *bRelPath;
@@ -45,7 +50,7 @@ void absPath(const char *relPath, char *ret) {
 		relPath = &cwd[0];
 		
 	} else
-	if (*(relPath+1) == DRIVE_INDICATOR_CHAR) {
+	if (*(relPath+1) == FILEIO_DRIVE_DELIMITER) {
 		// Handle absolute path
 		// nothing to do, relative = absolute
 		
@@ -57,7 +62,7 @@ void absPath(const char *relPath, char *ret) {
 		while (*t != 0) {
 			*bRet++ = *t++;
 		}
-		*bRet++ = PATH_DELIMITER;
+		*bRet++ = FILEIO_PATH_DELIMITER;
 		// Continue with relative path
 	}
 	
@@ -70,9 +75,9 @@ void absPath(const char *relPath, char *ret) {
 			// Go back to last delimiter
 			bRet--;	// Back to last char
 			bRet--;	// Back off first "."
-			if (*bRet == PATH_DELIMITER) bRet--;	// Back off last delimiter
-			if (*bRet == DRIVE_INDICATOR_CHAR) {bRet++; continue;}	// Too far!
-			while((*bRet != PATH_DELIMITER) && (bRet > ret)) bRet--;	// Back to last delimiter
+			if (*bRet == FILEIO_PATH_DELIMITER) bRet--;	// Back off last delimiter
+			if (*bRet == FILEIO_DRIVE_DELIMITER) {bRet++; continue;}	// Too far!
+			while((*bRet != FILEIO_PATH_DELIMITER) && (bRet > ret)) bRet--;	// Back to last delimiter
 			
 			continue;
 		}
@@ -90,7 +95,7 @@ FS *fsByAbsPath(const char *path) {
 	FS *fs;
 	
 	// Handle DOS style drives
-	if (path[1] != DRIVE_INDICATOR_CHAR) {
+	if (path[1] != FILEIO_DRIVE_DELIMITER) {
 		printf("No drive spec!\n");
 		errno = ERR_DRIVE_INVALID;
 		return NULL;
@@ -101,8 +106,10 @@ FS *fsByAbsPath(const char *path) {
 	
 	if (driveNum >= 32) driveNum -= 32;	// handle lower case letters
 	
-	if (driveNum >= MAX_DRIVES) {
-		printf("Drive %d > %d!\n", driveNum, MAX_DRIVES);
+	if (driveNum >= FILEIO_MAX_DRIVES) {
+		//printf("Drive %d > %d!\n", driveNum, FILEIO_MAX_DRIVES);
+		//printf("Drive >"+(char)('A'+FILEIO_MAX_DRIVES)+"!\n");
+		printf("Drive >"); putchar((char)('A'+FILEIO_MAX_DRIVES)); printf("!\n");
 		errno = ERR_DRIVE_INVALID;
 		return NULL;
 	}
@@ -116,7 +123,7 @@ FS *fsByAbsPath(const char *path) {
 FS *fsByPath(const char *path) {
 	// Chose a file system instance based on the given path
 	
-	char aPath[MAX_PATH];
+	char aPath[FILEIO_MAX_PATH];
 	
 	// Resolve path
 	absPath(path, &aPath[0]);
@@ -127,21 +134,21 @@ FS *fsByPath(const char *path) {
 
 // Generalized functions (redirecting to actual fs driver)
 DIR *opendir(const char *path) {
-	char aPath[MAX_PATH];
+	char aPath[FILEIO_MAX_PATH];
 	DIR *dir;
 	FS *fs;
 	
 	// Resolve path
 	absPath(path, &aPath[0]);
 	//if (aPath[0] == 0) return NULL;
-	//if (aPath[1] != DRIVE_INDICATOR_CHAR) return NULL;
+	//if (aPath[1] != FILEIO_DRIVE_DELIMITER) return NULL;
 	
 	// Resolve file system
 	fs = fsByAbsPath(aPath);
 	if (fs == NULL) return NULL;
 	
 	// Call fs.opendir()
-	if (aPath[2] == PATH_DELIMITER) {
+	if (aPath[2] == FILEIO_PATH_DELIMITER) {
 		dir = fs->opendir(aPath+3);	// Start after drive spec and delimiter
 	} else {
 		dir = fs->opendir(aPath+2);
@@ -164,14 +171,14 @@ dirent *readdir(DIR *dir) {
 }
 
 FILE *fopen(const char *path, const char *openMode) {
-	char aPath[MAX_PATH];
+	char aPath[FILEIO_MAX_PATH];
 	FILE *f;
 	FS *fs;
 	
 	// Resolve path
 	absPath(path, &aPath[0]);
 	//if (aPath[0] == 0) return NULL;
-	//if (aPath[1] != DRIVE_INDICATOR_CHAR) return NULL;
+	//if (aPath[1] != FILEIO_DRIVE_DELIMITER) return NULL;
 	
 	// Resolve file system
 	fs = fsByAbsPath(aPath);
@@ -203,6 +210,14 @@ int fgetc(FILE *f) {
 	return fs->fgetc(f);
 }
 
+size_t fread(void *ptr, size_t size, byte nmemb, FILE *f) {
+	FS *fs = (FS *)(f->fs);
+	return fs->fread(ptr, size, nmemb, f);
+}
 
+size_t fwrite(void *ptr, size_t size, byte nmemb, FILE *f) {
+	FS *fs = (FS *)(f->fs);
+	return fs->fwrite(ptr, size, nmemb, f);
+}
 
 #endif

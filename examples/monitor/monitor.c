@@ -18,27 +18,30 @@ char cmd_arg[MAX_INPUT];
 
 
 // Features to include
-//#define MONITOR_HELP	// Include help functionality (needs quite some space for strings...)
+//#define MONITOR_HELP	// Include "long" help functionality (needs quite some space for the strings...)
 #define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
+#define MONITOR_FILES	// Include file system stuff
 
+//#define MONITOR_SOFTSERIAL_AUTOSTART	// Make softserial take over STDIO at startup
+
+
+// Commands to include
 //#define MONITOR_CMD_BEEP
 #define MONITOR_CMD_CLS
 #define MONITOR_CMD_DUMP
 #define MONITOR_CMD_ECHO
-//#define MONITOR_CMD_HELP
+#define MONITOR_CMD_HELP	// Even without MONITOR_HELP, the HELP command can list all commands
 #define MONITOR_CMD_INTERRUPTS
 #define MONITOR_CMD_LOOP
 #define MONITOR_CMD_PEEKPOKE
 //#define MONITOR_CMD_PAUSE
 #define MONITOR_CMD_PORT
 #define MONITOR_CMD_PAUSE
-#ifdef MONITOR_SOFTSERIAL
-	#define MONITOR_CMD_SOFTSERIAL
-	//#define MONITOR_SOFTSERIAL_AUTOSTART
-#endif
 #define MONITOR_CMD_VER
 
+
 // Definitions
+#define ERR_OK 0
 #define ERR_COMMAND_UNKNOWN -4
 #define ERR_MISSING_ARGUMENT -5
 #define ERR_NOT_IMPLEMENTED -6
@@ -117,6 +120,7 @@ void printf_byte_pretty(byte v) {
 // Internal command call definition
 typedef int (*t_commandCall)(int argc, char *argv[]);
 
+
 // Struct for the internal commands
 typedef struct {
 	const char *name;
@@ -128,6 +132,13 @@ typedef struct {
 	
 } t_commandEntry;
 
+#ifdef MONITOR_HELP
+	// Include help string
+	#define T_COMMAND_ENTRY(n, c, h) {n, c, h}
+#else
+	// Discard help string
+	#define T_COMMAND_ENTRY(n, c, h) {n, c}
+#endif
 
 // Shell state
 byte running;
@@ -147,7 +158,7 @@ int cmd_beep(int argc, char *argv[]) {
 		vgl_sound_note(atoi(argv[1]), (argc > 2) ? atoi(argv[2]) : 500);
 		
 	}
-	return 0;
+	return ERR_OK;
 }
 #endif
 
@@ -157,7 +168,7 @@ int cmd_cls(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
 	clear();
-	return 0;
+	return ERR_OK;
 }
 #endif
 
@@ -190,7 +201,7 @@ int cmd_dump(int argc, char *argv[]) {
 		else a += l;
 	}
 	
-	return 0;
+	return ERR_OK;
 }
 #endif
 
@@ -203,7 +214,7 @@ int cmd_echo(int argc, char *argv[]) {
 		printf(argv[i]);
 	}
 	printf("\n");
-	return 0;
+	return ERR_OK;
 }
 #endif
 
@@ -211,13 +222,13 @@ int cmd_exit(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
 	running = false;
-	return 0;
+	return ERR_OK;
 }
 
-#ifdef MONITOR_CMD_HELP
+//#ifdef MONITOR_CMD_HELP
 int cmd_help(int argc, char *argv[]);	// Forward declaration, since "help" needs to know all the commands and the commands need to know this function...
 // implemented after declaration of COMMANDS[]
-#endif
+//#endif
 
 #ifdef MONITOR_CMD_INTERRUPTS
 int cmd_di(int argc, char *argv[]) {
@@ -228,7 +239,7 @@ int cmd_di(int argc, char *argv[]) {
 		di
 	__endasm;
 	
-	return 0;
+	return ERR_OK;
 }
 int cmd_ei(int argc, char *argv[]) {
 	(void)argc;
@@ -238,7 +249,7 @@ int cmd_ei(int argc, char *argv[]) {
 		ei
 	__endasm;
 	
-	return 0;
+	return ERR_OK;
 }
 
 int cmd_ints(int argc, char *argv[]) {
@@ -254,7 +265,7 @@ int cmd_ints(int argc, char *argv[]) {
 	}
 	cmd_di(0, NULL);
 	
-	return 0;
+	return ERR_OK;
 }
 
 #endif
@@ -279,7 +290,7 @@ int cmd_loop(int argc, char *argv[]) {
 		
 	}
 	
-	return 0;
+	return ERR_OK;
 }
 #endif
 
@@ -291,7 +302,7 @@ int cmd_pause(int argc, char *argv[]) {
 	//beep();
 	getchar();
 	//clear();
-	return 0;
+	return ERR_OK;
 }
 #endif
 
@@ -330,7 +341,7 @@ int cmd_peek(int argc, char *argv[]) {
 	
 	printf("\n");
 	
-	return 0;
+	return ERR_OK;
 }
 int cmd_poke(int argc, char *argv[]) {
 	word a;
@@ -354,11 +365,11 @@ int cmd_poke(int argc, char *argv[]) {
 		a++;
 	} while (*b != 0);
 	
-	return 0;
+	return ERR_OK;
 }
 
 word temp;
-typedef int (t_plain_vgldkinit)(void *, void *);
+typedef int (t_plain_vgldkinit)(t_putchar *, t_getchar *);
 int cmd_call(int argc, char *argv[]) {
 	word a;
 	
@@ -398,7 +409,7 @@ int cmd_call(int argc, char *argv[]) {
 			; Do not ret! This is intentionally left blank
 		_call_end:
 	__endasm;
-	return 0;
+	return ERR_OK;
 	#endif
 	
 }
@@ -421,7 +432,7 @@ int cmd_in(int argc, char *argv[]) {
 	printf_byte_pretty(v);
 	printf("\n");
 	
-	return 0;
+	return ERR_OK;
 }
 
 int cmd_out(int argc, char *argv[]) {
@@ -435,12 +446,108 @@ int cmd_out(int argc, char *argv[]) {
 	
 	port_out(p, v);
 	
-	return 0;
+	return ERR_OK;
 }
 #endif
 
 
-#ifdef MONITOR_CMD_SOFTSERIAL
+#ifdef MONITOR_CMD_VER
+int cmd_ver(int argc, char *argv[]) {
+	(void) argc; (void) argv;
+	
+	//printf("%s\n", VERSION);
+	printf(VERSION);
+	#ifdef VGLDK_SERIES
+		#define xstr(s) str(s)
+		#define str(s) #s
+		printf(" for SERIES " xstr(VGLDK_SERIES) );
+	#endif
+	printf("\n");
+	
+	return ERR_OK;
+}
+#endif
+
+
+
+
+// Commands for additional functions
+#ifdef MONITOR_FILES
+
+#define FILEIO_MAX_DRIVES 1
+//#define FS_INTERNAL_CASE_SENSITIVE	// Emu is UPPERCASE
+#include <fileio.h>
+
+#include <fs_internal.h>
+
+int cmd_files_cd(int argc, char *argv[]) {
+	//char s[FILEIO_MAX_PATH];
+	
+	if (argc < 2) {
+		// Show CWD
+		printf(cwd);
+		putchar('\n');
+		return ERR_OK;
+	}
+	
+	// Change directory
+	absPath(argv[1], cwd);	// Overwrite in-place (risky!)
+	//absPath(argv[1], a);
+	//printf(s);
+	//putchar('\n');
+	
+	return ERR_OK;
+}
+int cmd_files_dir(int argc, char *argv[]) {
+	(void) argc; (void) argv;
+	
+	DIR *dir;
+	dirent *de;
+	
+	dir = opendir(cwd);
+	if (dir == NULL) return errno;
+	
+	while (de = readdir(dir)) {
+		printf((char *)de->name);
+		putchar(' ');
+		//printf_d(de->size);
+		//putchar('\n');
+	}
+	putchar('\n');
+	closedir(dir);
+	
+	return ERR_OK;
+}
+int cmd_files_cat(int argc, char *argv[]) {
+	
+	FILE *f;
+	size_t l;
+	char buf[32];
+	
+	if (argc < 2) {
+		return ERR_MISSING_ARGUMENT;
+	}
+	
+	f = fopen(argv[1], 'r');
+	if (f == NULL) return errno;
+	
+	//printf(f->name); printf(":\n");
+	
+	while(feof(f) == 0) {
+		l = fread(&buf[0], 1, 31, f);
+		buf[l] = '\0';	// Terminate string
+		printf(buf);
+	}
+	//putchar('\n');
+	
+	fclose(f);
+	
+	return ERR_OK;
+}
+#endif
+
+
+#ifdef MONITOR_SOFTSERIAL
 #include <softserial.h>
 
 int cmd_serial_test(int argc, char *argv[]) {
@@ -454,10 +561,11 @@ int cmd_serial_test(int argc, char *argv[]) {
 	printf_x2(c);
 	printf("\n");
 	
-	return 0;
+	return ERR_OK;
 }
 
 #ifdef VGLDK_VARIABLE_STDIO
+// Allow switching STDIO to serial (onl available when built with VARIABLE_STDIO)
 int cmd_serial_io(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
@@ -482,7 +590,7 @@ int cmd_serial_io(int argc, char *argv[]) {
 		parse(cmd_arg);
 	}
 	*/
-	return 0;
+	return ERR_OK;
 }
 #endif
 
@@ -501,7 +609,7 @@ int cmd_serial_get(int argc, char *argv[]) {
 	
 	printf_x2(c);
 	
-	return 0;
+	return ERR_OK;
 }
 int cmd_serial_gets(int argc, char *argv[]) {
 	char *buffer;
@@ -513,7 +621,7 @@ int cmd_serial_gets(int argc, char *argv[]) {
 	serial_gets(buffer);
 	printf(buffer);
 	
-	return 0;
+	return ERR_OK;
 }
 int cmd_serial_put(int argc, char *argv[]) {
 	int i;
@@ -523,169 +631,73 @@ int cmd_serial_put(int argc, char *argv[]) {
 		serial_puts(argv[i]);
 	}
 	//printf("\n");
-	return 0;
+	return ERR_OK;
 }
 #endif
-
-#ifdef MONITOR_CMD_VER
-int cmd_ver(int argc, char *argv[]) {
-	(void) argc; (void) argv;
-	
-	//printf("%s\n", VERSION);
-	printf(VERSION);
-	#ifdef VGLDK_SERIES
-		#define xstr(s) str(s)
-		#define str(s) #s
-		printf(" for SERIES " xstr(VGLDK_SERIES) );
-	#endif
-	printf("\n");
-	
-	return 0;
-}
-#endif
-
 
 
 // List of internal calls
 const t_commandEntry COMMANDS[] = {
 	#ifdef MONITOR_CMD_BEEP
-	{"beep" , cmd_beep
-		#ifdef MONITOR_HELP
-		, "Make sound"
-		#endif
-	},
+	T_COMMAND_ENTRY("beep", cmd_beep, "Make sound"),
 	#endif
 	#ifdef MONITOR_CMD_CLS
-	{"cls"  , cmd_cls
-		#ifdef MONITOR_HELP
-		, "Clear screen"
-		#endif
-	},
+	T_COMMAND_ENTRY("cls"  , cmd_cls, "Clear screen"),
 	#endif
 	#ifdef MONITOR_CMD_DUMP
-	{"dump" , cmd_dump
-		#ifdef MONITOR_HELP
-		, "Hex dump"
-		#endif
-	},
+	T_COMMAND_ENTRY("dump" , cmd_dump, "Hex dump"),
 	#endif
 	#ifdef MONITOR_CMD_ECHO
-	{"echo" , cmd_echo
-		#ifdef MONITOR_HELP
-		, "Display text"
-		#endif
-	},
+	T_COMMAND_ENTRY("echo" , cmd_echo, "Display text"),
 	#endif
-	{"exit" , cmd_exit
-		#ifdef MONITOR_HELP
-		, "End shell"
-		#endif
-	},
-	#ifdef MONITOR_CMD_HELP
-	{"help" , cmd_help
-		#ifdef MONITOR_HELP
-		, "Show help"
-		#endif
-	},
-	#endif
+	T_COMMAND_ENTRY("exit" , cmd_exit, "End session"),
+	//#ifdef MONITOR_CMD_HELP
+	T_COMMAND_ENTRY("help" , cmd_help, "List cmds, explain"),
+	//#endif
 	#ifdef MONITOR_CMD_INTERRUPTS
-	{"di" , cmd_di
-		#ifdef MONITOR_HELP
-		, "Disable interrupts"
-		#endif
-	},
-	{"ei" , cmd_ei
-		#ifdef MONITOR_HELP
-		, "Enable interrupts"
-		#endif
-	},
-	{"ints" , cmd_ints
-		#ifdef MONITOR_HELP
-		, "Let ints happen"
-		#endif
-	},
+	T_COMMAND_ENTRY("di" , cmd_di, "Disable interrupts"),
+	T_COMMAND_ENTRY("ei" , cmd_ei, "Enable interrupts"),
+	T_COMMAND_ENTRY("ints" , cmd_ints, "Let ints happen"),
 	#endif
 	#ifdef MONITOR_CMD_LOOP
-	{"loop" , cmd_loop
-		#ifdef MONITOR_HELP
-		, "Run command in loop"
-		#endif
-	},
+	T_COMMAND_ENTRY("loop" , cmd_loop, "Run command in loop"),
 	#endif
 	#ifdef MONITOR_CMD_PORT
-	{"in" , cmd_in
-		#ifdef MONITOR_HELP
-		, "Read port"
-		#endif
-	},
-	{"out" , cmd_out
-		#ifdef MONITOR_HELP
-		, "Output to port"
-		#endif
-	},
+	T_COMMAND_ENTRY("in" , cmd_in, "Read port"),
+	T_COMMAND_ENTRY("out" , cmd_out, "Output to port"),
 	#endif
 	
 	#ifdef MONITOR_CMD_PAUSE
-	{"pause", cmd_pause
-		#ifdef MONITOR_HELP
-		, "Wait for key"
-		#endif
-	},
+	T_COMMAND_ENTRY("pause", cmd_pause, "Wait for key"),
 	#endif
 	#ifdef MONITOR_CMD_PEEKPOKE
-	{"peek", cmd_peek
-		#ifdef MONITOR_HELP
-		, "View mem"
-		#endif
-	},
-	{"poke", cmd_poke
-		#ifdef MONITOR_HELP
-		, "Modfiy mem"
-		#endif
-	},
-	{"call", cmd_call
-		#ifdef MONITOR_HELP
-		, "Call mem"
-		#endif
-	},
+	T_COMMAND_ENTRY("peek", cmd_peek, "View mem"),
+	T_COMMAND_ENTRY("poke", cmd_poke, "Modfiy mem"),
+	T_COMMAND_ENTRY("call", cmd_call, "Call mem"),
 	#endif
-	#ifdef MONITOR_CMD_SOFTSERIAL
-	{"stest", cmd_serial_test
-		#ifdef MONITOR_HELP
-		, "SoftSerial test"
-		#endif
-	},
-	#ifdef VGLDK_VARIABLE_STDIO
-	{"sio", cmd_serial_io
-		#ifdef MONITOR_HELP
-		, "Switch stdio to serial"
-		#endif
-	},
-	#endif
-	{"sget", cmd_serial_get
-		#ifdef MONITOR_HELP
-		, "SoftSerial get"
-		#endif
-	},
-	{"sgets", cmd_serial_gets
-		#ifdef MONITOR_HELP
-		, "SoftSerial gets"
-		#endif
-	},
-	{"sput", cmd_serial_put
-		#ifdef MONITOR_HELP
-		, "SoftSerial put"
-		#endif
-	},
+	#ifdef MONITOR_CMD_VER
+	T_COMMAND_ENTRY("ver"  , cmd_ver, "Version"),
 	#endif
 	
-	#ifdef MONITOR_CMD_VER
-	{"ver"  , cmd_ver
-		#ifdef MONITOR_HELP
-		, "Version"
-		#endif
-	},
+	
+	// Additional features
+	#ifdef MONITOR_FILES
+	T_COMMAND_ENTRY("cd", cmd_files_cd, "Change dir"),
+	T_COMMAND_ENTRY("dir", cmd_files_dir, "Show entries"),
+	T_COMMAND_ENTRY("cat", cmd_files_cat, "List file"),
 	#endif
+	
+	
+	#ifdef MONITOR_SOFTSERIAL
+	T_COMMAND_ENTRY("stest", cmd_serial_test, "Serial test"),
+	#ifdef VGLDK_VARIABLE_STDIO
+	T_COMMAND_ENTRY("sio", cmd_serial_io, "Switch STDIO to serial"),
+	#endif
+	T_COMMAND_ENTRY("sget", cmd_serial_get, "Serial get"),
+	T_COMMAND_ENTRY("sgets", cmd_serial_gets, "Serial gets"),
+	T_COMMAND_ENTRY("sput", cmd_serial_put, "Serial put"),
+	#endif
+
 };
 
 #ifdef MONITOR_CMD_HELP
@@ -697,23 +709,35 @@ int cmd_help(int argc, char *argv[]) {
 	if (argc < 2) {
 		// List all commands
 		for(i = 0; i < (sizeof(COMMANDS) / sizeof(t_commandEntry)); i++) {
-			if (i > 0) printf(" ");
-			printf("%s", COMMANDS[i].name);
+			if (i > 0) putchar(' ');	//printf(" ");
+			//printf("%s", COMMANDS[i].name);
+			printf(COMMANDS[i].name);
+			
+			#ifdef MONITOR_HELP
+			//printf(": ");
+			//printf(COMMANDS[i].help);
+			//putchar('\n');
+			#endif
 		}
 		printf("\n");
-		return 0;
+		return ERR_OK;
 		
 	}
 	
 	#ifdef MONITOR_HELP
 	// Specific help
 	for(i = 0; i < (sizeof(COMMANDS) / sizeof(t_commandEntry)); i++) {
-		if (strcmp(argv[1], COMMANDS[i].name) == 0) {
-			printf("%s: %s\n", COMMANDS[i].name, COMMANDS[i].help);
-			return 0;
+		if (stricmp(argv[1], COMMANDS[i].name) == 0) {
+			//printf("%s: %s\n", COMMANDS[i].name, COMMANDS[i].help);
+			printf(COMMANDS[i].name);
+			printf(": ");
+			printf(COMMANDS[i].help);
+			putchar('\n');
+			return ERR_OK;
 		}
 	}
-	printf("%s?\n", argv[1]);
+	//printf("%s?\n", argv[1]);
+	//printf(argv[1]); printf("?\n");
 	return ERR_COMMAND_UNKNOWN;
 	#else
 	(void)argv;
@@ -723,7 +747,10 @@ int cmd_help(int argc, char *argv[]) {
 #endif
 
 void prompt() {
-	//printf("%s>", cwd);
+	#ifdef MONITOR_FILES
+	// Show current directory, like in DOS
+	printf(cwd);
+	#endif
 	putchar('>');
 }
 
@@ -732,7 +759,7 @@ int eval(int argc, char *argv[]) {
 	int i;
 	
 	// No input? Continue.
-	if (argc == 0) return 0;
+	if (argc == 0) return ERR_OK;
 	
 	// Parse/run
 	//printf("argc=%d\n", argc);
@@ -754,11 +781,11 @@ int eval(int argc, char *argv[]) {
 			printf("%s", i);
 		}
 		printf("\n");
-		return 0;
+		return ERR_OK;
 	}
 	if (strcmp(argv[0], "exit") == 0) {
 		running = false;
-		return 0;
+		return ERR_OK;
 	}
 	*/
 	
@@ -911,6 +938,17 @@ void main() __naked {
 	
 	clear();
 	
+	#ifdef MONITOR_FILES
+	// Mount file systems
+	drives[0] = &fs_internal;
+	
+	// CWD
+	cwd[0] = 'A';
+	cwd[1] = FILEIO_DRIVE_DELIMITER;
+	cwd[2] = 0;
+	#endif
+	
+	#ifdef MONITOR_SOFTSERIAL
 	#ifdef MONITOR_SOFTSERIAL_AUTOSTART
 	if (serial_isReady()) {
 		// If serial cable is connected: Ask for which I/O to use
@@ -946,6 +984,7 @@ void main() __naked {
 		
 	}
 	#endif
+	#endif
 	
 	// Banner
 	cmd_ver(0, NULL);
@@ -957,6 +996,7 @@ void main() __naked {
 		// Prompt for input
 		prompt();
 		gets(cmd_arg);
+		putchar('\n');
 		
 		//putchar('"'); printf(cmd_arg); putchar('"'); printf("\n");
 		parse(cmd_arg);

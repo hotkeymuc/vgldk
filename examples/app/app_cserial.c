@@ -26,6 +26,8 @@
 #define CSERIAL_BITS_LOW 0x00	// Bits to set for serial "HIGH"
 #define CSERIAL_BITS_HIGH 0xff	// Bits to set for serial "LOW"
 
+#define CSERIAL_STROBE_MASK 0x04	// Bitmask (OR) on control port to strobe LOW (inverse for HIGH)
+
 // Timing configuration
 // 9600 baud:
 //#define CSERIAL_RX_DELAY 16	// GL4000 at 9600 baud: 16-17
@@ -47,7 +49,7 @@ __sfr __at CSERIAL_PORT_CONTROL cs_port_control;
 
 
 // Macros are faster than calling a function, because there is no stack housekeeping necessary
-#define cs_set(d) { cs_port_data = d; cs_port_latch = CSERIAL_BITS_MASK; cs_port_control |= 0x04; cs_port_control &= 0xfb; }
+#define cs_set(d) { cs_port_data = d; cs_port_latch = CSERIAL_BITS_MASK; cs_port_control |= CSERIAL_STROBE_MASK; cs_port_control &= (0xff ^ CSERIAL_STROBE_MASK); }
 /*
 void cs_set(byte data) {
 	

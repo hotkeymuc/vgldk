@@ -15,6 +15,7 @@ int errno;
 #define ERR_FILE_NOT_FOUND -2
 #define ERR_DRIVE_INVALID -3
 
+typedef word size_t;
 
 //#define EOF -1
 typedef struct {
@@ -27,14 +28,14 @@ typedef struct {
 	void *fs;	// Link to file system
 	
 	void *userData;	// Remote handles etc.
-	word size;
-	word currentPos;
+	size_t size;
+	size_t currentPos;
 } FILE;
 
 typedef struct {
 	//ino_t d_ino;
 	//char d_name[];
-	word pos;
+	size_t pos;
 	const char *name;
 	
 	// Mainly for testing
@@ -51,8 +52,8 @@ typedef struct {
 	//dirent *entries;
 	void *userData;	// Remote handles etc.
 	
-	word count;
-	word currentPos;
+	size_t count;
+	size_t currentPos;
 } DIR;
 
 

@@ -16,7 +16,7 @@ Implementation of fs.h using hard-coded data. Mainly used for testing.
 #include "file.h"
 
 //#define FS_INTERNAL_INCLUDE_TEST_APPS	// For testing: Include external app(s) from "loader" folder as virtual FS
-
+//#define FS_INTERNAL_CASE_SENSITIVE
 
 #ifdef FS_INTERNAL_INCLUDE_TEST_APPS
 	#include "../loader/out/app_test.app.h"
@@ -33,7 +33,7 @@ const dirent FS_INTERNAL_DIRENTS[] = {
 };
 */
 //const char TEST_CONTENTS[] = "This is contents of test.txt, hard-baked into the DOS code!";
-const char TEST_CONTENTS[] = "TEST_CONTENTS!";
+const char TEST_CONTENTS[] = "TEST_CONTENTS!\nLine2\n";
 const char AUTO_CMD_CONTENTS[] = "echo \"This is %TEST% auto.cmd!\"\n";
 const FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:FILE!
 	{
@@ -85,7 +85,7 @@ DIR *fs_int_opendir(const char *path) {
 	
 	DIR * dir;
 	
-	dir = &fs_int_tmpDir;
+	dir = &fs_int_tmpDir;	//@FIXME: Using the ONE temp. dir...
 	dir->path = path;
 	
 	//@FIXME: Only root directory is allowed for now
@@ -126,7 +126,7 @@ dirent *fs_int_readdir(DIR *dir) {
 	
 	// Create a dirent
 	//de = &dir->entries[dir->currentPos];
-	de = &fs_int_tmpDirent;
+	de = &fs_int_tmpDirent;		//@FIXME: Using the ONE temp. dir.ent..
 	
 	de->pos = dir->currentPos;
 	
@@ -165,12 +165,16 @@ FILE *fs_int_fopen(const char *path, const char *openMode) {
 	files = (FILE *)dir->userData;
 	
 	while(de = fs_int_readdir(dir)) {
+		#ifdef FS_INTERNAL_CASE_SENSITIVE
 		if (strcmp(path, de->name) == 0) {
+		#else
+		if (stricmp(path, de->name) == 0) {
+		#endif
 			//@FIXME: Pointer madness...
 			dirf = &files[de->pos];
 			
 			// Copy over
-			f = &fs_int_tmpFile;
+			f = &fs_int_tmpFile;		//@FIXME: Using the ONE temp. file...
 			f->name = dirf->name;
 			//f->fs = dirf->name;
 			f->userData = dirf->userData;
@@ -208,7 +212,7 @@ byte fs_int_feof(FILE *f) {
 int fs_int_fgetc(FILE *f) {
 	int b;
 	
-	if (fs_int_feof(f)) return EOF;
+	if (fs_int_feof(f)) return -1;	//EOF;
 	
 	// This is only possible on internal fs
 	b = ((byte *)f->userData)[f->currentPos];
@@ -218,7 +222,7 @@ int fs_int_fgetc(FILE *f) {
 	return b;
 }
 
-word fs_int_fread(void *ptr, word size, byte nmemb, FILE *f) {
+size_t fs_int_fread(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	// Read SIZE elements of size NMEMB and return how many elements were read
 	byte b;
 	word l;
@@ -238,7 +242,7 @@ word fs_int_fread(void *ptr, word size, byte nmemb, FILE *f) {
 	return l;
 }
 
-word fs_int_fwrite(void *ptr, word size, byte nmemb, FILE *f) {
+size_t fs_int_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	(void)ptr;
 	(void)size;
 	(void)nmemb;
