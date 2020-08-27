@@ -5,6 +5,7 @@
 	OK	Re-create TX 9600 baud: L=23, 9569 baud
 	OK	Determine max. TX baud: L=1, 21739 baud
 	OK	Try TX at 19200 baud
+	
 	OK	Re-create RX 9600 baud
 	OK	Determine max. RX baud: ca. 38400 baud
 	OK	Try RX at 19200 baud
