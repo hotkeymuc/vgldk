@@ -260,7 +260,7 @@ int fs_bb_fgetc(FILE *f) {
 	return b;
 }
 
-word fs_bb_fread(void *ptr, word size, byte nmemb, FILE *f) {
+size_t fs_bb_fread(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	// Read SIZE elements of size NMEMB and return how many elements were read
 	BB_HANDLE handle;
 	byte l;
@@ -276,7 +276,7 @@ word fs_bb_fread(void *ptr, word size, byte nmemb, FILE *f) {
 	return l;
 }
 
-word fs_bb_fwrite(void *ptr, word size, byte nmemb, FILE *f) {
+size_t fs_bb_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	BB_HANDLE handle;
 	byte l;
 	byte *b;
