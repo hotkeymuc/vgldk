@@ -16,13 +16,17 @@
 #include <vgldk.h>
 #include <stdiomin.h>
 
-__sfr __at 0x10 cs_port_data;
-__sfr __at 0x11 cs_port_latch;
-__sfr __at 0x12 cs_port_control;
 
+// GL4000
+#define CSERIAL_PORT_DATA 0x10
+#define CSERIAL_PORT_LATCH 0x11
+#define CSERIAL_PORT_CONTROL 0x12
+
+#define CSERIAL_BITS_MASK 0xff	// Bitmask on parallel port
+#define CSERIAL_BITS_LOW 0x00	// Bits to set for serial "HIGH"
+#define CSERIAL_BITS_HIGH 0xff	// Bits to set for serial "LOW"
 
 // Timing configuration
-
 // 9600 baud:
 //#define CSERIAL_RX_DELAY 16	// GL4000 at 9600 baud: 16-17
 //#define CSERIAL_TX_DELAY 22	// GL4000 at 9600 baud: L=23	=> 836us/8 =>  9569 baud
@@ -31,13 +35,16 @@ __sfr __at 0x12 cs_port_control;
 #define CSERIAL_RX_DELAY 6	// GL4000 at 19200 baud: 5-6
 #define CSERIAL_TX_DELAY 3	// GL4000 at 19200 baud: L=3	=> 408us/8 => 19607 baud
 
-
 #define CSERIAL_TIMEOUT_START 250	// Timeout while waiting for start bit
 #define CSERIAL_TIMEOUT_STOP 100	// Timeout while waiting for stop bit
 
-#define CSERIAL_BITS_MASK 0xff	// Bitmask on parallel port
-#define CSERIAL_BITS_LOW 0x00	// Bits to set for serial "HIGH"
-#define CSERIAL_BITS_HIGH 0xff	// Bits to set for serial "LOW"
+
+
+// Define port accesses
+__sfr __at CSERIAL_PORT_DATA cs_port_data;
+__sfr __at CSERIAL_PORT_LATCH cs_port_latch;
+__sfr __at CSERIAL_PORT_CONTROL cs_port_control;
+
 
 // Macros are faster than calling a function, because there is no stack housekeeping necessary
 #define cs_set(d) { cs_port_data = d; cs_port_latch = CSERIAL_BITS_MASK; cs_port_control |= 0x04; cs_port_control &= 0xfb; }
