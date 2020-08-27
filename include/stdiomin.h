@@ -106,9 +106,17 @@ char *gets(char *pc) {
 	char c;
 	pcs = pc;
 	
+	//@TODO: Handle cursor position/insert/overwrite/del/backspace
+	
 	//myscroll_counter = LCD_ROWS - lcd_y - 1;	// Reset scroll counter, i.e. user has enough time to read current page
 	while(1) {
 		c = getchar();
+		
+		
+		// Local echo
+		if (stdio_echo)
+			putchar(c);
+		
 		if ( (c == 8) || (c == 127) ) {
 			// Backspace/DEL
 			if (pc > pcs) {
@@ -122,10 +130,7 @@ char *gets(char *pc) {
 			}
 			continue;
 		}
-		
-		// Local echo
-		if (stdio_echo)
-			putchar(c);
+
 		
 		if ((c == '\n') || (c == '\r') || (c == 0)) {
 			// End of string

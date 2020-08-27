@@ -379,15 +379,24 @@ void lcd_putchar(byte c) {
 	byte o;
 	
 	if (c == '\r') {
+		// Carriage return
 		lcd_x = 0;
 		c = 0;
 	}
 	else
 	if (c == '\n') {
+		// New line
 		lcd_x = 0;
 		lcd_y++;
 		c = 0;
 	}
+	else
+	if (c == 8) {
+		// Backspace
+		if (lcd_x > 0) lcd_x--;
+		c = 0;
+	}
+	
 	
 	if (lcd_x >= LCD_COLS) {
 		lcd_x = 0;
