@@ -10,6 +10,8 @@ VGLDK_SERIES=4000
 LOC_CODE=0x8000
 LOC_DATA=0xc000
 
+CART_SIZE_KB=16
+
 include ../../tools/Makefile.mk
 
 all: cart

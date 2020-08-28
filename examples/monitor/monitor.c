@@ -481,8 +481,8 @@ int cmd_ver(int argc, char *argv[]) {
 
 #include <fs_internal.h>	// Include test files
 
-#include <mame.h>
 #define PB_USE_MAME	// For testing in MAME
+#include <mame.h>
 #include <parabuddy.h>
 #include <fs_parabuddy.h>
 

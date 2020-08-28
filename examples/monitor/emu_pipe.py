@@ -3,7 +3,9 @@
 """
 Emu companion
 
-This script is used to start MAME and re-direct its port-accesses via serial to the real hardware.
+This script is used to start MAME and trap some port accesses (requires patched MAME).
+
+It can then be used to re-direct port-accesses via serial to the real hardware.
 Goal is to find out more about undocumented hardware (e.g. audio chip)
 
 2020-05-27 Bernhard "HotKey" Slawik
@@ -31,13 +33,15 @@ import os
 # MAME
 MAME_CALL = '/z/data/_code/_c/mame.git/mame64'
 #MAME_CALL = '../../../mame.git/mame64'
-MAME_EMUSYS = 'gl6000sl'
+#MAME_EMUSYS = 'gl6000sl'
+MAME_EMUSYS = 'gl4000'
 
 MAME_CMD = MAME_CALL
 MAME_CMD += ' ' + MAME_EMUSYS
 #MAME_CMD += ' -nodebug'
 #MAME_CMD += ' -rompath ./roms'
 #MAME_CMD += ' -cart out/cpm.cart.bin'
+MAME_CMD += ' -cart out/monitor.cart.16kb.bin'
 MAME_CMD += ' -window'
 MAME_CMD += ' -nomax'
 MAME_CMD += ' -nofilter'
@@ -396,7 +400,7 @@ class Hardware:
 
 def show_help():
 	put(__doc__)
-	put('host.py ...')
+	put('emu_pipe.py ...')
 
 if __name__ == '__main__':
 	#put(__doc__)
