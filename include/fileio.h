@@ -25,16 +25,25 @@ TODO:
 	#define FILEIO_MAX_PATH 32	// Maximum number of characters in path names
 #endif
 
+//FS *cfs;	// Current file system driver
+char cwd[FILEIO_MAX_PATH];	// Current working directory
+
+
 #ifndef FILEIO_MAX_DRIVES
 	#define FILEIO_MAX_DRIVES 1	// Number of file systems ("drives") available
 #endif
 
-
-//FS *cfs;	// Current file system driver
-char cwd[FILEIO_MAX_PATH];	// Current working directory
-
 //const FS *drives[] = { (FS *)&fs_internal };
 const FS *drives[FILEIO_MAX_DRIVES];	// Keep in sync with implementations
+
+
+#ifndef FILEIO_ROOT_FS
+	#include "fs_null.h"
+	#define FILEIO_ROOT_FS fs_null
+#endif
+
+#define fileio_root_fs FILEIO_ROOT_FS
+
 
 void absPath(const char *relPath, char *ret) {
 	const char *bRelPath;

@@ -13,7 +13,7 @@ Implementation of fs.h using hard-coded data. Mainly used for testing.
 
 */
 
-#include "file.h"
+#include "fs.h"
 
 //#define FS_INTERNAL_INCLUDE_TEST_APPS	// For testing: Include external app(s) from "loader" folder as virtual FS
 //#define FS_INTERNAL_CASE_SENSITIVE
