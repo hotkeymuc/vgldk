@@ -132,7 +132,7 @@ LOC_CODE_MAIN = $(shell printf "0x%04x" $(LOC_CODE_MAIN_DECIMAL) )
 # Cartridge output options
 #  8 =  8KB = 0x2000 = AT28C64B
 # 32 = 32KB = 0x8000 = AT28C256
-CART_SIZE_KB = 8
+CART_SIZE_KB ?= 8
 #CART_SIZE_KB = 32
 
 # EEPROM burning options

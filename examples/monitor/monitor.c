@@ -19,10 +19,11 @@ char cmd_arg[MAX_INPUT];
 
 // Features to include
 //#define MONITOR_HELP	// Include "long" help functionality (needs quite some space for the strings...)
-#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
-#define MONITOR_FILES	// Include file system stuff
 
+#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
 //#define MONITOR_SOFTSERIAL_AUTOSTART	// Make softserial take over STDIO at startup
+
+#define MONITOR_FILES	// Include file system stuff
 
 
 // Commands to include
@@ -32,7 +33,7 @@ char cmd_arg[MAX_INPUT];
 #define MONITOR_CMD_ECHO
 #define MONITOR_CMD_HELP	// Even without MONITOR_HELP, the HELP command can list all commands
 #define MONITOR_CMD_INTERRUPTS
-#define MONITOR_CMD_LOOP
+//#define MONITOR_CMD_LOOP
 #define MONITOR_CMD_PEEKPOKE
 //#define MONITOR_CMD_PAUSE
 #define MONITOR_CMD_PORT
@@ -225,10 +226,10 @@ int cmd_exit(int argc, char *argv[]) {
 	return ERR_OK;
 }
 
-//#ifdef MONITOR_CMD_HELP
+#ifdef MONITOR_CMD_HELP
 int cmd_help(int argc, char *argv[]);	// Forward declaration, since "help" needs to know all the commands and the commands need to know this function...
 // implemented after declaration of COMMANDS[]
-//#endif
+#endif
 
 #ifdef MONITOR_CMD_INTERRUPTS
 int cmd_di(int argc, char *argv[]) {
@@ -474,11 +475,16 @@ int cmd_ver(int argc, char *argv[]) {
 // Commands for additional functions
 #ifdef MONITOR_FILES
 
-#define FILEIO_MAX_DRIVES 1
-//#define FS_INTERNAL_CASE_SENSITIVE	// Emu is UPPERCASE
+#define FILEIO_MAX_DRIVES 2	// Keep in sync with the filesystems actually mounted in main()
+//#define FS_INTERNAL_CASE_SENSITIVE	// Emu is UPPERCASE only...
 #include <fileio.h>
 
-#include <fs_internal.h>
+#include <fs_internal.h>	// Include test files
+
+#include <mame.h>
+#define PB_USE_MAME	// For testing in MAME
+#include <parabuddy.h>
+#include <fs_parabuddy.h>
 
 int cmd_files_cd(int argc, char *argv[]) {
 	//char s[FILEIO_MAX_PATH];
@@ -541,6 +547,17 @@ int cmd_files_cat(int argc, char *argv[]) {
 	//putchar('\n');
 	
 	fclose(f);
+	
+	return ERR_OK;
+}
+int cmd_files_iotest(int argc, char *argv[]) {
+	(void) argc; (void) argv;
+	
+	if (argc < 2) {
+		printf_x2(mame_getchar());
+	} else {
+		mame_put(argv[1], strlen(argv[1]));
+	}
 	
 	return ERR_OK;
 }
@@ -651,9 +668,9 @@ const t_commandEntry COMMANDS[] = {
 	T_COMMAND_ENTRY("echo" , cmd_echo, "Display text"),
 	#endif
 	T_COMMAND_ENTRY("exit" , cmd_exit, "End session"),
-	//#ifdef MONITOR_CMD_HELP
+	#ifdef MONITOR_CMD_HELP
 	T_COMMAND_ENTRY("help" , cmd_help, "List cmds, explain"),
-	//#endif
+	#endif
 	#ifdef MONITOR_CMD_INTERRUPTS
 	T_COMMAND_ENTRY("di" , cmd_di, "Disable interrupts"),
 	T_COMMAND_ENTRY("ei" , cmd_ei, "Enable interrupts"),
@@ -685,6 +702,7 @@ const t_commandEntry COMMANDS[] = {
 	T_COMMAND_ENTRY("cd", cmd_files_cd, "Change dir"),
 	T_COMMAND_ENTRY("dir", cmd_files_dir, "Show entries"),
 	T_COMMAND_ENTRY("cat", cmd_files_cat, "List file"),
+	T_COMMAND_ENTRY("iotest", cmd_files_iotest, "IO test"),
 	#endif
 	
 	
@@ -711,7 +729,7 @@ int cmd_help(int argc, char *argv[]) {
 		for(i = 0; i < (sizeof(COMMANDS) / sizeof(t_commandEntry)); i++) {
 			if (i > 0) putchar(' ');	//printf(" ");
 			//printf("%s", COMMANDS[i].name);
-			printf(COMMANDS[i].name);
+			puts(COMMANDS[i].name);
 			
 			#ifdef MONITOR_HELP
 			//printf(": ");
@@ -941,6 +959,7 @@ void main() __naked {
 	#ifdef MONITOR_FILES
 	// Mount file systems
 	drives[0] = &fs_internal;
+	drives[1] = &fs_parabuddy;
 	
 	// CWD
 	cwd[0] = 'A';

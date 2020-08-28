@@ -66,7 +66,7 @@ Some bare minimum stdio functions
 
 
 //#include <stdio.h>	// for printf() putchar() gets() getchar()
-void printf(char *pc) {
+void printf(const char *pc) {
 	/*
 	char c;
 	c = *pc;
@@ -78,6 +78,7 @@ void printf(char *pc) {
 	*/
 	while(*pc) putchar(*pc++);
 }
+#define puts(s) printf(s)
 
 //void printf_d(char *pc, byte d) {
 void printf_d(byte d) {

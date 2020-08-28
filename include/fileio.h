@@ -34,7 +34,7 @@ TODO:
 char cwd[FILEIO_MAX_PATH];	// Current working directory
 
 //const FS *drives[] = { (FS *)&fs_internal };
-FS *drives[FILEIO_MAX_DRIVES];	// Keep in sync with implementations
+const FS *drives[FILEIO_MAX_DRIVES];	// Keep in sync with implementations
 
 void absPath(const char *relPath, char *ret) {
 	const char *bRelPath;
@@ -115,7 +115,7 @@ FS *fsByAbsPath(const char *path) {
 	}
 	
 	// Return FS instance for drive
-	fs = drives[driveNum];
+	fs = (FS *)drives[driveNum];
 	
 	return fs;
 

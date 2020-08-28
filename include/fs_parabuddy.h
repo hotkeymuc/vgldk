@@ -20,7 +20,10 @@ Implementation of fs.h using the "Parallel Buddy" Arduino connected to the VGL p
 
 // Implementation
 
-byte fs_pb_mounted = 0;
+byte fs_pb_mounted;
+DIR fs_pb_tmpDir;
+dirent fs_pb_tmpDirent;
+FILE fs_pb_tmpFile;
 
 void fs_pb_mount(const char *options) {
 	byte ok;
@@ -35,35 +38,36 @@ void fs_pb_mount(const char *options) {
 	//printf("OK\n");
 	
 	// Init SD card via BusBuddy
-	printf("sd_init()...");
+	puts("sd_init()...");
 	ok = pb_sd_init();
 	if (ok == 1) {
-		printf("OK\n");
+		puts("OK\n");
 		fs_pb_mounted = 1;
 		
 	} else {
-		printf("failed %d.\n", ok);
+		//printf("failed %d.\n", ok);
+		puts("failed "); printf_d(ok); putchar('\n');
 		fs_pb_mounted = 0;
 	}
 }
 
 
-DIR fs_pb_tmpDir;
 DIR *fs_pb_opendir(const char *path) {
 	
-	BB_HANDLE dirHandle;
+	pb_handle dirHandle;
 	DIR * dir;
 	
 	dir = &fs_pb_tmpDir;
 	dir->path = path;
 	
-	//@TODO: call bf_init / sd_init! Or do that automatically in Arduino sketch?
 	
-	//@TODO: call bb_cmd_...()
-	printf("fs_pb_opendir NOT IMPL!\n");
+	
+	//@FIXME: pb_opendir
+	puts("fs_pb_opendir NOT IMPL!\n");
 	
 	// SD library handles opendir() like fopen()!
-	dirHandle = sd_open(path, BB_FILE_MODE_DIRECTORY);
+	//dirHandle = sd_open(path, BB_FILE_MODE_DIRECTORY);
+	dirHandle = pb_sd_open(path, 8);	//8 = BB_FILE_MODE_DIRECTORY
 	
 	//@TODO: Handle "dir not found"
 	
@@ -99,11 +103,14 @@ DIR *fs_pb_opendir(const char *path) {
 }
 
 int fs_pb_closedir(DIR * dir) {
-	BB_HANDLE dirHandle;
+	pb_handle dirHandle;
 	
 	// SD open directories are handled like files
-	dirHandle = (BB_HANDLE)dir->userData;
-	file_close(dirHandle);
+	dirHandle = (pb_handle)dir->userData;
+	
+	//@FIXME: pb_closedir
+	puts("fs_pb_closedir NOT IMPL!\n");
+	//pb_file_close(dirHandle);
 	
 	// Invalidate
 	dir->userData = NULL;
@@ -113,27 +120,33 @@ int fs_pb_closedir(DIR * dir) {
 }
 
 
-dirent fs_pb_tmpDirent;
+
 //struct dirent *readdir(DIR *dir) {
 dirent *fs_pb_readdir(DIR *dir) {
 	//struct dirent *de;
 	dirent *de;
-	BB_HANDLE dirHandle;
-	BB_HANDLE entryHandle;
+	pb_handle dirHandle;
+	/*
+	pb_handle entryHandle;
 	byte isDir;
 	size_t size;
-	char name[BB_MAX_FILENAME];
+	char name[PB_MAX_FILENAME];
+	*/
 	
 	// Fetch next file info from driver...
 	
 	// Get remote handle for that directory
-	dirHandle = (BB_HANDLE)dir->userData;
+	dirHandle = (pb_handle)dir->userData;
 	
+	puts("fs_pb_readdir NOT IMPL!\n");
+	de = &fs_pb_tmpDirent;
+	
+	/*
 	// Get next file in that directory
 	entryHandle = sd_openNext(dirHandle);
 	
 	// End of directory?
-	if (entryHandle == BB_NO_HANDLE) {
+	if (entryHandle == PB_NO_HANDLE) {
 		// End of dir
 		return NULL;
 	}
@@ -149,6 +162,7 @@ dirent *fs_pb_readdir(DIR *dir) {
 	//de->userData = (void *)entryHandle;
 	
 	file_close(entryHandle);
+	*/
 	
 	dir->currentPos++;
 	
@@ -156,18 +170,18 @@ dirent *fs_pb_readdir(DIR *dir) {
 }
 
 
-
-FILE fs_pb_tmpFile;
 FILE *fs_pb_fopen(const char *path, const char *openMode) {
 	FILE *f;	// FILE to be returned
 	
 	byte mode;	// for converting openMode string to mode byte
-	BB_HANDLE handle;	// Remote handle
+	pb_handle handle;	// Remote handle
 	
 	
 	//@FIXME: Actually use the parent directory of that file (ask DOS)
 	//parentDir = "\0";	//path;
 	
+	mode = PB_FILE_READ;
+	/*
 	mode = BB_FILE_MODE_READ;
 	if (strcmp(openMode, "r") == 0) mode = BB_FILE_MODE_READ;
 	if (strcmp(openMode, "w") == 0) mode = BB_FILE_MODE_WRITE;	//@TODO: Truncate to empty if it already exists!
@@ -180,13 +194,13 @@ FILE *fs_pb_fopen(const char *path, const char *openMode) {
 	// if (sd_exists(path)) {
 		printf("File \"%s\" exists=%d\n", sd_exists(path));
 	// }
-	
+	*/
 	
 	// Actually do the call to BusBuddy
 	handle = pb_sd_open(path, mode);
 	
 	// Invalid handle? File not found?
-	if (handle == BB_NO_HANDLE) {
+	if (handle == PB_NO_HANDLE) {
 		printf("No handle opened!\n");
 		errno = ERR_FILE_NOT_FOUND;	// Maybe a different error
 		return NULL;
@@ -212,10 +226,10 @@ FILE *fs_pb_fopen(const char *path, const char *openMode) {
 }
 
 int fs_pb_fclose(FILE *f) {
-	BB_HANDLE handle;
+	pb_handle handle;
 	
 	// Close remote file handle
-	handle = (BB_HANDLE)f->userData;
+	handle = (pb_handle)f->userData;
 	pb_file_close(handle);
 	
 	// Invalidate
@@ -226,11 +240,11 @@ int fs_pb_fclose(FILE *f) {
 }
 
 byte fs_pb_feof(FILE *f) {
-	BB_HANDLE handle;
+	pb_handle handle;
 	byte b;
 	
 	// Get "bytes available for reading" from remote
-	handle = (BB_HANDLE)f->userData;
+	handle = (pb_handle)f->userData;
 	b = pb_file_bytesAvailable(handle);
 	
 	if (b <= 0) return 1;
@@ -241,20 +255,20 @@ byte fs_pb_feof(FILE *f) {
 
 
 int fs_pb_fgetc(FILE *f) {
-	BB_HANDLE handle;
+	pb_handle handle;
 	byte b;
 	byte l;
 	
-	if (fs_pb_feof(f)) return EOF;
+	if (fs_pb_feof(f)) return -1;	//EOF;
 	
 	// It is really a bad idea to read each byte individually from SD over the BB protocol!
 	// Read SIZE elements of size NMEMB and return how many elements were read
 	
 	// Read from remote file handle
-	handle = (BB_HANDLE)f->userData;
+	handle = (pb_handle)f->userData;
 	l = pb_file_read(handle, &b, 1);
 	
-	if (l <= 0) return EOF;
+	if (l <= 0) return -1;	//EOF;
 	
 	f->currentPos++;
 	
@@ -263,7 +277,7 @@ int fs_pb_fgetc(FILE *f) {
 
 size_t fs_pb_fread(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	// Read SIZE elements of size NMEMB and return how many elements were read
-	BB_HANDLE handle;
+	pb_handle handle;
 	byte l;
 	
 	size *= nmemb;	//@FIXME: This can/will overflow
@@ -271,14 +285,14 @@ size_t fs_pb_fread(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	//@TODO: Check max frame length! Fragment if neccessary!
 	
 	// Read from remote file handle
-	handle = (BB_HANDLE)f->userData;
+	handle = (pb_handle)f->userData;
 	l = pb_file_read(handle, (byte *)ptr, size);
 	
 	return l;
 }
 
 size_t fs_pb_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f) {
-	BB_HANDLE handle;
+	pb_handle handle;
 	byte l;
 	byte *b;
 	
@@ -287,7 +301,7 @@ size_t fs_pb_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	//@TODO: Check max frame length! Fragment if neccessary!
 	
 	// Write to remote file handle
-	handle = (BB_HANDLE)f->userData;
+	handle = (pb_handle)f->userData;
 	
 	b = (byte *)ptr;
 	l = pb_file_write(handle, b, size);

@@ -1,5 +1,5 @@
 # VGLDK
-A development kit (SDK) for the Z80 based VTech "Genius LEADER" line of learning computers (also called "PreComputer", "YENO MisterX" or "Compusavant")
+A development kit (SDK) for the Z80 based VTech "Genius LEADER" line of learning computers (aka. "PreComputer", "YENO MisterX", "Genio" or "Compusavant")
 
 This is not a usable development environment, yet. For some working proof-of-concept stuff, visit the [Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking) and get started using the zipped snapshots of "VGL CP/M" and other SDCC code examples.
 

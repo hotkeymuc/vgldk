@@ -18,22 +18,26 @@ TODO:
 
 */
 
-#include <softserial.h>
 
 /*
 
 TODO:
+	* Use size_t
+	* Clean up error codes (use negative for errors)
 	* Send/receive arbitrary length data
 	* Checksum!
 
 */
 
-#define PB_DEBUG_PROTOCOL_ERRORS	// Put information about protocol errors on screen
+//#define PB_DEBUG_PROTOCOL_ERRORS	// Put information about protocol errors on screen
 #define PB_RECEIVE_TIMEOUT 0x1000	// 0x0800 is good
+//#define PB_USE_MAME	// Instead of sending to softserial, bytes are sent to a port which MAME traps
 
 #define PB_MAX_FRAME_SIZE 64  // Length of a command frame
+#define PB_MAX_FILENAME 32
 //#define PB_MAX_FILES 4  // Maximum number of simultaneous open files
-typedef pb_handle byte;
+typedef byte pb_handle;
+#define PB_NO_HANDLE 0xff
 
 //#define PB_TERMINATOR 0x0a
 #define PB_PREFIX 0x20
@@ -67,13 +71,28 @@ typedef pb_handle byte;
 #define PB_COMMAND_FILE_CLOSE 0x31
 #define PB_COMMAND_FILE_READ 0x32
 #define PB_COMMAND_FILE_WRITE 0x33
-#define PB_COMMAND_FILE_SEEK 0x34
-#define PB_COMMAND_FILE_SIZE 0x35
+//#define PB_COMMAND_FILE_SEEK 0x34
+//#define PB_COMMAND_FILE_SIZE 0x35
+#define PB_COMMAND_FILE_AVAILABLE 0x36
 
 
 #define PB_FILE_READ 0
 #define PB_FILE_WRITE 1
 
+//@TODO: Move this selection to softserial instead
+#ifdef PB_USE_MAME
+	// Using MAME trapped port access instead of hardware
+	#include "mame.h"
+	#define pb_getchar mame_getchar
+	#define pb_putchar mame_putchar
+	#define pb_puts mame_put
+#else
+	// Default: Use SoftSerial for communication
+	#include <softserial.h>
+	#define pb_getchar serial_getchar
+	#define pb_putchar serial_putchar
+	#define pb_puts serial_put
+#endif
 
 byte tmpFrame[PB_MAX_FRAME_SIZE];
 
@@ -84,7 +103,7 @@ byte pb_receiveRaw(byte *f) {
 	
 	// Wait for first sync prefix byte
 	do {
-		c = serial_getchar();
+		c = pb_getchar();
 		
 		if (c < 0) {
 			timeout--;
@@ -98,7 +117,7 @@ byte pb_receiveRaw(byte *f) {
 	
 	// Skip over prefix padding
 	do {
-		c = serial_getchar();
+		c = pb_getchar();
 		
 		if (c < 0) {
 			timeout--;
@@ -120,7 +139,7 @@ byte pb_receiveRaw(byte *f) {
 	while(l >= 2) {
 		
 		// Get next
-		c = serial_getchar();
+		c = pb_getchar();
 		
 		if (c < 0) {
 			// No data? Update timeout
@@ -145,10 +164,10 @@ byte pb_receiveRaw(byte *f) {
 void pb_sendRaw(byte *f, byte l) {
 	
 	//@FIXME: It suddenly just stopped working!
-	//serial_put(f, l);
+	//pb_put(f, l);
 	
 	//@FIXME: Do NOT send byte-by-byte. Too much overhead!
-	while (l-- > 0) serial_putchar(*f++);
+	while (l-- > 0) pb_putchar(*f++);
 }
 
 void pb_sendData(byte cmd, byte *v, const byte dataLen) {
@@ -156,15 +175,17 @@ void pb_sendData(byte cmd, byte *v, const byte dataLen) {
 	byte l;
 	
 	f = &tmpFrame[0];
-	*f++ = 1+1+dataLen;
+	*f++ = 1+dataLen;	// 1=cmd, x=dataLen
 	*f++ = cmd;
+	
+	//@TODO: Use memcpy()
 	l = dataLen;
 	while (l > 0) {
 		*f++ = *v++;
 		l--;
 	}
 	// *f = PB_TERMINATOR;
-	pb_sendRaw(&tmpFrame[0], 1+1+dataLen);
+	pb_sendRaw(&tmpFrame[0], 1+1+dataLen);	// 1=len, 1=cmd, x=dataLen
 }
 void pb_sendByte(byte cmd, byte v) {
 	pb_sendData(cmd, &v, 1);
@@ -214,7 +235,8 @@ byte pb_receiveData(byte expectedCmd, byte *v, byte minDataLen, byte *dataLen) {
 	
 	if ((l < (1+1 + minDataLen)) || (l > 1+1 + maxDataLen)) {
 		#ifdef PB_DEBUG_PROTOCOL_ERRORS
-		printf("L: %02X ! %02X\n", l, (1+1)); beep();
+		printf("L: %02X ! %02X\n", l, (1+1));
+		//beep();
 		#endif
 		return 0;
 	}
@@ -222,7 +244,8 @@ byte pb_receiveData(byte expectedCmd, byte *v, byte minDataLen, byte *dataLen) {
 	c = *f++;
 	if (c != expectedCmd) {
 		#ifdef PB_DEBUG_PROTOCOL_ERRORS
-		printf("C: %02X != %02X\n", c, expectedCmd); beep();
+		printf("C: %02X != %02X\n", c, expectedCmd);
+		//beep();
 		#endif
 		return 0;
 	}
@@ -238,8 +261,8 @@ byte pb_receiveData(byte expectedCmd, byte *v, byte minDataLen, byte *dataLen) {
 }
 
 
-byte pb_receiveByte(byte* v) {
-	return pb_receiveData(PB_COMMAND_RETURN_BYTE, v, 1, 0);
+byte pb_receiveByte(byte *v) {
+	return pb_receiveData(PB_COMMAND_RETURN_BYTE, v, 1, NULL);
 }
 
 byte pb_receiveWord(word *v) {
@@ -258,6 +281,7 @@ byte pb_receiveAsciiz(char* v) {
 
 
 
+
 word pingValue;
 void pb_ping() {
 	word vPing;
@@ -267,7 +291,8 @@ void pb_ping() {
 	vPing = pingValue++;
 	vPong = 0xffff;
 	
-	printf("Ping %02X %02X...\n", (vPing >> 8), vPing & 0xff);
+	//printf("Ping %02X %02X...\n", (vPing >> 8), vPing & 0xff);
+	puts("Ping"); printf_x4(vPing); putchar('\n');
 	
 	//pb_sendComposed2(PB_COMMAND_PING, (vPing >> 8), vPing & 0x00ff);	// MSB
 	//pb_sendComposed2(PB_COMMAND_PING, vPing & 0x00ff, (vPing >> 8));	// LSB
@@ -276,13 +301,14 @@ void pb_ping() {
 	//if (pb_receiveWord(&vPong) == 1) break;
 	
 	if (pb_receiveWord(&vPong) == 0) {
-		printf("failed...");
+		puts("failed.\n");
 		//beep();
 		return;
 	}
 
 	//printf("Pong %04X\n", vPong);
-	printf("Pong %02X %02X\n", (vPong >> 8), vPong & 0xff);
+	//printf("Pong %02X %02X\n", (vPong >> 8), vPong & 0xff);
+	puts("Pong"); printf_x4(vPong); putchar('\n');
 }
 
 void pb_endBootloader() {
@@ -365,7 +391,7 @@ byte pb_file_read(pb_handle h, byte *buf, byte l) {
 	return l;
 }
 
-void pb_file_write(pb_handle handle, byte *buf, byte l) {
+byte pb_file_write(pb_handle h, byte *buf, byte l) {
 	//@TODO: Implement
 	(void)h;
 	//pb_sendByte(PB_COMMAND_FILE_WRITE, h);
@@ -373,9 +399,11 @@ void pb_file_write(pb_handle handle, byte *buf, byte l) {
 	//byte data[2];
 	//data[0] = h;
 	//data[1] = l;
-	//pb_sendData(PB_COMMAND_FILE_WRITE, &data[0], 2 + l);
+	pb_sendData(PB_COMMAND_FILE_WRITE, buf, l);
 	
-	l = pb_result_byte();
+	if (pb_receiveByte(&l) != 1)
+		return 0;
+	
 	return l;
 }
 
@@ -387,10 +415,17 @@ void pb_file_write(pb_handle handle, byte *buf, byte l) {
 //PB_COMMAND_FILE_SEEK
 //}
 
-byte pb_file_bytesAvailable() {
+byte pb_file_bytesAvailable(pb_handle h) {
+	byte l;
 	//@TODO: Implement
-	//PB_COMMAND_FILE_SIZE
-	return 0;
+	// fsize() - ftell()?	PB_COMMAND_FILE_SIZE?
+	
+	pb_sendByte(PB_COMMAND_FILE_AVAILABLE, h);
+	
+	if (pb_receiveByte(&l) != 1)
+		return 0;
+	
+	return l;
 }
 
 /*
