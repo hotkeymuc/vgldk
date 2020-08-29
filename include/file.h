@@ -10,12 +10,15 @@ So I implemented my own minimal one to be used in my "DOS".
 */
 
 
-int errno;
 #define ERR_GENERAL -1
 #define ERR_FILE_NOT_FOUND -2
 #define ERR_DRIVE_INVALID -3
 
+#define FILE_PATH_DELIMITER '/'
+
 typedef word size_t;
+
+int errno;
 
 //#define EOF -1
 typedef struct {
@@ -25,7 +28,7 @@ typedef struct {
 	
 	// Link to file system
 	//FS *fs;
-	void *fs;	// Link to file system
+	const void *fs;	// Link to file system
 	
 	void *userData;	// Remote handles etc.
 	size_t size;
@@ -47,7 +50,7 @@ typedef struct {
 	
 	// Link to ressource
 	//FS *fs;
-	void *fs;	// Link to file system
+	const void *fs;	// Link to file system
 	
 	//dirent *entries;
 	void *userData;	// Remote handles etc.

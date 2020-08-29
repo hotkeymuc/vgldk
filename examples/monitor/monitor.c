@@ -20,7 +20,7 @@ char cmd_arg[MAX_INPUT];
 // Features to include
 //#define MONITOR_HELP	// Include "long" help functionality (needs quite some space for the strings...)
 
-#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
+//#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
 //#define MONITOR_SOFTSERIAL_AUTOSTART	// Make softserial take over STDIO at startup
 
 #define MONITOR_FILES	// Include file system stuff
@@ -84,7 +84,6 @@ byte stricmp(const char *cs, const char *ct) {
 	if (stricmp1(*cs, *ct)) return 1;
 	return 0;
 }
-
 
 
 
@@ -475,16 +474,25 @@ int cmd_ver(int argc, char *argv[]) {
 // Commands for additional functions
 #ifdef MONITOR_FILES
 
-#define FILEIO_MAX_DRIVES 2	// Keep in sync with the filesystems actually mounted in main()
-//#define FS_INTERNAL_CASE_SENSITIVE	// Emu is UPPERCASE only...
-#include <fileio.h>
-
-#include <fs_internal.h>	// Include test files
-
 #define PB_USE_MAME	// For testing in MAME
 #include <mame.h>
-#include <parabuddy.h>
-#include <fs_parabuddy.h>
+//#include <parabuddy.h>
+//#include <fs_parabuddy.h>
+
+// File systems
+#include <fs_null.h>
+
+//#define FS_INTERNAL_CASE_SENSITIVE	// Emu is UPPERCASE only...
+#include <fs_internal.h>
+
+#define FS_ROOT_MOUNTS {{"int", &fs_internal}, {"nul", &fs_null}}
+//#define FS_ROOT_CASE_SENSITIVE	// Emu is UPPERCASE only...
+#include <fs_root.h>
+
+#define FILEIO_ROOT_FS fs_root
+//#define FILEIO_ROOT_FS fs_internal
+#include <fileio.h>
+
 
 int cmd_files_cd(int argc, char *argv[]) {
 	//char s[FILEIO_MAX_PATH];
@@ -524,23 +532,26 @@ int cmd_files_dir(int argc, char *argv[]) {
 	
 	return ERR_OK;
 }
+#define FILES_BUF_SIZE 32
 int cmd_files_cat(int argc, char *argv[]) {
 	
 	FILE *f;
 	size_t l;
-	char buf[32];
+	const char *filename;
+	char buf[FILES_BUF_SIZE];
 	
 	if (argc < 2) {
 		return ERR_MISSING_ARGUMENT;
 	}
 	
-	f = fopen(argv[1], 'r');
+	filename = argv[1];
+	f = fopen(filename, "r");
 	if (f == NULL) return errno;
 	
 	//printf(f->name); printf(":\n");
 	
 	while(feof(f) == 0) {
-		l = fread(&buf[0], 1, 31, f);
+		l = fread(&buf[0], 1, FILES_BUF_SIZE-1, f);
 		buf[l] = '\0';	// Terminate string
 		printf(buf);
 	}
@@ -958,13 +969,15 @@ void main() __naked {
 	
 	#ifdef MONITOR_FILES
 	// Mount file systems
-	drives[0] = &fs_internal;
-	drives[1] = &fs_parabuddy;
+	//drives[0] = &fs_internal;
+	//drives[1] = &fs_parabuddy;
 	
 	// CWD
-	cwd[0] = 'A';
-	cwd[1] = FILEIO_DRIVE_DELIMITER;
-	cwd[2] = 0;
+	//cwd[0] = 'A';
+	//cwd[1] = FILEIO_DRIVE_DELIMITER;
+	//cwd[2] = 0;
+	cwd[0] = FILE_PATH_DELIMITER;
+	cwd[1] = 0;
 	#endif
 	
 	#ifdef MONITOR_SOFTSERIAL

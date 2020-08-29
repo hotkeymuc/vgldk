@@ -215,12 +215,12 @@ app:: info $(OUTPUT_FILE_APP)
 
 
 $(CRT_REL_FILE): create_out_dir $(CRT_S_FILE)
-	# Compile CRT0 $< to $@
+	### Compiling CRT0 $< to $@
 	$(SDASZ80) -o $(CRT_REL_FILE) $(CRT_S_FILE)
 
 
 $(OUT_DIR)/%.ihx: %.c $(CRT_REL_FILE)
-	# Compile $< and $(CRT_REL_FILE) to $@
+	### Compiling $< and $(CRT_REL_FILE) to $@
 	@# --out-fmt-s19
 	@# --out-fmt-ihx
 	$(CC) -mz80 --no-std-crt0 \
@@ -231,7 +231,7 @@ $(OUT_DIR)/%.ihx: %.c $(CRT_REL_FILE)
 	$(CRT_REL_FILE) $<
 
 %.ihx.bin: %.ihx
-	# Build memory dump binary $@
+	### Building memory dump binary $@
 	@#$(OBJCOPY) -Iihex -Obinary $< $@
 	@#makebin -s 65536 $< $@
 	@#      -p = only extract minimal amount
@@ -240,7 +240,7 @@ $(OUT_DIR)/%.ihx: %.c $(CRT_REL_FILE)
 # Cartridge
 #%.cart.$(CART_SIZE_KB)kb.bin: %.ihx.bin
 $(OUTPUT_FILE_CART): $(OUTPUT_FILE_HEX_BIN)
-	# Extract cartridge section from $< ($(ADDR_CART) and up)
+	### Extracting cartridge section from $< ($(ADDR_CART) and up)
 	$(DD) iflag=skip_bytes skip=$(ADDR_CART_DECIMAL) bs=1024 count=$(CART_SIZE_KB) if=$< of=$@ status=none
 	
 	@# Create empty EPROM file filled with FF (full cart size)
@@ -260,7 +260,7 @@ clean:
 	rm -f $(OUT_DIR)/$(NAME).*
 
 emu: $(OUTPUT_FILE_CART)
-	# Start MAME using the cartridge file \"$(OUTPUT_FILE_CART)\"
+	### Starting MAME using the cartridge file \"$(OUTPUT_FILE_CART)\"
 	$(MAME) \
 	$(EMU_SYS) \
 	-rompath "$(EMU_ROM_DIR)" \

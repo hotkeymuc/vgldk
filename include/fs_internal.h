@@ -1,6 +1,5 @@
 #ifndef __FS_INTERNAL_H
 #define __FS_INTERNAL_H
-
 /*
 
 Internal File System
@@ -10,7 +9,6 @@ Implementation of fs.h using hard-coded data. Mainly used for testing.
 
 
 2019-07-11 Bernhard "HotKey" Slawik
-
 */
 
 #include "fs.h"
@@ -18,23 +16,18 @@ Implementation of fs.h using hard-coded data. Mainly used for testing.
 //#define FS_INTERNAL_INCLUDE_TEST_APPS	// For testing: Include external app(s) from "loader" folder as virtual FS
 //#define FS_INTERNAL_CASE_SENSITIVE
 
+
+// Internal fs disk
+// Define some static test files. Only for testing low-level file access.
+//const char TEST_CONTENTS[] = "This is contents of test.txt, hard-baked into the DOS code!";
+const char TEST_CONTENTS[] = "TEST_CONTENTS!\nLine2\n";
+const char AUTO_CMD_CONTENTS[] = "echo \"This is %TEST% auto.cmd!\"\n";
+
 #ifdef FS_INTERNAL_INCLUDE_TEST_APPS
 	#include "../loader/out/app_test.app.h"
 	#include "../loader/out/app_hello.app.h"
 #endif
 
-
-// Internal fs disk
-// Define some static test files. Only for testing low-level file access.
-/*
-const dirent FS_INTERNAL_DIRENTS[] = {
-	{0, "test.txt"},
-	{1, "app_hello"}
-};
-*/
-//const char TEST_CONTENTS[] = "This is contents of test.txt, hard-baked into the DOS code!";
-const char TEST_CONTENTS[] = "TEST_CONTENTS!\nLine2\n";
-const char AUTO_CMD_CONTENTS[] = "echo \"This is %TEST% auto.cmd!\"\n";
 const FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:FILE!
 	{
 		"auto.cmd",
@@ -45,12 +38,12 @@ const FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:FILE!
 		0
 	},
 	{
-		"test.txt",
-		NULL,
-		NULL,
-		&TEST_CONTENTS[0],
-		sizeof(TEST_CONTENTS),
-		0
+		"test.txt",	// name
+		NULL,	// mode
+		NULL,	// fs
+		&TEST_CONTENTS[0],	// userData
+		sizeof(TEST_CONTENTS),	// size
+		0	// currentPos
 	},
 #ifdef FS_INTERNAL_INCLUDE_TEST_APPS
 	{
@@ -71,35 +64,71 @@ const FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:FILE!
 	}
 #endif
 };
+#define FS_INTERNAL_FILES_COUNT (sizeof(FS_INTERNAL_FILES) / sizeof(FILE))
 
+
+// Forwards
+void fs_int_mount(const char *options);
+DIR *fs_int_opendir(const char *path);
+int fs_int_closedir(DIR * dir);
+dirent *fs_int_readdir(DIR *dir);
+FILE *fs_int_fopen(const char *path, const char *openMode);
+int fs_int_fclose(FILE *f);
+byte fs_int_feof(FILE *f);
+int fs_int_fgetc(FILE *f);
+size_t fs_int_fread(void *ptr, size_t size, size_t nmemb, FILE *f);
+size_t fs_int_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f);
+
+
+// Publish a FS struct
+const FS fs_internal = {	// Keep in sync with fs.h:FS!
+	fs_int_mount,
+	
+	fs_int_opendir,
+	fs_int_closedir,
+	fs_int_readdir,
+	
+	fs_int_fopen,
+	fs_int_fclose,
+	fs_int_feof,
+	fs_int_fgetc,
+	fs_int_fread,
+	fs_int_fwrite
+};
 
 
 // Implementation
+DIR fs_int_tmpDir;
+dirent fs_int_tmpDirent;
+FILE fs_int_tmpFile;
+
 void fs_int_mount(const char *options) {
 	// Nothing to do here for now
 	(void)options;
 }
 
-DIR fs_int_tmpDir;
 DIR *fs_int_opendir(const char *path) {
-	
 	DIR * dir;
+	const char *pp;
+	
+	pp = path;
+	if (*pp == FILE_PATH_DELIMITER) pp++;	// Skip initial slash
 	
 	dir = &fs_int_tmpDir;	//@FIXME: Using the ONE temp. dir...
-	dir->path = path;
+	dir->fs = &fs_internal;
+	//dir->path = path;	// this can have weird behaviour
 	
-	//@FIXME: Only root directory is allowed for now
-	if (*path != 0) {
+	// Only root directory is allowed for now
+	if (*pp != 0) {
 		//printf("Only root dir!\n");
 		errno = ERR_FILE_NOT_FOUND;
 		return NULL;
 	}
 	
 	dir->userData = (FILE *)&FS_INTERNAL_FILES[0];
-	dir->count = (sizeof(FS_INTERNAL_FILES) / sizeof(FILE));
+	dir->count = FS_INTERNAL_FILES_COUNT;
 	
-	//rewinddir(dir);
-	dir->currentPos = 0;
+	dir->currentPos = 0;	// Rewind
 	return dir;
 }
 
@@ -109,16 +138,11 @@ int fs_int_closedir(DIR * dir) {
 	return 0;
 }
 
-
-dirent fs_int_tmpDirent;
-//struct dirent *readdir(DIR *dir) {
 dirent *fs_int_readdir(DIR *dir) {
-	//struct dirent *de;
 	dirent *de;
 	FILE *f;
 	FILE *files;
 	
-	//@TODO: Get next file from driver...
 	if (dir->currentPos >= dir->count) {
 		// Done.
 		return NULL;
@@ -140,13 +164,11 @@ dirent *fs_int_readdir(DIR *dir) {
 	return de;
 }
 
-
-
-FILE fs_int_tmpFile;
 FILE *fs_int_fopen(const char *path, const char *openMode) {
 	FILE *f;	// FILE to be returned
 	
 	// For searching
+	const char *pp;
 	const byte *parentDir;
 	FILE *files;
 	FILE *dirf;
@@ -154,6 +176,9 @@ FILE *fs_int_fopen(const char *path, const char *openMode) {
 	dirent *de;
 	
 	// Scan directory for the given file
+	pp = path;
+	if (*pp == FILE_PATH_DELIMITER) pp++;	// Skip initial slash
+	
 	f = NULL;
 	
 	//@FIXME: Actually use the parent directory of that file (ask DOS)
@@ -168,7 +193,7 @@ FILE *fs_int_fopen(const char *path, const char *openMode) {
 		#ifdef FS_INTERNAL_CASE_SENSITIVE
 		if (strcmp(path, de->name) == 0) {
 		#else
-		if (stricmp(path, de->name) == 0) {
+		if (stricmp(pp, de->name) == 0) {
 		#endif
 			//@FIXME: Pointer madness...
 			dirf = &files[de->pos];
@@ -191,6 +216,7 @@ FILE *fs_int_fopen(const char *path, const char *openMode) {
 		return NULL;
 	}
 	
+	f->fs = &fs_internal;
 	f->mode = openMode;
 	f->currentPos = 0;
 	
@@ -251,22 +277,5 @@ size_t fs_int_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	printf("fs_int is RO!\n");
 	return 0;
 }
-
-
-// Publish a FS struct
-const FS fs_internal = {	// Keep in sync with fs.h:FS!
-	fs_int_mount,
-	
-	fs_int_opendir,
-	fs_int_closedir,
-	fs_int_readdir,
-	
-	fs_int_fopen,
-	fs_int_fclose,
-	fs_int_feof,
-	fs_int_fgetc,
-	fs_int_fread,
-	fs_int_fwrite
-};
 
 #endif
