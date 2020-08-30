@@ -32,8 +32,10 @@ TODO:
 //#define PB_DEBUG_FRAMES	// Dump hex data to screen?
 #define PB_DEBUG_PROTOCOL_ERRORS	// Put information about protocol errors on screen
 #define PB_RECEIVE_TIMEOUT 0x1000	// 0x0800 is good
-//#define PB_USE_MAME	// Instead of sending to softserial, bytes are sent to a port which MAME traps
 
+//#define PB_USE_SOFTSERIAL // Use SoftSerial as physical layer (actual hardware)
+//#define PB_USE_MAME	// Use MAME port traps (link to host) as a physical layer (running in emulation)
+//#define PB_USE_ARDUINO  // Provide a custom physical layer (ParallelBuddy Arduino Sketch)
 
 #define PB_MAX_FRAME_SIZE 64  // Length of a command frame
 #define PB_MAX_FILENAME 32
@@ -63,11 +65,11 @@ TODO:
 //#define PB_COMMAND_SD_MKDIR 0x25
 //#define PB_COMMAND_SD_RMDIR 0x26
 
-#define PB_COMMAND_FILE_OPENDIR 30
-#define PB_COMMAND_FILE_READDIR 31
-#define PB_COMMAND_FILE_CLOSEDIR 32
+#define PB_COMMAND_FILE_OPENDIR 0x30
+#define PB_COMMAND_FILE_READDIR 0x31
+#define PB_COMMAND_FILE_CLOSEDIR 0x32
 
-#define PB_COMMAND_FILE_OPEN 40
+#define PB_COMMAND_FILE_OPEN 0x40
 #define PB_COMMAND_FILE_CLOSE 0x41
 #define PB_COMMAND_FILE_EOF 0x42
 #define PB_COMMAND_FILE_READ 0x43
@@ -90,99 +92,293 @@ TODO:
 typedef byte pb_handle;
 
 
+// Prepare "Physical Layer" (pb_sendRaw / pb_receiveRaw)
+
+#ifndef PB_USE_SOFTSERIAL
+  #ifndef PB_USE_MAME
+    #ifndef PB_USE_ARDUINO
+      #error "parabuddy.h: No physical layer defined! Define either PB_USE_SOFTSERIAL, PB_USE_MAME or PB_USE_ARDUINO."
+    #endif
+  #endif
+#endif
 
 
-//@TODO: Move this selection to softserial instead
+//@TODO: Move this selection to softserial instead?
 #ifdef PB_USE_MAME
 	// Using MAME trapped port access instead of hardware
 	#include "mame.h"
 	#define pb_getchar mame_getchar
 	#define pb_putchar mame_putchar
 	#define pb_puts mame_put
-#else
+  
+  byte pb_receiveRaw(byte *f) {
+    int c;
+    byte l;
+    word timeout = PB_RECEIVE_TIMEOUT;
+    
+    // Wait for first sync prefix byte
+    do {
+      c = pb_getchar();
+      if (c < 0) {
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;  // Timeout while waiting for sync
+        continue;
+      }
+      
+    } while (c != PB_PREFIX);
+    
+    // c is now at the first encountered prefix byte
+    
+    // Skip over prefix padding
+    do {
+      c = pb_getchar();
+      if (c < 0) {
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;  // Timeout while in prefix
+        continue;
+      }
+    } while (c == PB_PREFIX);
+    
+    // c now contains the first character beyond PB_PREFIX
+    // The first char is LENGTH
+    l = c;
+    
+    // Store character
+    #ifdef PB_DEBUG_FRAMES
+    putchar('[');
+    printf_x2(c);
+    #endif
+    *f++ = c;
+    
+    // Receive until termination
+    while(l > 0) {
+      c = pb_getchar();
+      
+      if (c < 0) {
+        // No data? Update timeout
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;
+        continue;
+      }
+      
+      // Store character
+      #ifdef PB_DEBUG_FRAMES
+      printf_x2(c);
+      #endif
+      *f++ = c;
+      
+      l--;
+    }
+    #ifdef PB_DEBUG_FRAMES
+    putchar(']');
+    #endif
+    
+    // Finished!
+    return PB_ERROR_OK;
+  }
+  void pb_sendRaw(byte *f, byte l) {
+    
+    //@FIXME: It suddenly just stopped working!
+    //pb_put(f, l);
+    
+    //@FIXME: Do NOT send byte-by-byte. Too much overhead!
+    while (l-- > 0) pb_putchar(*f++);
+  }
+#endif
+
+#ifdef PB_USE_SOFTSERIAL
 	// Default: Use SoftSerial for communication
 	#include <softserial.h>
 	#define pb_getchar serial_getchar
 	#define pb_putchar serial_putchar
 	#define pb_puts serial_put
+  
+  byte pb_receiveRaw(byte *f) {
+    int c;
+    byte l;
+    word timeout = PB_RECEIVE_TIMEOUT;
+    
+    // Wait for first sync prefix byte
+    do {
+      c = pb_getchar();
+      if (c < 0) {
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;  // Timeout while waiting for sync
+        continue;
+      }
+      
+    } while (c != PB_PREFIX);
+    
+    // c is now at the first encountered prefix byte
+    
+    // Skip over prefix padding
+    do {
+      c = pb_getchar();
+      if (c < 0) {
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;  // Timeout while in prefix
+        continue;
+      }
+    } while (c == PB_PREFIX);
+    
+    // c now contains the first character beyond PB_PREFIX
+    // The first char is LENGTH
+    l = c;
+    
+    // Store character
+    #ifdef PB_DEBUG_FRAMES
+    putchar('[');
+    printf_x2(c);
+    #endif
+    *f++ = c;
+    
+    // Receive until termination
+    while(l > 0) {
+      c = pb_getchar();
+      
+      if (c < 0) {
+        // No data? Update timeout
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;
+        continue;
+      }
+      
+      // Store character
+      #ifdef PB_DEBUG_FRAMES
+      printf_x2(c);
+      #endif
+      *f++ = c;
+      
+      l--;
+    }
+    #ifdef PB_DEBUG_FRAMES
+    putchar(']');
+    #endif
+    
+    // Finished!
+    return PB_ERROR_OK;
+  }
+  void pb_sendRaw(byte *f, byte l) {
+    
+    //@FIXME: It suddenly just stopped working!
+    //pb_put(f, l);
+    
+    //@FIXME: Do NOT send byte-by-byte. Too much overhead!
+    while (l-- > 0) pb_putchar(*f++);
+  }
+#endif
+
+#ifdef PB_USE_ARDUINO
+  // Included in Arduino sketch: Use Hardware Serial (called "pb_serial")
+  int pb_getchar() {
+    //while (!pb_serial.available()) {}
+    return pb_serial.read();
+  }
+  void pb_putchar(char c) {
+    pb_serial.write(c);
+  }
+  
+  byte pb_receiveRaw(byte *f) {
+    int c;
+    byte l;
+    word timeout = PB_RECEIVE_TIMEOUT;
+  
+    #ifdef PB_DEBUG_FRAMES
+      hostSerial.print("pre?");
+    #endif
+    // Wait for first sync prefix byte
+    do {
+      c = pb_getchar();
+      if (c < 0) {
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;  // Timeout while waiting for sync
+        continue;
+      }
+      
+    } while (c != PB_PREFIX);
+  
+    #ifdef PB_DEBUG_FRAMES
+      hostSerial.print("!");
+    #endif
+    // c is now at the first encountered prefix byte
+    
+    // Skip over prefix padding
+    do {
+      c = pb_getchar();
+      if (c < 0) {
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;  // Timeout while in prefix
+        continue;
+      }
+    } while (c == PB_PREFIX);
+    
+    // c now contains the first character beyond PB_PREFIX
+    #ifdef PB_DEBUG_FRAMES
+      hostSerial.print("D");
+    #endif
+    // The first char is LENGTH
+    l = c;
+    
+    // Store character
+    #ifdef PB_DEBUG_FRAMES
+      hostSerial.print("[");
+      hostSerial.print(c, HEX);
+    #endif
+    *f++ = c;
+    
+    // Receive until termination
+    while(l > 0) {
+      c = pb_getchar();
+      
+      if (c < 0) {
+        // No data? Update timeout
+        timeout--;
+        if (timeout <= 0) return PB_ERROR_TIMEOUT;
+        continue;
+      }
+      
+      // Store character
+      #ifdef PB_DEBUG_FRAMES
+        hostSerial.print(c, HEX);
+      #endif
+      *f++ = c;
+      
+      l--;
+    }
+    #ifdef PB_DEBUG_FRAMES
+      hostSerial.print("]");
+    #endif
+    
+    // Finished!
+    return PB_ERROR_OK;
+  }
+  void pb_sendRaw(byte *b, word l) {
+  
+    #ifdef PB_DEBUG_SENDING
+      // Debug
+      put_("#Sending l=");
+      printf_d(l);
+    #endif
+    
+    // Send Pre-padding
+    // Three sync bytes turn out to be quite reliable!
+    //pb_putchar(PB_PREFIX);
+    pb_serial.write(PB_PREFIX);
+    pb_serial.write(PB_PREFIX);
+    pb_serial.write(PB_PREFIX);
+    //pb_serial.print("   ");
+  
+    // Actually send
+    size_t lSent = pb_serial.write(b, l);
+    
+    pb_serial.flush();  // Wait for data to be sent
+  }
+  
 #endif
 
 
+// Data Link Layer (independent of Physical Layer)
 byte tmpFrame[PB_MAX_FRAME_SIZE];
-
-byte pb_receiveRaw(byte *f) {
-	int c;
-	byte l;
-	word timeout = PB_RECEIVE_TIMEOUT;
-	
-	// Wait for first sync prefix byte
-	do {
-		c = pb_getchar();
-		if (c < 0) {
-			timeout--;
-			if (timeout <= 0) return PB_ERROR_TIMEOUT;	// Timeout while waiting for sync
-			continue;
-		}
-		
-	} while (c != PB_PREFIX);
-	
-	// c is now at the first encountered prefix byte
-	
-	// Skip over prefix padding
-	do {
-		c = pb_getchar();
-		if (c < 0) {
-			timeout--;
-			if (timeout <= 0) return PB_ERROR_TIMEOUT;	// Timeout while in prefix
-			continue;
-		}
-	} while (c == PB_PREFIX);
-	
-	// c now contains the first character beyond PB_PREFIX
-	// The first char is LENGTH
-	l = c;
-	
-	// Store character
-	#ifdef PB_DEBUG_FRAMES
-	putchar('[');
-	printf_x2(c);
-	#endif
-	*f++ = c;
-	
-	// Receive until termination
-	while(l > 0) {
-		c = pb_getchar();
-		
-		if (c < 0) {
-			// No data? Update timeout
-			timeout--;
-			if (timeout <= 0) return PB_ERROR_TIMEOUT;
-			continue;
-		}
-		
-		// Store character
-		#ifdef PB_DEBUG_FRAMES
-		printf_x2(c);
-		#endif
-		*f++ = c;
-		
-		l--;
-	}
-	#ifdef PB_DEBUG_FRAMES
-	putchar(']');
-	#endif
-	
-	// Finished!
-	return PB_ERROR_OK;
-}
-void pb_sendRaw(byte *f, byte l) {
-	
-	//@FIXME: It suddenly just stopped working!
-	//pb_put(f, l);
-	
-	//@FIXME: Do NOT send byte-by-byte. Too much overhead!
-	while (l-- > 0) pb_putchar(*f++);
-}
 
 void pb_sendFrame(byte cmd, byte *v, const byte dataLen) {
 	byte *f;
@@ -454,7 +650,7 @@ byte pb_file_read(pb_handle h, byte *buf, byte l) {
 	} data;
 	data.h = h;
 	data.l = l;
-	pb_sendFrame(PB_COMMAND_FILE_READ, (void*)&data, sizeof(data));
+	pb_sendFrame(PB_COMMAND_FILE_READ, (byte*)&data, sizeof(data));
 	
 	while(pb_receiveFrame(PB_COMMAND_RETURN_DATA, buf, 0, &l) != PB_ERROR_OK) {
 		// Delay / Timeout

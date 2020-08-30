@@ -130,16 +130,27 @@ class Monitor:
 			self.put('! Cannot send data, because serial is not open!')
 			return False
 		
-		if (SHOW_TRAFFIC): self.put('>>> "%s"' % str_hex(s))
+		#if (SHOW_TRAFFIC): self.put('>>> "%s"' % str_hex(s))
+		if (SHOW_TRAFFIC): self.put('>>> %s' % str_hex(s))
 		
 		if PYTHON3:
-			self.ser.write(bytes(s, 'ascii'))	# Python3
+			#self.ser.write(bytes(s, 'ascii'))	# Python3
+			self.ser.write(s)	# s must be binary
 		else:
 			self.ser.write(s)	# Python2
 		
 		self.ser.flush()	# Wait until all data is written
 		
-	
+	def read(self):
+		b = self.ser.read()
+		
+		if (b is None) or (len(b) == 0):
+			# Just ignore empty inputs (b'' means "nothing received")
+			return None
+		
+		if (SHOW_TRAFFIC): self.put('<<< "%s"' % str_hex(b))
+		return b
+		
 	def readline(self, timeout=SERIAL_TIMEOUT):
 		"""
 		data = ''

@@ -1,12 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-MAME test of ParallelBuddy
+MAME test of Arduino projects (e.g. ParallelBuddy)
 
 This script is used to start MAME and trap some port accesses (requires patched MAME).
-It requires you to run a cartridge that uses parabuddy.h and PB_USE_MAME switch.
 
-It then interprets all data as "ParallelBuddy" protocol data.
+It then routes all traffic to a physical device connected via serial.
+This can be used to test an actual Arduino against an emulated machine.
 
 2020-08-29 Bernhard "HotKey" Slawik
 """
@@ -17,7 +17,14 @@ PYTHON3 = (sys.version_info.major == 3)
 
 import time
 import getopt
+
 import os
+# Use "Monitor" as Arduino stand-in
+sys.path.append(os.path.join('..', 'examples', 'monitor'))
+import monitor
+monitor.SHOW_TRAFFIC = True
+ARDUINO_PORT = '/dev/ttyUSB1'
+ARDUINO_BAUD = 9600
 
 
 # MAME
@@ -31,17 +38,15 @@ MAME_EMUSYS = 'gl4000'
 MAME_CART = '../examples/monitor/out/monitor.cart.16kb.bin'
 mame.SHOW_TRAFFIC = False
 
-# ParallelBuddy
-import parabuddy
 
 
 def put(txt):
-	print('mame_parabuddy: %s' % txt)
+	print('mame_arduino: %s' % txt)
 
 
 def show_help():
 	put(__doc__)
-	put('mame_parabuddy.py ...')
+	put('mame_arduino.py ...')
 
 if __name__ == '__main__':
 	#put(__doc__)
@@ -67,7 +72,8 @@ if __name__ == '__main__':
 			baud = int(arg)
 	"""
 	
-	pb = parabuddy.ParaBuddy()
+	arduino = monitor.Monitor(port=ARDUINO_PORT, baud=ARDUINO_BAUD)
+	
 	emu = mame.MAME(command=MAME_COMMAND, rompath=MAME_ROMPATH, emusys=MAME_EMUSYS, cart=MAME_CART)
 	
 	def my_mame_on_data(s):
@@ -81,8 +87,8 @@ if __name__ == '__main__':
 			put('Unparsable HEX: ' + str(s))
 			return False
 			
-		# Pass it on to ParallelBuddy host implementation
-		pb.handle_data(data)
+		# Pass it on to serial
+		arduino.write(data)
 	
 	def my_send_to_mame(data):
 		# Send a binary array back to the MAME emulation debug port
@@ -94,16 +100,28 @@ if __name__ == '__main__':
 	
 	# If MAME needs to output to a port: Redirect to Hardware
 	emu.on_data = my_mame_on_data
-	pb.on_send = my_send_to_mame
 	
+	
+	arduino.open()
 	emu.open()
 	#timeout = 5
 	
 	while (emu.running):	# and (timeout > 0):
 		#put('MAME run timeout: %d' % timeout)
-		time.sleep(1)
+		
+		d = arduino.read()
+		if (d is not None) and (len(d) > 0):
+			#put('Arduino to MAME: ' + str(d))
+			my_send_to_mame(d)
+			continue
+		else:
+			# Flush buffer with PB_PREFIX to make data get sent
+			my_send_to_mame([ 0xfe for i in range(4)])
+		
+		time.sleep(.2)
 		#timeout -= 1
 	
 	emu.close()
+	arduino.close()
 	
 	put('End.')

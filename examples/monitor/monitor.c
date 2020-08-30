@@ -480,6 +480,7 @@ int cmd_ver(int argc, char *argv[]) {
 #include <fs_internal.h>
 
 #define PB_USE_MAME	// For testing in MAME
+//#define PB_USE_SOFTSERIAL	// For running on real hardware
 #include <mame.h>
 #include <parabuddy.h>
 #include <fs_parabuddy.h>

@@ -15,20 +15,11 @@ import sys
 PYTHON3 = (sys.version_info.major == 3)
 
 
-if PYTHON3:
-	from _thread import start_new_thread	# Python 3
-else:
-	from thread import start_new_thread	# Python 2
-
-import serial
-#import subprocess
-
 import os
 sys.path.append(os.path.join('..', 'examples', 'monitor'))
 import monitor
 
 import time
-import sys	# for sys.argv and sys.exit(status)
 #import getopt
 from optparse import OptionParser
 import os
