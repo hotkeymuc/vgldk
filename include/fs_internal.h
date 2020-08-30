@@ -28,7 +28,7 @@ const char AUTO_CMD_CONTENTS[] = "echo \"This is %TEST% auto.cmd!\"\n";
 	#include "../loader/out/app_hello.app.h"
 #endif
 
-const file_t FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:file_t!
+const file_FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:file_FILE!
 	{
 		"auto.cmd",
 		NULL,
@@ -64,20 +64,20 @@ const file_t FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:file_t!
 	}
 #endif
 };
-#define FS_INTERNAL_FILES_COUNT (sizeof(FS_INTERNAL_FILES) / sizeof(file_t))
+#define FS_INTERNAL_FILES_COUNT (sizeof(FS_INTERNAL_FILES) / sizeof(file_FILE))
 
 
 // Forwards
 void fs_int_mount(const char *options);
-dir_t *fs_int_opendir(const char *path);
-int fs_int_closedir(dir_t * dir);
-dirent *fs_int_readdir(dir_t *dir);
-file_t *fs_int_fopen(const char *path, const char *openMode);
-int fs_int_fclose(file_t *f);
-byte fs_int_feof(file_t *f);
-int fs_int_fgetc(file_t *f);
-size_t fs_int_fread(void *ptr, size_t size, size_t nmemb, file_t *f);
-size_t fs_int_fwrite(void *ptr, size_t size, size_t nmemb, file_t *f);
+file_DIR *fs_int_opendir(const char *path);
+int fs_int_closedir(file_DIR * dir);
+dirent *fs_int_readdir(file_DIR *dir);
+file_FILE *fs_int_fopen(const char *path, const char *openMode);
+int fs_int_fclose(file_FILE *f);
+byte fs_int_feof(file_FILE *f);
+int fs_int_fgetc(file_FILE *f);
+size_t fs_int_fread(void *ptr, size_t size, size_t nmemb, file_FILE *f);
+size_t fs_int_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f);
 
 
 // Publish a FS struct
@@ -98,25 +98,21 @@ const FS fs_internal = {	// Keep in sync with fs.h:FS!
 
 
 // Implementation
-dir_t fs_int_tmpDir;
+file_DIR fs_int_tmpDir;
 dirent fs_int_tmpDirent;
-file_t fs_int_tmpFile;
+file_FILE fs_int_tmpFile;
 
 void fs_int_mount(const char *options) {
 	// Nothing to do here for now
 	(void)options;
 }
 
-dir_t *fs_int_opendir(const char *path) {
-	dir_t * dir;
+file_DIR *fs_int_opendir(const char *path) {
+	file_DIR * dir;  // file_DIR to be returned
 	const char *pp;
 	
 	pp = path;
 	if (*pp == FILE_PATH_DELIMITER) pp++;	// Skip initial slash
-	
-	dir = &fs_int_tmpDir;	//@FIXME: Using the ONE temp. dir...
-	dir->fs = &fs_internal;
-	//dir->path = path;	// this can have weird behaviour
 	
 	// Only root directory is allowed for now
 	if (*pp != 0) {
@@ -124,24 +120,28 @@ dir_t *fs_int_opendir(const char *path) {
 		errno = ERR_FILE_NOT_FOUND;
 		return NULL;
 	}
+
+  dir = &fs_int_tmpDir; //@FIXME: Using the ONE temp. dir...
+  dir->fs = &fs_internal;
+  //dir->path = path; // this can have weird behaviour
 	
-	dir->userData = (file_t *)&FS_INTERNAL_FILES[0];
+	dir->userData = (file_FILE *)&FS_INTERNAL_FILES[0];
 	dir->count = FS_INTERNAL_FILES_COUNT;
 	
 	dir->currentPos = 0;	// Rewind
 	return dir;
 }
 
-int fs_int_closedir(dir_t * dir) {
+int fs_int_closedir(file_DIR * dir) {
 	//dir->currentPos = 0;	// or something
 	dir->count = 0;
 	return 0;
 }
 
-dirent *fs_int_readdir(dir_t *dir) {
+dirent *fs_int_readdir(file_DIR *dir) {
 	dirent *de;
-	file_t *f;
-	file_t *files;
+	file_FILE *f;
+	file_FILE *files;
 	
 	if (dir->currentPos >= dir->count) {
 		// Done.
@@ -154,7 +154,7 @@ dirent *fs_int_readdir(dir_t *dir) {
 	
 	de->pos = dir->currentPos;
 	
-	files = (file_t *)dir->userData;
+	files = (file_FILE *)dir->userData;
 	f = &files[dir->currentPos];
 	de->name = f->name;
 	de->userData = f->userData;	// Only possible on internal fs, since data is already in memory
@@ -164,15 +164,15 @@ dirent *fs_int_readdir(dir_t *dir) {
 	return de;
 }
 
-file_t *fs_int_fopen(const char *path, const char *openMode) {
-	file_t *f;	// file_t to be returned
+file_FILE *fs_int_fopen(const char *path, const char *openMode) {
+	file_FILE *f;	// file_FILE to be returned
 	
 	// For searching
 	const char *pp;
 	const char *parentDir;
-	file_t *files;
-	file_t *dirf;
-	dir_t *dir;
+	file_FILE *files;
+	file_FILE *dirf;
+	file_DIR *dir;
 	dirent *de;
 	
 	// Scan directory for the given file
@@ -187,7 +187,7 @@ file_t *fs_int_fopen(const char *path, const char *openMode) {
 	dir = fs_int_opendir(parentDir);
 	if (dir == NULL) return NULL;
 	
-	files = (file_t *)dir->userData;
+	files = (file_FILE *)dir->userData;
 	
 	while(de = fs_int_readdir(dir)) {
 		#ifdef FS_INTERNAL_CASE_SENSITIVE
@@ -223,19 +223,19 @@ file_t *fs_int_fopen(const char *path, const char *openMode) {
 	return f;
 }
 
-int fs_int_fclose(file_t *f) {
+int fs_int_fclose(file_FILE *f) {
 	// ...
 	f->currentPos = 0;
 	f->size = 0;
 	return 0;
 }
 
-byte fs_int_feof(file_t *f) {
+byte fs_int_feof(file_FILE *f) {
 	if (f->currentPos >= f->size) return 1;
 	return 0;
 }
 
-int fs_int_fgetc(file_t *f) {
+int fs_int_fgetc(file_FILE *f) {
 	int b;
 	
 	if (fs_int_feof(f)) return -1;	//EOF;
@@ -248,7 +248,7 @@ int fs_int_fgetc(file_t *f) {
 	return b;
 }
 
-size_t fs_int_fread(void *ptr, size_t size, size_t nmemb, file_t *f) {
+size_t fs_int_fread(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	// Read SIZE elements of size NMEMB and return how many elements were read
 	byte b;
 	word l;
@@ -268,7 +268,7 @@ size_t fs_int_fread(void *ptr, size_t size, size_t nmemb, file_t *f) {
 	return l;
 }
 
-size_t fs_int_fwrite(void *ptr, size_t size, size_t nmemb, file_t *f) {
+size_t fs_int_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	(void)ptr;
 	(void)size;
 	(void)nmemb;

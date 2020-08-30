@@ -13,23 +13,23 @@ This allows for different file systems (internal, FAT, ...)
 
 */
 
-#include "file.h"	// Include definitions for file_t and dir_t
+#include "file.h"	// Include definitions for file_FILE and file_DIR
 
 // File system abstraction
 typedef void (*t_mount)(const char *);
 
-typedef dir_t *(*t_opendir)(const char *);
-typedef int (*t_closedir)(dir_t *);
-typedef dirent *(*t_readdir)(dir_t *);
+typedef file_DIR *(*t_opendir)(const char *);
+typedef int (*t_closedir)(file_DIR *);
+typedef dirent *(*t_readdir)(file_DIR *);
 //@TODO: t_mkdir
 //@TODO: t_rm/rmdir
 
-typedef file_t *(*t_fopen)(const char *, const char *);
-typedef int (*t_fclose)(file_t *);
-typedef byte (*t_feof)(file_t *);
-//typedef int (*t_fgetc)(file_t *);
-typedef size_t (*t_fread)(void *, size_t, size_t, file_t *);
-typedef size_t (*t_fwrite)(void *, size_t, size_t, file_t *);
+typedef file_FILE *(*t_fopen)(const char *, const char *);
+typedef int (*t_fclose)(file_FILE *);
+typedef byte (*t_feof)(file_FILE *);
+//typedef int (*t_fgetc)(file_FILE *);
+typedef size_t (*t_fread)(void *, size_t, size_t, file_FILE *);
+typedef size_t (*t_fwrite)(void *, size_t, size_t, file_FILE *);
 //@TODO: t_ftell
 //@TODO: t_fseek
 

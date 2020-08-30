@@ -118,7 +118,7 @@ if __name__ == '__main__':
 			# Flush buffer with PB_PREFIX to make data get sent
 			my_send_to_mame([ 0xfe for i in range(4)])
 		
-		time.sleep(.2)
+		time.sleep(.1)
 		#timeout -= 1
 	
 	emu.close()

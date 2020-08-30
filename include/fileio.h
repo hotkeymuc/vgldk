@@ -40,6 +40,9 @@ char cwd[FILEIO_MAX_PATH];	// Current working directory
 
 #define fileio_root_fs FILEIO_ROOT_FS
 
+void fileio_mount(const char *options) {
+  fileio_root_fs.mount(options);
+}
 
 void fileio_absPath(const char *relPath, char *ret) {
 	const char *bRelPath;
@@ -102,7 +105,7 @@ void fileio_absPath(const char *relPath, char *ret) {
 }
 
 // Generalized functions (redirecting to actual fs driver)
-dir_t *fileio_opendir(const char *path) {
+file_DIR *fileio_opendir(const char *path) {
 	char aPath[FILEIO_MAX_PATH];
 	
 	// Resolve path
@@ -112,17 +115,17 @@ dir_t *fileio_opendir(const char *path) {
 	return fileio_root_fs.opendir(aPath);
 }
 
-int fileio_closedir(dir_t * dir) {
+int fileio_closedir(file_DIR * dir) {
 	FS *fs = (FS *)(dir->fs);
 	return fs->closedir(dir);
 }
 
-dirent *fileio_readdir(dir_t *dir) {
+dirent *fileio_readdir(file_DIR *dir) {
 	FS *fs = (FS *)(dir->fs);
 	return fs->readdir(dir);
 }
 
-file_t *fileio_open(const char *path, const char *openMode) {
+file_FILE *fileio_open(const char *path, const char *openMode) {
 	char aPath[FILEIO_MAX_PATH];
 	
 	// Resolve path
@@ -133,29 +136,29 @@ file_t *fileio_open(const char *path, const char *openMode) {
 	
 }
 
-int fileio_close(file_t *f) {
+int fileio_close(file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
 	return fs->close(f);
 }
 
-byte fileio_eof(file_t *f) {
+byte fileio_eof(file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
  
 	return fs->eof(f);
 }
 
 /*
-int fileio_getc(file_t *f) {
+int fileio_getc(file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
 	return fs->getc(f);
 }
 */
-size_t fileio_read(void *ptr, size_t size, byte nmemb, file_t *f) {
+size_t fileio_read(void *ptr, size_t size, byte nmemb, file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
 	return fs->read(ptr, size, nmemb, f);
 }
 
-size_t fileio_write(void *ptr, size_t size, byte nmemb, file_t *f) {
+size_t fileio_write(void *ptr, size_t size, byte nmemb, file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
 	return fs->write(ptr, size, nmemb, f);
 }

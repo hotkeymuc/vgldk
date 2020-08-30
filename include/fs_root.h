@@ -22,15 +22,15 @@ const fs_root_mount_t fs_root_mounts[] = FS_ROOT_MOUNTS;
 
 // Forwards
 void fs_root_mount(const char *options);
-dir_t *fs_root_opendir(const char *path);
-int fs_root_closedir(dir_t * dir);
-dirent *fs_root_readdir(dir_t *dir);
-file_t *fs_root_fopen(const char *path, const char *openMode);
-int fs_root_fclose(file_t *f);
-byte fs_root_feof(file_t *f);
-int fs_root_fgetc(file_t *f);
-size_t fs_root_fread(void *ptr, size_t size, size_t nmemb, file_t *f);
-size_t fs_root_fwrite(void *ptr, size_t size, size_t nmemb, file_t *f);
+file_DIR *fs_root_opendir(const char *path);
+int fs_root_closedir(file_DIR * dir);
+dirent *fs_root_readdir(file_DIR *dir);
+file_FILE *fs_root_fopen(const char *path, const char *openMode);
+int fs_root_fclose(file_FILE *f);
+byte fs_root_feof(file_FILE *f);
+int fs_root_fgetc(file_FILE *f);
+size_t fs_root_fread(void *ptr, size_t size, size_t nmemb, file_FILE *f);
+size_t fs_root_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f);
 
 
 // Publish a FS struct
@@ -51,7 +51,7 @@ const FS fs_root = {	// Keep in sync with fs.h:FS!
 
 
 // Implementation
-dir_t fs_root_tmpDir;
+file_DIR fs_root_tmpDir;
 dirent fs_root_tmpDirent;
 
 int fs_root_indexOf(const char *path, const char **pp) {
@@ -99,10 +99,16 @@ int fs_root_indexOf(const char *path, const char **pp) {
 
 void fs_root_mount(const char *options) {
 	(void)options;
+  int i;
+
+  // Mount all file systems
+  for(i = 0; i < FS_ROOT_MOUNTS_COUNT; i++) {
+    fs_root_mounts[i].fs->mount(options);
+  }
 }
 
-dir_t *fs_root_opendir(const char *path) {
-	dir_t * dir;
+file_DIR *fs_root_opendir(const char *path) {
+	file_DIR * dir;
 	int i;
 	const char *pp;
 	
@@ -113,7 +119,7 @@ dir_t *fs_root_opendir(const char *path) {
 	if (*pp == 0) {
 		// Root path: List mounts
 		
-		// Prepare a dir_t handle
+		// Prepare a file_DIR handle
 		dir = &fs_root_tmpDir;	//@FIXME: Using the ONE temp. dir...
 		dir->fs = &fs_root;
 		//dir->path = path;	// This can lead to weird behaviour!
@@ -139,12 +145,12 @@ dir_t *fs_root_opendir(const char *path) {
 	
 }
 
-int fs_root_closedir(dir_t * dir) {
+int fs_root_closedir(file_DIR * dir) {
 	dir->count = 0;
 	return 0;
 }
 
-dirent *fs_root_readdir(dir_t *dir) {
+dirent *fs_root_readdir(file_DIR *dir) {
 	dirent *de;
 	
 	if (dir->currentPos >= dir->count) {
@@ -163,7 +169,7 @@ dirent *fs_root_readdir(dir_t *dir) {
 	
 }
 
-file_t *fs_root_fopen(const char *path, const char *openMode) {
+file_FILE *fs_root_fopen(const char *path, const char *openMode) {
 	
 	int i;
 	const char *pp;
@@ -189,22 +195,22 @@ file_t *fs_root_fopen(const char *path, const char *openMode) {
 	
 }
 
-int fs_root_fclose(file_t *f) {
+int fs_root_fclose(file_FILE *f) {
 	(void)f;
 	return 0;
 }
 
-byte fs_root_feof(file_t *f) {
+byte fs_root_feof(file_FILE *f) {
 	(void)f;
 	return 1;
 }
 
-int fs_root_fgetc(file_t *f) {
+int fs_root_fgetc(file_FILE *f) {
 	(void)f;
 	return -1;	// EOF
 }
 
-size_t fs_root_fread(void *ptr, size_t size, size_t nmemb, file_t *f) {
+size_t fs_root_fread(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	(void)ptr;
 	(void)size;
 	(void)nmemb;
@@ -213,7 +219,7 @@ size_t fs_root_fread(void *ptr, size_t size, size_t nmemb, file_t *f) {
 	return 0;
 }
 
-size_t fs_root_fwrite(void *ptr, size_t size, size_t nmemb, file_t *f) {
+size_t fs_root_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	(void)ptr;
 	(void)size;
 	(void)nmemb;
