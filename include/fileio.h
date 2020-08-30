@@ -26,6 +26,7 @@ TODO:
 char cwd[FILEIO_MAX_PATH];	// Current working directory
 
 #ifndef FILEIO_ROOT_FS
+	#warning "No root filesystem specified for fileio.h (FILEIO_ROOT_FS). Using fs_null."
 	#include "fs_null.h"
 	#define FILEIO_ROOT_FS fs_null
 #endif

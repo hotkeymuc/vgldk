@@ -29,55 +29,68 @@ TODO:
 
 */
 
-//#define PB_DEBUG_PROTOCOL_ERRORS	// Put information about protocol errors on screen
+//#define PB_DEBUG_FRAMES	// Dump hex data to screen?
+#define PB_DEBUG_PROTOCOL_ERRORS	// Put information about protocol errors on screen
 #define PB_RECEIVE_TIMEOUT 0x1000	// 0x0800 is good
 //#define PB_USE_MAME	// Instead of sending to softserial, bytes are sent to a port which MAME traps
 
+
 #define PB_MAX_FRAME_SIZE 64  // Length of a command frame
 #define PB_MAX_FILENAME 32
-//#define PB_MAX_FILES 4  // Maximum number of simultaneous open files
-typedef byte pb_handle;
-#define PB_NO_HANDLE 0xff
 
-//#define PB_TERMINATOR 0x0a
-#define PB_PREFIX 0x20
 
-#define PB_COMMAND_RETURN_OK 0x10
+#define PB_PREFIX 0xfe	// Must NOT collide with first byte! STX 0x02 or ENQ 0x05
+//#define PB_TERMINATOR 0x03	// ETX 0x03 or EOT 0x04
+
+#define PB_COMMAND_RETURN_OK 0x06	//ACK
 #define PB_COMMAND_RETURN_BYTE 0x11
 #define PB_COMMAND_RETURN_WORD 0x12
 #define PB_COMMAND_RETURN_ASCIIZ 0x13
 #define PB_COMMAND_RETURN_DATA 0x14
-#define PB_COMMAND_RETURN_NACK 0x1F
-
-#define PB_ERROR_UNKNOWN 0x01
-#define PB_ERROR_LENGTH  0x02
+#define PB_COMMAND_RETURN_NACK 0x15	// NAK
 
 // Functionality
-
 #define PB_COMMAND_END_BOOTLOADER 0x1A
 
 #define PB_COMMAND_PING 0xE0
 #define PB_COMMAND_PING_HOST 0xE1
 
-#define PB_COMMAND_SD_INIT 0x20
-#define PB_COMMAND_SD_EXISTS 0x21
-#define PB_COMMAND_SD_OPEN 0x22
+//#define PB_COMMAND_SD_INIT 0x20
+//#define PB_COMMAND_SD_EXISTS 0x21
+//#define PB_COMMAND_SD_OPEN 0x22
 //#define PB_COMMAND_SD_CLOSE 0x23
 //#define PB_COMMAND_SD_REMOVE 0x4
 //#define PB_COMMAND_SD_MKDIR 0x25
 //#define PB_COMMAND_SD_RMDIR 0x26
 
-#define PB_COMMAND_FILE_OPEN 30
-#define PB_COMMAND_FILE_CLOSE 0x31
-#define PB_COMMAND_FILE_READ 0x32
-#define PB_COMMAND_FILE_WRITE 0x33
-//#define PB_COMMAND_FILE_SEEK 0x34
-//#define PB_COMMAND_FILE_SIZE 0x35
-#define PB_COMMAND_FILE_AVAILABLE 0x36
+#define PB_COMMAND_FILE_OPENDIR 30
+#define PB_COMMAND_FILE_READDIR 31
+#define PB_COMMAND_FILE_CLOSEDIR 32
 
+#define PB_COMMAND_FILE_OPEN 40
+#define PB_COMMAND_FILE_CLOSE 0x41
+#define PB_COMMAND_FILE_EOF 0x42
+#define PB_COMMAND_FILE_READ 0x43
+#define PB_COMMAND_FILE_WRITE 0x44
+//#define PB_COMMAND_FILE_SEEK 0x45
+//#define PB_COMMAND_FILE_SIZE 0x46
+#define PB_COMMAND_FILE_AVAILABLE 0x47
+
+
+#define PB_ERROR_OK 0x00
+#define PB_ERROR_UNKNOWN 0x01
+#define PB_ERROR_LENGTH 0x02
+#define PB_ERROR_TIMEOUT 0x03
+#define PB_ERROR_CORRUPT 0x04
 
 #define PB_FILE_READ 0
 #define PB_FILE_WRITE 1
+
+#define PB_NO_HANDLE 0xff
+typedef byte pb_handle;
+
+
+
 
 //@TODO: Move this selection to softserial instead
 #ifdef PB_USE_MAME
@@ -94,6 +107,7 @@ typedef byte pb_handle;
 	#define pb_puts serial_put
 #endif
 
+
 byte tmpFrame[PB_MAX_FRAME_SIZE];
 
 byte pb_receiveRaw(byte *f) {
@@ -104,10 +118,9 @@ byte pb_receiveRaw(byte *f) {
 	// Wait for first sync prefix byte
 	do {
 		c = pb_getchar();
-		
 		if (c < 0) {
 			timeout--;
-			if (timeout <= 0) return 0;	// Timeout while waiting for sync
+			if (timeout <= 0) return PB_ERROR_TIMEOUT;	// Timeout while waiting for sync
 			continue;
 		}
 		
@@ -118,14 +131,11 @@ byte pb_receiveRaw(byte *f) {
 	// Skip over prefix padding
 	do {
 		c = pb_getchar();
-		
 		if (c < 0) {
 			timeout--;
-			if (timeout <= 0) return 0;	// Timeout while in prefix
+			if (timeout <= 0) return PB_ERROR_TIMEOUT;	// Timeout while in prefix
 			continue;
 		}
-		
-		//if (c == PB_TERMINATOR) return 0;	// End inside prefix? Nah-ah.
 	} while (c == PB_PREFIX);
 	
 	// c now contains the first character beyond PB_PREFIX
@@ -133,33 +143,37 @@ byte pb_receiveRaw(byte *f) {
 	l = c;
 	
 	// Store character
+	#ifdef PB_DEBUG_FRAMES
+	putchar('[');
+	printf_x2(c);
+	#endif
 	*f++ = c;
 	
 	// Receive until termination
-	while(l >= 2) {
-		
-		// Get next
+	while(l > 0) {
 		c = pb_getchar();
 		
 		if (c < 0) {
 			// No data? Update timeout
 			timeout--;
-			if (timeout <= 0) return 0;
+			if (timeout <= 0) return PB_ERROR_TIMEOUT;
 			continue;
 		}
 		
-		// Check for termination character(s)
-		//if (c == PB_TERMINATOR) return 1;	// Finished!
-		
 		// Store character
+		#ifdef PB_DEBUG_FRAMES
+		printf_x2(c);
+		#endif
 		*f++ = c;
 		
 		l--;
-		//if (l <= 1) return 1;	// Finished!
 	}
+	#ifdef PB_DEBUG_FRAMES
+	putchar(']');
+	#endif
 	
 	// Finished!
-	return 1;
+	return PB_ERROR_OK;
 }
 void pb_sendRaw(byte *f, byte l) {
 	
@@ -170,7 +184,7 @@ void pb_sendRaw(byte *f, byte l) {
 	while (l-- > 0) pb_putchar(*f++);
 }
 
-void pb_sendData(byte cmd, byte *v, const byte dataLen) {
+void pb_sendFrame(byte cmd, byte *v, const byte dataLen) {
 	byte *f;
 	byte l;
 	
@@ -188,10 +202,10 @@ void pb_sendData(byte cmd, byte *v, const byte dataLen) {
 	pb_sendRaw(&tmpFrame[0], 1+1+dataLen);	// 1=len, 1=cmd, x=dataLen
 }
 void pb_sendByte(byte cmd, byte v) {
-	pb_sendData(cmd, &v, 1);
+	pb_sendFrame(cmd, &v, 1);
 }
 void pb_sendWord(byte cmd, word v) {
-	pb_sendData(cmd, (byte *)&v, 2);
+	pb_sendFrame(cmd, (byte *)&v, 2);
 }
 void pb_sendAsciiz(byte cmd, const char *v) {
 	byte l;
@@ -203,84 +217,95 @@ void pb_sendAsciiz(byte cmd, const char *v) {
 	while(*c++ != 0) l++;
 	
 	// Send it
-	pb_sendData(cmd, (byte *)v, l);
+	pb_sendFrame(cmd, (byte *)v, l);
 }
-byte pb_receiveData(byte expectedCmd, byte *v, byte minDataLen, byte *dataLen) {
+byte pb_receiveFrame(byte expectedCmd, byte *v, byte minDataLen, byte *dataLen) {
 	byte l;
 	byte c;
 	byte *f;
 	byte maxDataLen;
 	
-	if (pb_receiveRaw(&tmpFrame[0]) == 0) {
-		#ifdef PB_DEBUG_PROTOCOL_ERRORS
-		printf("TO");
-		#endif
-		return 0;
+	if (pb_receiveRaw(&tmpFrame[0]) != PB_ERROR_OK) {
+		return PB_ERROR_UNKNOWN;
 	}
 	
 	f = &tmpFrame[0];
 	
 	l = *f++;
 	
-	// No dataLen given? Use minDataLen
-	if (dataLen == 0x0000) {
-		maxDataLen = minDataLen;
-	} else {
-		maxDataLen = *dataLen;	// Interpret dataLen as maxDataLen...
-		
-		// ...and set dataLen to the actual number
-		if (l <= 2)	*dataLen = 0;
-		else		*dataLen = l-2;
+	if (l < 1) {
+		#ifdef PB_DEBUG_PROTOCOL_ERRORS
+		puts("L<1!");
+		#endif
+		return PB_ERROR_LENGTH;
 	}
 	
-	if ((l < (1+1 + minDataLen)) || (l > 1+1 + maxDataLen)) {
+	// No dataLen given? Use minDataLen
+	if (dataLen == NULL) {
+		maxDataLen = minDataLen;
+	} else {
+		maxDataLen = *dataLen;	// Interpret given value of dataLen as maxDataLen...
+	}
+	
+	// Set dataLen to the actual number of data bytes
+	l --;
+	
+	if ((l < minDataLen) || (l > maxDataLen)) {
 		#ifdef PB_DEBUG_PROTOCOL_ERRORS
-		printf("L: %02X ! %02X\n", l, (1+1));
+		puts("L!");
+		puts("="); printf_x2(l);
+		puts(",min="); printf_x2(minDataLen);
+		puts(",max="); printf_x2(maxDataLen);
+		puts("!\n");
+		getchar();
+		//printf("L: %02X ! %02X\n", l, (1+1));
 		//beep();
 		#endif
-		return 0;
+		return PB_ERROR_LENGTH;
 	}
+	if (dataLen != NULL) *dataLen = l;
 	
 	c = *f++;
 	if (c != expectedCmd) {
 		#ifdef PB_DEBUG_PROTOCOL_ERRORS
-		printf("C: %02X != %02X\n", c, expectedCmd);
+		puts("C!");
+		//printf("C: %02X != %02X\n", c, expectedCmd);
 		//beep();
 		#endif
-		return 0;
+		return PB_ERROR_CORRUPT;
 	}
 	
 	// Stuff the rest into v
-	l -= 2;
 	while(l > 0) {
 		*v++ = *f++;
 		l--;
 	}
 	
-	return 1;
+	return PB_ERROR_OK;
 }
 
 
 byte pb_receiveByte(byte *v) {
-	return pb_receiveData(PB_COMMAND_RETURN_BYTE, v, 1, NULL);
+	return pb_receiveFrame(PB_COMMAND_RETURN_BYTE, v, 1, NULL);
 }
 
 byte pb_receiveWord(word *v) {
-	return pb_receiveData(PB_COMMAND_RETURN_WORD, (byte *)v, 2, 0);
+	return pb_receiveFrame(PB_COMMAND_RETURN_WORD, (byte *)v, 2, 0);
 }
 
 byte pb_receiveAsciiz(char* v) {
 	byte r;
 	byte l;
 	
-	r = pb_receiveData(PB_COMMAND_RETURN_ASCIIZ, (byte *)v, 0, &l);
+	l = PB_MAX_FILENAME;
+	r = pb_receiveFrame(PB_COMMAND_RETURN_ASCIIZ, (byte *)v, 0, &l);
 	*(v+l) = 0x00;	// Zero terminate
 	
 	return r;
 }
 
 
-
+// Functionality
 
 word pingValue;
 void pb_ping() {
@@ -313,15 +338,48 @@ void pb_ping() {
 
 void pb_endBootloader() {
 	// Tell Arduino that we want to communicate with it (not the host PC)
-	printf("End bootloader...\n");
-	//pb_sendComposed0(PB_COMMAND_END_BOOTLOADER);
-	pb_sendData(PB_COMMAND_END_BOOTLOADER, 0, 0);
+	//printf("End bootloader...\n");
+	pb_sendFrame(PB_COMMAND_END_BOOTLOADER, 0, 0);
 }
 
+
+pb_handle pb_file_opendir(const char *path) {
+	pb_handle h;
+	
+	pb_sendAsciiz(PB_COMMAND_FILE_OPENDIR, (char *)path);
+	
+	while (pb_receiveByte(&h) != PB_ERROR_OK) {
+		// Delay / Timeout
+	}
+	
+	return h;
+}
+
+void pb_file_closedir(pb_handle h) {
+	pb_sendByte(PB_COMMAND_FILE_CLOSEDIR, h);
+	// Has no return value
+}
+
+byte pb_file_readdir(pb_handle h, char *name) {
+	
+	pb_sendByte(PB_COMMAND_FILE_READDIR, h);
+	
+	//@TODO: Receive a whole dirent struct?
+	//while(pb_receiveFrame(PB_COMMAND_RETURN_DATA, buf, 0, &l) == 1) {}
+	
+	// Receive name
+	while (pb_receiveAsciiz(name) != PB_ERROR_OK) {
+		// Wait
+	}
+	
+	return PB_ERROR_OK;
+}
+
+/*
 byte pb_sd_init() {
 	byte ok;
 	
-	pb_sendData(PB_COMMAND_SD_INIT, 0, 0);
+	pb_sendFrame(PB_COMMAND_SD_INIT, 0, 0);
 	
 	while (pb_receiveByte(&ok) != 1) {
 		// Delay / Timeout
@@ -354,37 +412,51 @@ byte pb_sd_exists(const char *filename) {
 	}
 	return ex;
 }
+*/
 
 
-
-pb_handle pb_file_open(const char *filename, byte mode) {
-	pb_handle handle;
+pb_handle pb_file_open(const char *filename, const char*mode) {
+	pb_handle h;
 	
-	//@TODO: Mount/Driver (SD, SOCK, HOST)!
 	//@TODO: Mode!
 	(void)mode;
 	
 	pb_sendAsciiz(PB_COMMAND_FILE_OPEN, (char *)filename);
 	
-	while (pb_receiveByte(&handle) != 1) {
+	while (pb_receiveByte(&h) != PB_ERROR_OK) {
 		// Delay / Timeout
 	}
-	return handle;
+	return h;
 }
-
 
 void pb_file_close(byte h) {
 	pb_sendByte(PB_COMMAND_FILE_CLOSE, h);
 	// Has no return value
 }
 
-byte pb_file_read(pb_handle h, byte *buf, byte l) {
-	byte data[2];
-	data[0] = h;
-	data[1] = l;
-	pb_sendData(PB_COMMAND_FILE_READ, &data[0], 2);
+byte pb_file_eof(pb_handle h) {
+	byte r;
 	
-	while(pb_receiveData(PB_COMMAND_RETURN_DATA, buf, 0, &l) == 1) {
+	pb_sendByte(PB_COMMAND_FILE_EOF, h);
+	
+	while (pb_receiveByte(&r) != PB_ERROR_OK) {
+		// Delay / Timeout
+	}
+	return r;
+}
+
+
+
+byte pb_file_read(pb_handle h, byte *buf, byte l) {
+	struct {
+		byte h ;
+		byte l;
+	} data;
+	data.h = h;
+	data.l = l;
+	pb_sendFrame(PB_COMMAND_FILE_READ, (void*)&data, sizeof(data));
+	
+	while(pb_receiveFrame(PB_COMMAND_RETURN_DATA, buf, 0, &l) != PB_ERROR_OK) {
 		// Delay / Timeout
 	}
 	
@@ -399,22 +471,22 @@ byte pb_file_write(pb_handle h, byte *buf, byte l) {
 	//byte data[2];
 	//data[0] = h;
 	//data[1] = l;
-	pb_sendData(PB_COMMAND_FILE_WRITE, buf, l);
+	pb_sendFrame(PB_COMMAND_FILE_WRITE, buf, l);
 	
-	if (pb_receiveByte(&l) != 1)
+	if (pb_receiveByte(&l) != PB_ERROR_OK)
 		return 0;
 	
 	return l;
 }
 
-
-//word pb_file_tell(byte handle) {
-//PB_COMMAND_FILE_TELL
-//}
-//void pb_file_seek(byte handle, word o) {
-//PB_COMMAND_FILE_SEEK
-//}
-
+/*
+word pb_file_tell(byte handle) {
+	PB_COMMAND_FILE_TELL
+}
+void pb_file_seek(byte handle, word o) {
+	PB_COMMAND_FILE_SEEK
+}
+*/
 byte pb_file_bytesAvailable(pb_handle h) {
 	byte l;
 	//@TODO: Implement
@@ -422,132 +494,10 @@ byte pb_file_bytesAvailable(pb_handle h) {
 	
 	pb_sendByte(PB_COMMAND_FILE_AVAILABLE, h);
 	
-	if (pb_receiveByte(&l) != 1)
+	if (pb_receiveByte(&l) != PB_ERROR_OK)
 		return 0;
 	
 	return l;
 }
 
-/*
-
-int main(int argc, char *argv[]) {
-	char c;
-	
-	byte handle;
-	byte tmpData[32];
-	byte l;
-	byte r;
-	
-	(void)argc;	(void)argv;	// Mark args as "not used" to suppress warnings
-	
-	
-	printf("Parallel Buddy\n");
-	//beep(); printf("Key to start..."); getchar();
-	
-	pb_endBootloader();
-	
-	pingValue = 0x0123;
-	
-	do {
-		printf("EPQS\n");
-		
-		c = getchar();
-		
-		switch(c) {
-			case 'e':
-				pb_endBootloader();
-				break;
-			
-			case 'h':
-				serial_puts("puts()!\n");
-				break;
-			
-			case 'i':
-				serial_put("put()!\n", 7);
-				break;
-			
-			case 'j':
-				pb_sendWord(PB_COMMAND_PING, 0x6667);
-				for(r = 0; r < 10; r++) {
-					c = serial_getchar();
-					printf("%02X", c);
-				}
-				getchar();
-				break;
-			
-			case 'p':
-				pb_ping();
-				break;
-			
-			case 'o':
-				//pb_sendComposed2(PB_COMMAND_PING_HOST, 0x12, 0x34);
-				pb_sendAsciiz(PB_COMMAND_PING_HOST, "Hello host! This is parallelBuddy!");
-				break;
-			
-			case 's':
-				printf("Init SD...");
-				r = sd_init();
-				if (r == 1)	printf("OK\n");
-				else		printf("E=%d\n", r);
-				
-				getchar();
-				if (r != 1) continue;
-				
-				
-				printf("Open file...");
-				handle = sd_open("test.txt", PB_FILE_READ);
-				printf("OK\n");
-				
-				getchar();
-			
-				printf("Read...");
-				l = file_read(handle, &tmpData[0], 32);
-				printf("%d bytes\n", l);
-				
-				getchar();
-				
-				printf("\"%s\"\n", (char *)&tmpData[0]);
-				getchar();
-			
-				printf("Close file...");
-				file_close(handle);
-				printf("OK\n");
-				break;
-			
-			default:
-				printf("?\n");
-		}
-		
-	} while(c != 'q');
-	
-	
-	return 0;
-}
-
-*/
-
-/*
-// Sanity check
-int main(int argc, char *argv[]) {
-	char c;
-	
-	(void)argc; (void)argv;
-	
-	serial_puts("Hello!");
-	printf("Press keys to send to serial: ");
-	while(1) {
-		
-		//printf("Hello LCD\n");
-		//serial_puts("Hello SERIAL!\n");
-		c = getchar();
-		printf("%c", c);
-		serial_putchar(c);
-		
-		if (c == 'h') {
-			serial_puts("Hello!");
-		}
-		
-	}
-}
-*/
 #endif 	//__PARABUDDY_H

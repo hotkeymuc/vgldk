@@ -474,44 +474,44 @@ int cmd_ver(int argc, char *argv[]) {
 // Commands for additional functions
 #ifdef MONITOR_FILES
 
-#define PB_USE_MAME	// For testing in MAME
-#include <mame.h>
-//#include <parabuddy.h>
-//#include <fs_parabuddy.h>
-
 // File systems
 #include <fs_null.h>
 
-//#define FS_INTERNAL_CASE_SENSITIVE	// Emu is UPPERCASE only...
 #include <fs_internal.h>
 
-#define FS_ROOT_MOUNTS {{"int", &fs_internal}, {"nul", &fs_null}}
-//#define FS_ROOT_CASE_SENSITIVE	// Emu is UPPERCASE only...
+#define PB_USE_MAME	// For testing in MAME
+#include <mame.h>
+#include <parabuddy.h>
+#include <fs_parabuddy.h>
+
+// Define roots for the root filesystem
+#define FS_ROOT_MOUNTS {\
+	{"nul",	&fs_null},		\
+	{"int",	&fs_internal},	\
+	{"pb",	&fs_parabuddy},	\
+}
+
 #include <fs_root.h>
 
-#define FILEIO_ROOT_FS fs_root
 //#define FILEIO_ROOT_FS fs_internal
+#define FILEIO_ROOT_FS fs_root
 #include <fileio.h>
 
 
 int cmd_files_cd(int argc, char *argv[]) {
-	//char s[FILEIO_MAX_PATH];
 	
 	if (argc < 2) {
 		// Show CWD
-		printf(cwd);
+		puts(cwd);
 		putchar('\n');
 		return ERR_OK;
 	}
 	
 	// Change directory
 	absPath(argv[1], cwd);	// Overwrite in-place (risky!)
-	//absPath(argv[1], a);
-	//printf(s);
-	//putchar('\n');
-	
 	return ERR_OK;
 }
+
 int cmd_files_dir(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
@@ -532,42 +532,44 @@ int cmd_files_dir(int argc, char *argv[]) {
 	
 	return ERR_OK;
 }
+
 #define FILES_BUF_SIZE 32
 int cmd_files_cat(int argc, char *argv[]) {
-	
 	FILE *f;
 	size_t l;
-	const char *filename;
 	char buf[FILES_BUF_SIZE];
 	
-	if (argc < 2) {
-		return ERR_MISSING_ARGUMENT;
-	}
+	if (argc < 2) return ERR_MISSING_ARGUMENT;
 	
-	filename = argv[1];
-	f = fopen(filename, "r");
+	// Open file
+	f = fopen(argv[1], "r");
 	if (f == NULL) return errno;
 	
-	//printf(f->name); printf(":\n");
-	
-	while(feof(f) == 0) {
+	// Read file buffer-by-buffer
+	//while(feof(f) == 0) {
+	do {
 		l = fread(&buf[0], 1, FILES_BUF_SIZE-1, f);
 		buf[l] = '\0';	// Terminate string
-		printf(buf);
-	}
-	//putchar('\n');
-	
+		if (l > 0)
+			printf(buf);
+	} while (l > 0);
 	fclose(f);
+	//putchar('\n');	// final LF?
 	
 	return ERR_OK;
 }
+
 int cmd_files_iotest(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
 	if (argc < 2) {
+		#ifdef __MAME_H
 		printf_x2(mame_getchar());
+		#endif
 	} else {
+		#ifdef __MAME_H
 		mame_put(argv[1], strlen(argv[1]));
+		#endif
 	}
 	
 	return ERR_OK;

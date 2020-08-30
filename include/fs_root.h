@@ -4,10 +4,11 @@
 #include "fs.h"
 
 #ifndef FS_ROOT_MOUNTS
-	#warning "fs_root has no FS_ROOT_MOUNTS defined"
+	#warning "No mounts specified for fs_root.h (FS_ROOT_MOUNTS). Using empty list."
 	#define FS_ROOT_MOUNTS {}
 #endif
 
+//#define FS_ROOT_CASE_SENSITIVE
 
 typedef struct {
 	const char *name;

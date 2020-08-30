@@ -39,11 +39,11 @@ Use this patch for MAME (mame.git/src/mame/drivers/pc2000.cpp):
 
 __sfr __at MAME_PORT mame_port;
 
-char mame_getchar() {
+unsigned char mame_getchar() {
 	return mame_port;
 }
 
-void mame_putchar(char c) {
+void mame_putchar(unsigned char c) {
 	mame_port = c;
 }
 
