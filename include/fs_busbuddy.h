@@ -47,11 +47,11 @@ void fs_bb_mount(const char *options) {
 }
 
 
-DIR fs_bb_tmpDir;
-DIR *fs_bb_opendir(const char *path) {
+dir_t fs_bb_tmpDir;
+dir_t *fs_bb_opendir(const char *path) {
 	
 	BB_HANDLE dirHandle;
-	DIR * dir;
+	dir_t * dir;
 	
 	dir = &fs_bb_tmpDir;
 	dir->path = path;
@@ -90,14 +90,14 @@ DIR *fs_bb_opendir(const char *path) {
 	*/
 	
 	dir->userData = (void *)dirHandle;	// Store remote handle
-	dir->count = 0;	//(sizeof(FS_INTERNAL_FILES) / sizeof(FILE));
+	dir->count = 0;	//(sizeof(FS_INTERNAL_FILES) / sizeof(file_t));
 	//rewinddir(dir);
 	dir->currentPos = 0;
 	
 	return dir;
 }
 
-int fs_bb_closedir(DIR * dir) {
+int fs_bb_closedir(dir_t * dir) {
 	BB_HANDLE dirHandle;
 	
 	// SD open directories are handled like files
@@ -113,8 +113,8 @@ int fs_bb_closedir(DIR * dir) {
 
 
 dirent fs_bb_tmpDirent;
-//struct dirent *readdir(DIR *dir) {
-dirent *fs_bb_readdir(DIR *dir) {
+//struct dirent *readdir(dir_t *dir) {
+dirent *fs_bb_readdir(dir_t *dir) {
 	//struct dirent *de;
 	dirent *de;
 	BB_HANDLE dirHandle;
@@ -156,9 +156,9 @@ dirent *fs_bb_readdir(DIR *dir) {
 
 
 
-FILE fs_bb_tmpFile;
-FILE *fs_bb_fopen(const char *path, const char *openMode) {
-	FILE *f;	// FILE to be returned
+file_t fs_bb_tmpFile;
+file_t *fs_bb_fopen(const char *path, const char *openMode) {
+	file_t *f;	// file_t to be returned
 	
 	byte mode;	// for converting openMode string to mode byte
 	BB_HANDLE handle;	// Remote handle
@@ -210,7 +210,7 @@ FILE *fs_bb_fopen(const char *path, const char *openMode) {
 	return f;
 }
 
-int fs_bb_fclose(FILE *f) {
+int fs_bb_fclose(file_t *f) {
 	BB_HANDLE handle;
 	
 	// Close remote file handle
@@ -224,7 +224,7 @@ int fs_bb_fclose(FILE *f) {
 	return 0;
 }
 
-byte fs_bb_feof(FILE *f) {
+byte fs_bb_feof(file_t *f) {
 	BB_HANDLE handle;
 	byte b;
 	
@@ -239,7 +239,7 @@ byte fs_bb_feof(FILE *f) {
 
 
 
-int fs_bb_fgetc(FILE *f) {
+int fs_bb_fgetc(file_t *f) {
 	BB_HANDLE handle;
 	byte b;
 	byte l;
@@ -260,7 +260,7 @@ int fs_bb_fgetc(FILE *f) {
 	return b;
 }
 
-size_t fs_bb_fread(void *ptr, size_t size, size_t nmemb, FILE *f) {
+size_t fs_bb_fread(void *ptr, size_t size, size_t nmemb, file_t *f) {
 	// Read SIZE elements of size NMEMB and return how many elements were read
 	BB_HANDLE handle;
 	byte l;
@@ -276,7 +276,7 @@ size_t fs_bb_fread(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	return l;
 }
 
-size_t fs_bb_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f) {
+size_t fs_bb_fwrite(void *ptr, size_t size, size_t nmemb, file_t *f) {
 	BB_HANDLE handle;
 	byte l;
 	byte *b;
@@ -306,7 +306,7 @@ const FS fs_busbuddy = {	// Keep in sync with fs.h:FS!
 	fs_bb_fopen,
 	fs_bb_fclose,
 	fs_bb_feof,
-	fs_bb_fgetc,
+	//fs_bb_fgetc,
 	fs_bb_fread,
 	fs_bb_fwrite
 };

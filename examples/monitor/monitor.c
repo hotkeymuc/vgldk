@@ -516,7 +516,7 @@ int cmd_files_cd(int argc, char *argv[]) {
 int cmd_files_dir(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
-	DIR *dir;
+	dir_t *dir;
 	dirent *de;
 	
 	dir = opendir(cwd);
@@ -536,7 +536,7 @@ int cmd_files_dir(int argc, char *argv[]) {
 
 #define FILES_BUF_SIZE 32
 int cmd_files_cat(int argc, char *argv[]) {
-	FILE *f;
+	file_t *f;
 	size_t l;
 	char buf[FILES_BUF_SIZE];
 	

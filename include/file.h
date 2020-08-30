@@ -33,7 +33,7 @@ typedef struct {
 	void *userData;	// Remote handles etc.
 	size_t size;
 	size_t currentPos;
-} FILE;
+} file_t; // FILE
 
 typedef struct {
 	//ino_t d_ino;
@@ -57,7 +57,7 @@ typedef struct {
 	
 	size_t count;
 	size_t currentPos;
-} DIR;
+} dir_t;  // DIR
 
 
 

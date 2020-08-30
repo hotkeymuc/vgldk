@@ -13,23 +13,23 @@ This allows for different file systems (internal, FAT, ...)
 
 */
 
-#include "file.h"	// Include definitions for FILE and DIR
+#include "file.h"	// Include definitions for file_t and dir_t
 
 // File system abstraction
 typedef void (*t_mount)(const char *);
 
-typedef DIR *(*t_opendir)(const char *);
-typedef int (*t_closedir)(DIR *);
-typedef dirent *(*t_readdir)(DIR *);
+typedef dir_t *(*t_opendir)(const char *);
+typedef int (*t_closedir)(dir_t *);
+typedef dirent *(*t_readdir)(dir_t *);
 //@TODO: t_mkdir
 //@TODO: t_rm/rmdir
 
-typedef FILE *(*t_fopen)(const char *, const char *);
-typedef int (*t_fclose)(FILE *);
-typedef byte (*t_feof)(FILE *);
-typedef int (*t_fgetc)(FILE *);
-typedef size_t (*t_fread)(void *, size_t, size_t, FILE *);
-typedef size_t (*t_fwrite)(void *, size_t, size_t, FILE *);
+typedef file_t *(*t_fopen)(const char *, const char *);
+typedef int (*t_fclose)(file_t *);
+typedef byte (*t_feof)(file_t *);
+//typedef int (*t_fgetc)(file_t *);
+typedef size_t (*t_fread)(void *, size_t, size_t, file_t *);
+typedef size_t (*t_fwrite)(void *, size_t, size_t, file_t *);
 //@TODO: t_ftell
 //@TODO: t_fseek
 
@@ -40,12 +40,12 @@ typedef struct {
 	t_closedir closedir;
 	t_readdir readdir;
 	
-	t_fopen fopen;
-	t_fclose fclose;
-	t_feof feof;
-	t_fgetc fgetc;
-	t_fread fread;
-	t_fwrite fwrite;
+	t_fopen open;
+	t_fclose close;
+	t_feof eof;
+	//t_fgetc getc;
+	t_fread read;
+	t_fwrite write;
 } FS;
 
 

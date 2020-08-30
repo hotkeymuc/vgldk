@@ -22,6 +22,13 @@ TODO:
 	#define FILEIO_MAX_PATH 32	// Maximum number of characters in path names
 #endif
 
+#ifndef FILEIO_CUSTOM_NAMES
+  
+  // If not specified otherwise: Map stdio file methods to fileio methods
+  #define FILEIO_DEFINE_FUNCTIONS
+#endif
+
+
 //FS *cfs;	// Current file system driver
 char cwd[FILEIO_MAX_PATH];	// Current working directory
 
@@ -34,7 +41,7 @@ char cwd[FILEIO_MAX_PATH];	// Current working directory
 #define fileio_root_fs FILEIO_ROOT_FS
 
 
-void absPath(const char *relPath, char *ret) {
+void fileio_absPath(const char *relPath, char *ret) {
 	const char *bRelPath;
 	char *bRet;
 	char *t;
@@ -95,60 +102,78 @@ void absPath(const char *relPath, char *ret) {
 }
 
 // Generalized functions (redirecting to actual fs driver)
-DIR *opendir(const char *path) {
+dir_t *fileio_opendir(const char *path) {
 	char aPath[FILEIO_MAX_PATH];
 	
 	// Resolve path
-	absPath(path, aPath);
+	fileio_absPath(path, aPath);
 	
 	// Re-direct to root_fs
 	return fileio_root_fs.opendir(aPath);
 }
 
-int closedir(DIR * dir) {
+int fileio_closedir(dir_t * dir) {
 	FS *fs = (FS *)(dir->fs);
 	return fs->closedir(dir);
 }
 
-dirent *readdir(DIR *dir) {
+dirent *fileio_readdir(dir_t *dir) {
 	FS *fs = (FS *)(dir->fs);
 	return fs->readdir(dir);
 }
 
-FILE *fopen(const char *path, const char *openMode) {
+file_t *fileio_open(const char *path, const char *openMode) {
 	char aPath[FILEIO_MAX_PATH];
 	
 	// Resolve path
-	absPath(path, aPath);
+	fileio_absPath(path, aPath);
 	
 	// Re-direct to root_fs
-	return fileio_root_fs.fopen(aPath, openMode);
+	return fileio_root_fs.open(aPath, openMode);
 	
 }
 
-int fclose(FILE *f) {
+int fileio_close(file_t *f) {
 	FS *fs = (FS *)(f->fs);
-	return fs->fclose(f);
+	return fs->close(f);
 }
 
-byte feof(FILE *f) {
+byte fileio_eof(file_t *f) {
 	FS *fs = (FS *)(f->fs);
-	return fs->feof(f);
+ 
+	return fs->eof(f);
 }
 
-int fgetc(FILE *f) {
+/*
+int fileio_getc(file_t *f) {
 	FS *fs = (FS *)(f->fs);
-	return fs->fgetc(f);
+	return fs->getc(f);
+}
+*/
+size_t fileio_read(void *ptr, size_t size, byte nmemb, file_t *f) {
+	FS *fs = (FS *)(f->fs);
+	return fs->read(ptr, size, nmemb, f);
 }
 
-size_t fread(void *ptr, size_t size, byte nmemb, FILE *f) {
+size_t fileio_write(void *ptr, size_t size, byte nmemb, file_t *f) {
 	FS *fs = (FS *)(f->fs);
-	return fs->fread(ptr, size, nmemb, f);
+	return fs->write(ptr, size, nmemb, f);
 }
 
-size_t fwrite(void *ptr, size_t size, byte nmemb, FILE *f) {
-	FS *fs = (FS *)(f->fs);
-	return fs->fwrite(ptr, size, nmemb, f);
-}
+
+#ifdef FILEIO_DEFINE_FUNCTIONS
+  #define absPath fileio_absPath
+  #define opendir fileio_opendir
+  #define closedir fileio_closedir
+  #define readdir fileio_readdir
+  
+  #define fopen fileio_open
+  #define fclose fileio_close
+  #define feof fileio_eof
+  //#define fgetc fileio_getc
+  #define fread fileio_read
+  #define fwrite fileio_write
+#endif
+
 
 #endif

@@ -22,15 +22,15 @@ Implementation of fs.h using the "Parallel Buddy" Arduino connected to the VGL p
 
 // Forwards
 void fs_pb_mount(const char *options);
-DIR *fs_pb_opendir(const char *path);
-int fs_pb_closedir(DIR * dir);
-dirent *fs_pb_readdir(DIR *dir);
-FILE *fs_pb_fopen(const char *path, const char *mode);
-int fs_pb_fclose(FILE *f);
-byte fs_pb_feof(FILE *f);
-int fs_pb_fgetc(FILE *f);
-size_t fs_pb_fread(void *ptr, size_t size, size_t nmemb, FILE *f);
-size_t fs_pb_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f);
+dir_t *fs_pb_opendir(const char *path);
+int fs_pb_closedir(dir_t * dir);
+dirent *fs_pb_readdir(dir_t *dir);
+file_t *fs_pb_fopen(const char *path, const char *mode);
+int fs_pb_fclose(file_t *f);
+byte fs_pb_feof(file_t *f);
+int fs_pb_fgetc(file_t *f);
+size_t fs_pb_fread(void *ptr, size_t size, size_t nmemb, file_t *f);
+size_t fs_pb_fwrite(void *ptr, size_t size, size_t nmemb, file_t *f);
 
 
 // Publish a FS struct
@@ -44,7 +44,7 @@ const FS fs_parabuddy = {	// Keep in sync with fs.h:FS!
 	fs_pb_fopen,
 	fs_pb_fclose,
 	fs_pb_feof,
-	fs_pb_fgetc,
+	//fs_pb_fgetc,
 	fs_pb_fread,
 	fs_pb_fwrite
 };
@@ -52,10 +52,10 @@ const FS fs_parabuddy = {	// Keep in sync with fs.h:FS!
 
 // Implementation
 byte fs_pb_mounted;
-DIR fs_pb_tmpDir;
+dir_t fs_pb_tmpDir;
 dirent fs_pb_tmpDirent;
 char fs_pb_tmpName[FS_PARABUDDY_MAX_PATH];
-FILE fs_pb_tmpFile;
+file_t fs_pb_tmpFile;
 
 void fs_pb_mount(const char *options) {
 	//byte ok;
@@ -86,9 +86,9 @@ void fs_pb_mount(const char *options) {
 }
 
 
-DIR *fs_pb_opendir(const char *path) {
+dir_t *fs_pb_opendir(const char *path) {
 	pb_handle h;
-	DIR * dir;
+	dir_t * dir;
 	
 	h = pb_file_opendir(path);
 	if (h == PB_NO_HANDLE) {
@@ -106,7 +106,7 @@ DIR *fs_pb_opendir(const char *path) {
 	return dir;
 }
 
-int fs_pb_closedir(DIR * dir) {
+int fs_pb_closedir(dir_t * dir) {
 	pb_handle h;
 	
 	h = (pb_handle)dir->userData;
@@ -119,7 +119,7 @@ int fs_pb_closedir(DIR * dir) {
 	return 0;
 }
 
-dirent *fs_pb_readdir(DIR *dir) {
+dirent *fs_pb_readdir(dir_t *dir) {
 	dirent *de;
 	pb_handle h;
 	
@@ -144,8 +144,8 @@ dirent *fs_pb_readdir(DIR *dir) {
 }
 
 
-FILE *fs_pb_fopen(const char *path, const char *mode) {
-	FILE *f;	// FILE to be returned
+file_t *fs_pb_fopen(const char *path, const char *mode) {
+	file_t *f;	// file_t to be returned
 	pb_handle h;	// Remote handle
 	
 	// Actually do the call to BusBuddy
@@ -170,7 +170,7 @@ FILE *fs_pb_fopen(const char *path, const char *mode) {
 	return f;
 }
 
-int fs_pb_fclose(FILE *f) {
+int fs_pb_fclose(file_t *f) {
 	pb_handle h;
 	
 	// Close remote file handle
@@ -184,7 +184,7 @@ int fs_pb_fclose(FILE *f) {
 	return 0;
 }
 
-byte fs_pb_feof(FILE *f) {
+byte fs_pb_feof(file_t *f) {
 	pb_handle h;
 	//byte b;
 	
@@ -198,7 +198,7 @@ byte fs_pb_feof(FILE *f) {
 
 
 
-int fs_pb_fgetc(FILE *f) {
+int fs_pb_fgetc(file_t *f) {
 	pb_handle h;
 	byte b;
 	byte l;
@@ -219,7 +219,7 @@ int fs_pb_fgetc(FILE *f) {
 	return b;
 }
 
-size_t fs_pb_fread(void *ptr, size_t size, size_t nmemb, FILE *f) {
+size_t fs_pb_fread(void *ptr, size_t size, size_t nmemb, file_t *f) {
 	// Read SIZE elements of size NMEMB and return how many elements were read
 	pb_handle h;
 	byte l;
@@ -235,7 +235,7 @@ size_t fs_pb_fread(void *ptr, size_t size, size_t nmemb, FILE *f) {
 	return l;
 }
 
-size_t fs_pb_fwrite(void *ptr, size_t size, size_t nmemb, FILE *f) {
+size_t fs_pb_fwrite(void *ptr, size_t size, size_t nmemb, file_t *f) {
 	pb_handle h;
 	byte l;
 	byte *b;
