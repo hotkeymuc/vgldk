@@ -23,9 +23,9 @@ TODO:
 #define byte unsigned char
 #define word unsigned short
 
-#define clear lcd_clear
+#define clear lcd_clear	// Make it available as well known "clear()" command
 
-// HDD44780 definitions
+// HDD44780 specific definitions
 #define LCD_CLEARDISPLAY 0x01
 #define LCD_RETURNHOME 0x02
 #define LCD_ENTRYMODESET 0x04
@@ -63,37 +63,31 @@ TODO:
 #define LCD_5x10DOTS 0x04
 #define LCD_5x8DOTS 0x00
 
-#ifndef LCD_CONTROL_PORT
-	#define LCD_CONTROL_PORT 0x0a
-	#define LCD_DATA_PORT 0x0b
+// Define port accesses
+
+//#define LCD_PORT_CTRL 0x0a	// pc1000: 0x20, gl2000/gl4000: 0x0a
+#ifndef LCD_PORT_CTRL
+	#error "LCD_PORT_CTRL must be defined in order to use HD44780 LCD"
 #endif
+__sfr __at LCD_PORT_CTRL lcd_controlPort;
 
-/*
-// MODEL2000
-#define LCD_COLS 20
-#define LCD_ROWS 2
-
-// MODEL4000
-#define LCD_COLS 20
-#define LCD_ROWS 4
-*/
-
-
-#define LCD_COLS DISPLAY_COLS
-#define LCD_ROWS DISPLAY_ROWS
+//#define LCD_PORT_DATA 0x0b	// pc1000: 0x21, gl2000/gl4000: 0x0b
+#ifndef LCD_PORT_DATA
+	#error "LCD_PORT_DATA must be defined in order to use HD44780 LCD"
+#endif
+__sfr __at LCD_PORT_DATA lcd_dataPort;
 
 
 // Mapping of screen coordinates to HDD44780 DDRAM addresses
-
-#if LCD_ROWS == 4
-	const byte lcd_map_4rows[LCD_ROWS * LCD_COLS + 1] = {
-		0,	1,	2,	3,	8,	9,	10,	11,	12,	13,	14,	15,	24,	25,	26,	27,	28,	29,	30,	31,
-		64,	65,	66,	67,	72,	73,	74,	75,	76,	77,	78,	79,	88,	89,	90,	91,	92,	93,	94,	95,
-		4,	5,	6,	7,	16,	17,	18,	19,	20,	21,	22,	23,	32,	33,	34,	35,	36,	37,	38,	39,
-		68,	69,	70,	71,	80,	81,	82,	83,	84,	85,	86,	87,	96,	97,	98, 99,	100,	101,	102,	103,
-		103	// Double
+//#define LCD_ROWS 4	// pc1000: 1, gl2000: 2, gl4000: 4
+//#define LCD_COLS 20
+#if LCD_ROWS == 1
+	//@FIXME: Not yet working correctly...
+	const byte lcd_map_1row[LCD_ROWS * LCD_COLS + 1] = {
+		0,	1,	2,	3,	4,	5,	6,	7,	8,	9,	10,	11,	12,	13,	14,	15,	16,	17,	18,	19,
+		19	// Double
 	};
-	#define lcd_map lcd_map_4rows
+	#define lcd_map lcd_map_1row
 	
 #elif LCD_ROWS == 2
 	const byte lcd_map_2rows[LCD_ROWS * LCD_COLS + 1] = {
@@ -103,17 +97,18 @@ TODO:
 	};
 	#define lcd_map lcd_map_2rows
 	
-#elif LCD_ROWS == 1
-	//@FIXME: Not yet working correctly...
-	const byte lcd_map_1row[LCD_ROWS * LCD_COLS + 1] = {
-		0,	1,	2,	3,	4,	5,	6,	7,	8,	9,	10,	11,	12,	13,	14,	15,	16,	17,	18,	19,
-		19	// Double
+#elif LCD_ROWS == 4
+	const byte lcd_map_4rows[LCD_ROWS * LCD_COLS + 1] = {
+		0,	1,	2,	3,	8,	9,	10,	11,	12,	13,	14,	15,	24,	25,	26,	27,	28,	29,	30,	31,
+		64,	65,	66,	67,	72,	73,	74,	75,	76,	77,	78,	79,	88,	89,	90,	91,	92,	93,	94,	95,
+		4,	5,	6,	7,	16,	17,	18,	19,	20,	21,	22,	23,	32,	33,	34,	35,	36,	37,	38,	39,
+		68,	69,	70,	71,	80,	81,	82,	83,	84,	85,	86,	87,	96,	97,	98, 99,	100,	101,	102,	103,
+		103	// Double
 	};
-	#define lcd_map lcd_map_1row
+	#define lcd_map lcd_map_4rows
 	
 #else
-	#error "A sensible value for LCD_ROWS must be defined in order to use LCD"
-	
+	#error "A sensible value for LCD_ROWS must be defined in order to use HD44780 LCD"
 #endif
 
 
@@ -159,50 +154,21 @@ __endasm;
 }
 
 
-void lcd_writeControl(byte a) __naked {	// aka "_out_0x0a"
-	(void)a;	// suppress warning "unreferenced function argument"
+void lcd_writeControl(byte a) {
+	lcd_controlPort = a;	// Output value to LCD control port
 	
-	__asm
-		push hl
-		
-		; Get parameter from stack into a
-		ld hl,#0x0004
-		add hl,sp
-		ld a,(hl)
-		
-		; Put it to port
-		out	(LCD_CONTROL_PORT), a
-		
-		call _lcd_delay_short
-		call _lcd_delay_short
-		
-		pop hl
-		ret
-	__endasm;
+	//@TODO: Tune these!
+	lcd_delay_short();
+	lcd_delay_short();
 }
 
-void lcd_writeData(byte a) __naked {	// aka "_out_0x0b"
-	(void)a;	// suppress warning "unreferenced function argument"
+void lcd_writeData(byte a) {
+	lcd_dataPort = a;	// Output value to LCD data port
 	
-	__asm
-		push hl
-		
-		; Get parameter from stack into a
-		ld hl,#0x0004
-		add hl,sp
-		ld a,(hl)
-		
-		; Put it to port
-		out	(LCD_DATA_PORT), a
-		
-		;call _lcd_delay_long
-		call _lcd_delay_short
-		
-		pop hl
-		ret
-	__endasm;
+	//@TODO: Tune these!
+	//_lcd_delay_long();
+	lcd_delay_short();
 }
-
 
 /*
 void lcd_cursor_on() {
@@ -217,7 +183,7 @@ void lcd_cursor_off() {
 
 #ifndef lcd_MINIMAL
 void lcd_set_cursor() {
-	// Set cursor
+	// Set cursor to position
 	byte o;
 	
 	o = lcd_x + (lcd_y * LCD_COLS);
