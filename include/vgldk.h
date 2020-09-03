@@ -35,7 +35,7 @@ typedef char * p_char;
 #define true 1
 #define false 0
 #define NULL ((void *)0)
-//(void *) NULL=0;
+//const void *NULL = (void *)0;
 
 #ifndef VGLDK_SERIES
 	#error "VGLDK_SERIES must be defined"
