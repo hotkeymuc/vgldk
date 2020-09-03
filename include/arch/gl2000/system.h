@@ -16,17 +16,24 @@ for use with SDCC compiler
 
 //#define ARCH GL2000
 
-#define DISPLAY_COLS 20
-#define DISPLAY_ROWS 2
+// Display
+#define LCD_ROWS 2
+#define LCD_COLS 20
+#define LCD_PORT_CTRL 0x0a
+#define LCD_PORT_DATA 0x0b
+#include <driver/hd44780.h>
 
+
+// Keyboard
 //volatile __at (0xdce0) unsigned char KEY_STATUS;	// Controls reading from the keyboard on 2000 (put 0xc0 into it, wait for it to become 0xd0)
 //volatile __at (0xdce4) unsigned char KEY_CURRENT;	// Holds the current key code on 2000
-
-#include "lcd.h"
 #include "keyboard.h"
+
+// Sound
 #include "sound.h"
 
-// Publish callbacks for STDIO
+
+// Publish function NAMES for STDIO
 #define VGLDK_STDOUT_PUTCHAR lcd_putchar
 #define VGLDK_STDIN_GETCHAR keyboard_getchar
 

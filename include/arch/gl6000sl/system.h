@@ -171,14 +171,18 @@ Intro sound port accesses at 0x2x?:
 2020-05-14 Bernhard "HotKey" Slawik
 */
 
+// Display
 // It is graphical, so there is no distinct number
 // Let's chose some average values
 #define DISPLAY_COLS 40
 #define DISPLAY_ROWS 10
 #include "lcd.h"
+
+// Keyboard
 #include "keyboard.h"
 
-// Publish callbacks for STDIO
+
+// Publish function NAMES for STDIO
 #define VGLDK_STDOUT_PUTCHAR lcd_putchar
 #define VGLDK_STDIN_GETCHAR keyboard_getchar
 
