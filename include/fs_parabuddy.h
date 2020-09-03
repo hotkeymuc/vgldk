@@ -14,7 +14,7 @@ Implementation of fs.h using the "Parallel Buddy" Arduino connected to the VGL p
 
 */
 
-#include "file.h"
+#include "fs.h"
 
 #define FS_PARABUDDY_MAX_PATH 32
 #include <parabuddy.h>

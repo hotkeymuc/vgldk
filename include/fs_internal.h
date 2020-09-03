@@ -20,8 +20,8 @@ Implementation of fs.h using hard-coded data. Mainly used for testing.
 // Internal fs disk
 // Define some static test files. Only for testing low-level file access.
 //const char TEST_CONTENTS[] = "This is contents of test.txt, hard-baked into the DOS code!";
-const char TEST_CONTENTS[] = "TEST_CONTENTS!\nLine2\n";
-const char AUTO_CMD_CONTENTS[] = "echo \"This is %TEST% auto.cmd!\"\n";
+const char TEST_CONTENTS[] = "TEST_CONTENTS of fs_internal!\nLine2\n";
+//const char AUTO_CMD_CONTENTS[] = "echo \"This is %TEST% auto.cmd!\"\n";
 
 #ifdef FS_INTERNAL_INCLUDE_TEST_APPS
 	#include "../loader/out/app_test.app.h"
@@ -29,6 +29,16 @@ const char AUTO_CMD_CONTENTS[] = "echo \"This is %TEST% auto.cmd!\"\n";
 #endif
 
 const file_FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:file_FILE!
+  {
+    "test.txt", // name
+    NULL, // mode
+    NULL, // fs
+    (void*)&TEST_CONTENTS[0], // userData
+    sizeof(TEST_CONTENTS),  // size
+    0 // currentPos
+  },
+
+  /*
 	{
 		"auto.cmd",
 		NULL,
@@ -37,14 +47,7 @@ const file_FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:file_FILE!
 		sizeof(AUTO_CMD_CONTENTS),
 		0
 	},
-	{
-		"test.txt",	// name
-		NULL,	// mode
-		NULL,	// fs
-		(void*)&TEST_CONTENTS[0],	// userData
-		sizeof(TEST_CONTENTS),	// size
-		0	// currentPos
-	},
+  */
 #ifdef FS_INTERNAL_INCLUDE_TEST_APPS
 	{
 		"test.app",
@@ -274,7 +277,7 @@ size_t fs_int_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	(void)nmemb;
 	(void)f;
 	
-	printf("fs_int is RO!\n");
+	//printf("fs_int is RO!\n");
 	return 0;
 }
 

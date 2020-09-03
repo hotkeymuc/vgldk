@@ -3,8 +3,8 @@
 
 #include "fs.h"
 
-
 // Forwards
+/*
 void fs_null_mount(const char *options);
 file_DIR *fs_null_opendir(const char *path);
 int fs_null_closedir(file_DIR * dir);
@@ -15,26 +15,27 @@ byte fs_null_feof(file_FILE *f);
 int fs_null_fgetc(file_FILE *f);
 size_t fs_null_fread(void *ptr, size_t size, size_t nmemb, file_FILE *f);
 size_t fs_null_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f);
-
+*/
 
 // Publish a FS struct
 const FS fs_null = {	// Keep in sync with fs.h:FS!
-	fs_null_mount,
+	NULL,	//fs_null_mount,
 	
-	fs_null_opendir,
-	fs_null_closedir,
-	fs_null_readdir,
+	NULL,	//fs_null_opendir,
+	NULL,	//fs_null_closedir,
+	NULL,	//fs_null_readdir,
 	
-	fs_null_fopen,
-	fs_null_fclose,
-	fs_null_feof,
-	//fs_null_fgetc,
-	fs_null_fread,
-	fs_null_fwrite
+	NULL,	//fs_null_fopen,
+	NULL,	//fs_null_fclose,
+	NULL,	//fs_null_feof,
+	//NULL,	//fs_null_fgetc,
+	NULL,	//fs_null_fread,
+	NULL,	//fs_null_fwrite
 };
 
 
 // Implementation
+/*
 file_DIR fs_null_tmpDir;
 
 void fs_null_mount(const char *options) {
@@ -101,5 +102,6 @@ size_t fs_null_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	
 	return 0;
 }
+*/
 
 #endif

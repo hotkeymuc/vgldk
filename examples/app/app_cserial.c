@@ -30,12 +30,12 @@
 
 // Timing configuration
 // 9600 baud:
-//#define CSERIAL_RX_DELAY 16	// GL4000 at 9600 baud: 16-17
-//#define CSERIAL_TX_DELAY 22	// GL4000 at 9600 baud: L=23	=> 836us/8 =>  9569 baud
+//#define CSERIAL_DELAY_RX 16	// GL4000 at 9600 baud: 16-17
+//#define CSERIAL_DELAY_TX 22	// GL4000 at 9600 baud: L=23	=> 836us/8 =>  9569 baud
 
 // 19200 baud:
-#define CSERIAL_RX_DELAY 6	// GL4000 at 19200 baud: 5-6
-#define CSERIAL_TX_DELAY 3	// GL4000 at 19200 baud: L=3	=> 408us/8 => 19607 baud
+#define CSERIAL_DELAY_RX 6	// GL4000 at 19200 baud: 5-6
+#define CSERIAL_DELAY_TX 3	// GL4000 at 19200 baud: L=3	=> 408us/8 => 19607 baud
 
 #define CSERIAL_TIMEOUT_START 250	// Timeout while waiting for start bit
 #define CSERIAL_TIMEOUT_STOP 100	// Timeout while waiting for stop bit
@@ -103,7 +103,7 @@ void cs_rx_delay() {
 	// cserial.c on GL4000 at 9600 baud with MARK at each bit: 9
 	// cserial.c on GL4000 at ~38400 baud: 1
 	// cserial.c on GL4000 at 19200 baud: 5
-	for(i = 0; i < CSERIAL_RX_DELAY; i++) {
+	for(i = 0; i < CSERIAL_DELAY_RX; i++) {
 		__asm
 			nop
 		__endasm;
@@ -222,7 +222,7 @@ void cs_tx_delay() {
 		;	ld	l, #22	; cserial.c on GL4000: L=22	=> 816us/8 =>  9803 baud
 		;	ld	l, #23	; cserial.c on GL4000: L=23	=> 836us/8 =>  9569 baud (works as 9600 baud!)
 		;	ld	l, #25	; cserial.c on GL4000: L=25	=> 880us/8 =>  9090 baud
-		ld	l, #CSERIAL_TX_DELAY
+		ld	l, #CSERIAL_DELAY_TX
 		
 		_cs_tx_delay_loop:
 			dec	l

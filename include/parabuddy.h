@@ -30,7 +30,7 @@ TODO:
 */
 
 //#define PB_DEBUG_FRAMES	// Dump hex data to screen?
-#define PB_DEBUG_PROTOCOL_ERRORS	// Put information about protocol errors on screen
+//#define PB_DEBUG_PROTOCOL_ERRORS	// Put information about protocol errors on screen
 #define PB_RECEIVE_TIMEOUT 0x1000	// 0x0800 is good
 
 //#define PB_USE_SOFTSERIAL // Use SoftSerial as physical layer (actual hardware)
@@ -177,7 +177,6 @@ typedef byte pb_handle;
     return PB_ERROR_OK;
   }
   void pb_sendRaw(byte *f, byte l) {
-    
     //@FIXME: It suddenly just stopped working!
     //pb_put(f, l);
     
@@ -352,6 +351,7 @@ typedef byte pb_handle;
     // Finished!
     return PB_ERROR_OK;
   }
+  
   void pb_sendRaw(byte *b, word l) {
   
     #ifdef PB_DEBUG_SENDING
@@ -504,7 +504,7 @@ byte pb_receiveAsciiz(char* v) {
 // Functionality
 
 word pingValue;
-void pb_ping() {
+byte pb_ping() {
 	word vPing;
 	word vPong;
 	
@@ -513,7 +513,7 @@ void pb_ping() {
 	vPong = 0xffff;
 	
 	//printf("Ping %02X %02X...\n", (vPing >> 8), vPing & 0xff);
-	puts("Ping"); printf_x4(vPing); putchar('\n');
+	//puts("Ping"); printf_x4(vPing); putchar('\n');
 	
 	//pb_sendComposed2(PB_COMMAND_PING, (vPing >> 8), vPing & 0x00ff);	// MSB
 	//pb_sendComposed2(PB_COMMAND_PING, vPing & 0x00ff, (vPing >> 8));	// LSB
@@ -522,14 +522,16 @@ void pb_ping() {
 	//if (pb_receiveWord(&vPong) == 1) break;
 	
 	if (pb_receiveWord(&vPong) == 0) {
-		puts("failed.\n");
+		//puts("failed.\n");
 		//beep();
-		return;
+		return PB_ERROR_UNKNOWN;
 	}
 
 	//printf("Pong %04X\n", vPong);
 	//printf("Pong %02X %02X\n", (vPong >> 8), vPong & 0xff);
-	puts("Pong"); printf_x4(vPong); putchar('\n');
+	//puts("Pong"); printf_x4(vPong); putchar('\n');
+  if (vPing != vPong) return PB_ERROR_CORRUPT;
+  return PB_ERROR_OK;
 }
 
 void pb_endBootloader() {

@@ -22,15 +22,11 @@ TODO:
 	#define FILEIO_MAX_PATH 32	// Maximum number of characters in path names
 #endif
 
-#ifndef FILEIO_CUSTOM_NAMES
-  
-  // If not specified otherwise: Map stdio file methods to fileio methods
-  #define FILEIO_DEFINE_FUNCTIONS
+#ifndef FILEIO_NAMESPACED
+  // If not specified otherwise: Map well-known stdio file methods
+  #define FILEIO_DEFINE_STDIO_FUNCTIONS
 #endif
 
-
-//FS *cfs;	// Current file system driver
-char cwd[FILEIO_MAX_PATH];	// Current working directory
 
 #ifndef FILEIO_ROOT_FS
 	#warning "No root filesystem specified for fileio.h (FILEIO_ROOT_FS). Using fs_null."
@@ -40,8 +36,14 @@ char cwd[FILEIO_MAX_PATH];	// Current working directory
 
 #define fileio_root_fs FILEIO_ROOT_FS
 
+char cwd[FILEIO_MAX_PATH];  // Current working directory
+
 void fileio_mount(const char *options) {
-  fileio_root_fs.mount(options);
+	if (fileio_root_fs.mount == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return;
+	}
+	fileio_root_fs.mount(options);
 }
 
 void fileio_absPath(const char *relPath, char *ret) {
@@ -108,6 +110,11 @@ void fileio_absPath(const char *relPath, char *ret) {
 file_DIR *fileio_opendir(const char *path) {
 	char aPath[FILEIO_MAX_PATH];
 	
+	if (fileio_root_fs.opendir == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return NULL;
+	}
+	
 	// Resolve path
 	fileio_absPath(path, aPath);
 	
@@ -117,16 +124,33 @@ file_DIR *fileio_opendir(const char *path) {
 
 int fileio_closedir(file_DIR * dir) {
 	FS *fs = (FS *)(dir->fs);
+	
+	if (fs->closedir == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return -1;
+	}
+	
 	return fs->closedir(dir);
 }
 
 dirent *fileio_readdir(file_DIR *dir) {
 	FS *fs = (FS *)(dir->fs);
+	
+	if (fs->readdir == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return NULL;
+	}
+	
 	return fs->readdir(dir);
 }
 
 file_FILE *fileio_open(const char *path, const char *openMode) {
 	char aPath[FILEIO_MAX_PATH];
+	
+	if (fileio_root_fs.open == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return NULL;
+	}
 	
 	// Resolve path
 	fileio_absPath(path, aPath);
@@ -138,12 +162,23 @@ file_FILE *fileio_open(const char *path, const char *openMode) {
 
 int fileio_close(file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
+	
+	if (fs->close == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return ERR_UNSUPPORTED;
+	}
+	
 	return fs->close(f);
 }
 
 byte fileio_eof(file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
- 
+	
+ 	if (fs->close == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return 1;
+	}
+	
 	return fs->eof(f);
 }
 
@@ -153,18 +188,31 @@ int fileio_getc(file_FILE *f) {
 	return fs->getc(f);
 }
 */
+
 size_t fileio_read(void *ptr, size_t size, byte nmemb, file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
+	
+ 	if (fs->read == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return 0;
+	}
+	
 	return fs->read(ptr, size, nmemb, f);
 }
 
 size_t fileio_write(void *ptr, size_t size, byte nmemb, file_FILE *f) {
 	FS *fs = (FS *)(f->fs);
+	
+ 	if (fs->write == NULL) {
+		errno = ERR_UNSUPPORTED;
+		return 0;
+	}
+	
 	return fs->write(ptr, size, nmemb, f);
 }
 
 
-#ifdef FILEIO_DEFINE_FUNCTIONS
+#ifdef FILEIO_DEFINE_STDIO_FUNCTIONS
   #define absPath fileio_absPath
   #define opendir fileio_opendir
   #define closedir fileio_closedir

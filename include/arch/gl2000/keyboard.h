@@ -4,12 +4,30 @@
 VTech Genius Leader Keyboard
 
 //@TODO: Handling of keyboard should happen inside an interrupt handler!
-//@TODO: store 16 bytes of last state to allow key-rollover
+//@TODO: Handle roll-over like in GL6000SL's implementation
+//@TODO: Unify into one single "matrix keyboard" driver
 
 2019-11-03 Bernhard "HotKey" Slawik
 */
 
-#include "ports.h"
+
+// BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
+// This also makes the parallel port wiggle, so it might interfere with serial/parallel communication!
+//#define KEYBOARD_LATCH
+
+// Ports
+#define KEYBOARD_PORT_ROW_OUT 0x10
+#define KEYBOARD_PORT_COL_IN 0x10
+#define KEYBOARD_PORT_COL_IN2 0x11
+__sfr __at KEYBOARD_PORT_ROW_OUT keyboard_port_matrixRowOut;
+__sfr __at KEYBOARD_PORT_COL_IN keyboard_port_matrixColIn;
+__sfr __at KEYBOARD_PORT_COL_IN2 keyboard_port_matrixColIn2;
+
+#ifdef KEYBOARD_LATCH
+	#define KEYBOARD_PORT_LATCH 0x11
+	__sfr __at KEYBOARD_PORT_LATCH keyboard_port_matrixLatch;
+#endif
+
 
 #define VGL_KEYS_MASK_CAPS	0x20
 
@@ -61,14 +79,10 @@ byte keyboard_inkey() {
 	byte row, col;
 	char r;
 	
-	
-	// BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
-	//port_0x11_out(0xff);
-	__asm
-		ld a, #0xff
-		out (0x11), a
-	__endasm;
-	
+	#ifdef KEYBOARD_LATCH
+		// BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
+		keyboard_port_matrixLatch = 0xff;
+	#endif
 	
 	r = 0;
 	//m = 0x80;
@@ -79,22 +93,17 @@ byte keyboard_inkey() {
 		// Send bit mask to MUXer
 		
 		// BIOS4000 01bc: Send bit mask to 0x10
-		port_0x10_out(m);
+		keyboard_port_matrixRowOut = m;
 		
 		// Read back 0x10
-		b1 = port_0x10_in();
+		b1 = keyboard_port_matrixColIn;
 		
 		// Read back 0x11
-		//b2 = port_0x11_in();
+		//b2= keyboard_port_matrixColIn2;
 		
 		
 		// BIOS4000 01c7: Reset it back to 0x00
-		//port_0x10_out(0x00);
-		__asm
-			ld a, #0x00
-			out (0x10), a
-		__endasm;
-		
+		keyboard_port_matrixRowOut = 0x00;
 		
 		if (b1 < 0xff) {
 			m2 = 0x01;
@@ -131,7 +140,6 @@ byte keyboard_inkey() {
 		row --;
 		*/
 	}
-	//putchar('.');
 	//port_0x12_out(port_0x12_in() | VGL_KEYS_MASK_CAPS);	// CAPS on?
 	//port_0x12_out(port_0x12_in() & (0xff - VGL_KEYS_MASK_CAPS));	// CAPS off?
 	
@@ -146,15 +154,21 @@ byte keyboard_checkkey() {
 	byte b1;
 	//byte b2;
 	
-	// Set all mux lines HIGH (although in original firmware, keyboard matrix works without it)
-	port_0x11_out(0xff);
+	#ifdef KEYBOARD_LATCH
+		// Set all mux lines HIGH (although in original firmware, keyboard matrix works without it)
+		keyboard_port_matrixLatch = 0xff;
+	#endif
 	
-	port_0x10_out(0xff);
-	b1 = port_0x10_in();
-	//b2 = port_0x11_in();
-	port_0x10_out(0x00);
+	// Set all outputs at the same time
+	keyboard_port_matrixRowOut = 0xff;
+	
+	// Read back if anything is pressed
+	b1 = keyboard_port_matrixColIn;
+	//b2= keyboard_port_matrixColIn2;
+	keyboard_port_matrixRowOut = 0x00;
+	
 	if (b1 < 0xff) return b1;	// Some key is pressed
-	//if (b2 < 0xff) return b2;	// Some key is pressed
+	//if (b2 < 0xff) return b2;	// Some key is pressed (2)
 	
 	return 0;	// No keys are pressed
 }

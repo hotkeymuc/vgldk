@@ -8,7 +8,7 @@
 #include <vgldk.h>
 
 
-const char VERSION[] = "Monitor 1.0";
+const char VERSION[] = "Monitor 1.2";
 const word tempAddr = 0xC400;
 
 // Setup
@@ -20,8 +20,10 @@ char cmd_arg[MAX_INPUT];
 // Features to include
 //#define MONITOR_HELP	// Include "long" help functionality (needs quite some space for the strings...)
 
-//#define MONITOR_SOFTSERIAL	// Include the softserial include (serial using bit-banged parallel port)
-//#define MONITOR_SOFTSERIAL_AUTOSTART	// Make softserial take over STDIO at startup
+#define MONITOR_SERIAL	// Include serial functions
+//#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use old ASM-based softserial
+#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart
+//#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
 
 #define MONITOR_FILES	// Include file system stuff
 
@@ -87,6 +89,11 @@ byte stricmp(const char *cs, const char *ct) {
 
 
 
+#ifdef MONITOR_CMD_DUMP
+  #define HEX_USE_DUMP
+  #define HEX_DUMP_WIDTH 8 //((DISPLAY_COLS-6)/3)
+#endif
+#include <hex.h>
 
 void printf_bin(byte v) {
 	byte p;
@@ -96,12 +103,6 @@ void printf_bin(byte v) {
 	}
 }
 
-
-#ifdef MONITOR_CMD_DUMP
-  #define HEX_USE_DUMP
-  #define HEX_DUMP_WIDTH 8 //((DISPLAY_COLS-6)/3)
-#endif
-#include <hex.h>
 void printf_byte_pretty(byte v) {
 	
 	// Hex
@@ -116,6 +117,7 @@ void printf_byte_pretty(byte v) {
 	putchar(' '); printf_d(v);
 	*/
 }
+
 
 // Internal command call definition
 typedef int (*t_commandCall)(int argc, char *argv[]);
@@ -181,7 +183,7 @@ int cmd_dump(int argc, char *argv[]) {
 	
 	a = (argc < 2) ? tempAddr : hextow(argv[1]);
 	
-	l = (argc < 3) ? (4 * DISPLAY_ROWS) : hextob(argv[2]);
+	l = (argc < 3) ? (4 * 1) : hextob(argv[2]);	// 4 * LCD_ROWS
 	while(a < 0xffff) {
 		dump(a, l);
 		
@@ -457,10 +459,13 @@ int cmd_ver(int argc, char *argv[]) {
 	
 	//printf("%s\n", VERSION);
 	printf(VERSION);
+	
+	// Print the VGLDK_SERIES value
 	#ifdef VGLDK_SERIES
+		// Super-hack to get the value of a DEFINE as a string
 		#define xstr(s) str(s)
 		#define str(s) #s
-		printf(" for SERIES " xstr(VGLDK_SERIES) );
+		printf(" / " xstr(VGLDK_SERIES) );
 	#endif
 	printf("\n");
 	
@@ -475,20 +480,21 @@ int cmd_ver(int argc, char *argv[]) {
 #ifdef MONITOR_FILES
 
 // File systems
-#include <fs_null.h>
-
-#include <fs_internal.h>
+//#include <fs_null.h>
+//#include <fs_internal.h>
 
 #define PB_USE_MAME	// For testing in MAME
 //#define PB_USE_SOFTSERIAL	// For running on real hardware
+//#define PB_DEBUG_FRAMES
+#define PB_DEBUG_PROTOCOL_ERRORS
 #include <mame.h>
 #include <parabuddy.h>
 #include <fs_parabuddy.h>
 
 // Define roots for the root filesystem
 #define FS_ROOT_MOUNTS {\
-	{"nul",	&fs_null},		\
-	{"int",	&fs_internal},	\
+	/*{"nul",	&fs_null},*/		\
+	/*{"int",	&fs_internal},*/	\
 	{"pb",	&fs_parabuddy},	\
 }
 
@@ -578,9 +584,52 @@ int cmd_files_iotest(int argc, char *argv[]) {
 #endif
 
 
-#ifdef MONITOR_SOFTSERIAL
-#include <softserial.h>
+#ifdef MONITOR_SERIAL
 
+#ifdef MONITOR_SERIAL_USE_SOFTSERIAL
+	// Use old (but trusted) arch specific ASM based softserial
+	#include <softserial.h>
+#endif
+
+#ifdef MONITOR_SERIAL_USE_SOFTUART
+	// Use C softuart
+	#include "driver/softuart.h"
+
+	// Make softuart compatible with softserial
+	#define serial_getchar_nonblocking softuart_receiveByte
+	#define serial_putchar softuart_sendByte
+	char serial_getchar() {
+		int c;
+		c = -1;
+		while (c < 0) {
+			c = serial_getchar_nonblocking();
+		}
+		return c;
+	}
+	word serial_gets(char *buffer) {
+		char *pb;
+		int c;
+		
+		pb = buffer;
+		do {
+			c = serial_getchar();
+			if (c == 10) break;
+			*pb++ = c;
+		} while(c != 10);
+		
+		*pb++ = 0;	// Terminate
+		return (word)pb - (word)buffer;	// Return L
+	}
+	void serial_puts(char *buffer) {
+		char *pb;
+		pb = buffer;
+		while (*pb != 0) {
+			serial_putchar(*pb++);
+		}
+	}
+#endif
+
+/*
 int cmd_serial_test(int argc, char *argv[]) {
 	int c = 0;
 	
@@ -594,6 +643,7 @@ int cmd_serial_test(int argc, char *argv[]) {
 	
 	return ERR_OK;
 }
+*/
 
 #ifdef VGLDK_VARIABLE_STDIO
 // Allow switching STDIO to serial (onl available when built with VARIABLE_STDIO)
@@ -720,8 +770,8 @@ const t_commandEntry COMMANDS[] = {
 	#endif
 	
 	
-	#ifdef MONITOR_SOFTSERIAL
-	T_COMMAND_ENTRY("stest", cmd_serial_test, "Serial test"),
+	#ifdef MONITOR_SERIAL
+	//T_COMMAND_ENTRY("stest", cmd_serial_test, "Serial test"),
 	#ifdef VGLDK_VARIABLE_STDIO
 	T_COMMAND_ENTRY("sio", cmd_serial_io, "Switch STDIO to serial"),
 	#endif
@@ -959,7 +1009,7 @@ void parse(char *s) {
 
 
 void main() __naked {
-	#ifdef MONITOR_SOFTSERIAL_AUTOSTART
+	#ifdef MONITOR_SERIAL_AUTOSTART
 	int c;
 	#endif
 	
@@ -983,8 +1033,8 @@ void main() __naked {
 	cwd[1] = 0;
 	#endif
 	
-	#ifdef MONITOR_SOFTSERIAL
-	#ifdef MONITOR_SOFTSERIAL_AUTOSTART
+	#ifdef MONITOR_SERIAL
+	#ifdef MONITOR_SERIAL_AUTOSTART
 	if (serial_isReady()) {
 		// If serial cable is connected: Ask for which I/O to use
 		

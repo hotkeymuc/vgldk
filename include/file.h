@@ -10,9 +10,12 @@ So I implemented my own minimal one to be used in my "DOS".
 */
 
 
+#define ERR_OK 0
 #define ERR_GENERAL -1
 #define ERR_FILE_NOT_FOUND -2
 #define ERR_DRIVE_INVALID -3
+#define ERR_TIMEOUT -4
+#define ERR_UNSUPPORTED -5
 
 #define FILE_PATH_DELIMITER '/'
 

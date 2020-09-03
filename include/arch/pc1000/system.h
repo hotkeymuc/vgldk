@@ -19,6 +19,8 @@ for use with SDCC compiler
 
 //#define ARCH PC1000
 
+#warning "The system architecture PC1000 is not working correctly, yet! Screen will be blank!"
+
 #define LCD_MINIMAL
 
 // Display
@@ -26,6 +28,7 @@ for use with SDCC compiler
 #define LCD_COLS 20
 #define LCD_PORT_CTRL 0x20
 #define LCD_PORT_DATA 0x21
+//@TODO: Use "lcd_scroll_cb" to pause after each line
 #include <driver/hd44780.h>
 
 // Keyboard
