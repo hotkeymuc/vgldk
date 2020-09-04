@@ -25,9 +25,12 @@ def human_readable(s):
 	stats = [
 		'0x%06X' % s,
 		'% 6d Bytes' % s,
-		'% 6.1f KByte' % (s/1024.0),
-		'% 8.2f Kbit' % ((s*8) / 1024.0),
-		'fits on a % 4d KByte / % 6d Kbit ROM' % (sCeil // 1024, (sCeil*8) // 1024),
+		'% 8.3f KByte' % (s/1024.0),
+		'% 8.3f Kbit' % ((s*8) / 1024.0),
+		'fits in',
+		'% 4d KByte' % (sCeil // 1024),
+		'% 6d Kbit' % ((sCeil*8) // 1024),
+		'ROM'
 	]
 	r = sep.join(stats)
 	return r
