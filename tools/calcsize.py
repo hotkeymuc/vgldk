@@ -6,6 +6,7 @@ Useful for trimming down a binary file to fit a desired EEPROM.
 2020-09-04 Bernhard "HotKey" Slawik
 """
 import sys
+import math
 
 def put(t):
 	print(str(t))
@@ -14,9 +15,21 @@ def human_readable(s):
 	
 	#return '%d Bytes %d Kbit / 0x%04X / %.1f KB' % (s, (s*8) // 1024, s, s/1024.0 )
 	
+	ROM_MIN_SIZE_KB = 1
+	
+	sCeil = math.pow(2, math.ceil(math.log(s, 2))) if s > 0 else 0
+	sCeil = max(1024*ROM_MIN_SIZE_KB, sCeil)
+	
 	#sep = ' / '
 	sep = '\t'
-	r = sep.join(['% 6d Bytes' % s, '0x%06X Bytes' % s, '% 8.2f Kbit' % ((s*8) / 1024.0), '% 6.1f KB' % (s/1024.0)])
+	stats = [
+		'0x%06X' % s,
+		'% 6d Bytes' % s,
+		'% 6.1f KByte' % (s/1024.0),
+		'% 8.2f Kbit' % ((s*8) / 1024.0),
+		'fits on a % 4d KByte / % 6d Kbit ROM' % (sCeil // 1024, (sCeil*8) // 1024),
+	]
+	r = sep.join(stats)
 	return r
 
 if __name__ == '__main__':#
@@ -33,8 +46,9 @@ if __name__ == '__main__':#
 	l = len(data)
 	put('Filesize  : %s' % human_readable(l))
 	
-	while data[l-1] == 0xff:
+	l -= 1
+	while (l >= 0) and (data[l] == 0xff):
 		l -= 1
-	
+	l += 1
 	put('Used space: %s' % human_readable(l))
 	
