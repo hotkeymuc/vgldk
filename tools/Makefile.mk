@@ -179,6 +179,7 @@ MAME = mame
 MINIPRO = minipro
 #REL2APP = python $(TOOLS_DIR)/rel2app.py
 SEND2MONITOR = python $(TOOLS_DIR)/send2monitor.py
+CALCSIZE = python $(TOOLS_DIR)/calcsize.py
 
 # Targets
 .PHONY: info clean emu burn
@@ -198,7 +199,9 @@ create_out_dir:
 
 cart:: VGLDK_TARGET = cart
 cart:: info $(OUTPUT_FILE_CART)
-	@echo Cartridge file $(OUTPUT_FILE_CART) was created.
+	### Info
+	@echo Cartridge file $(OUTPUT_FILE_CART) was successfully created.
+	@$(CALCSIZE) $(OUTPUT_FILE_CART)
 
 app:: VGLDK_SERIES ?= 0
 #app:: ARCH_ID = plain
@@ -278,8 +281,12 @@ emu: $(OUTPUT_FILE_CART)
 
 burn: $(OUTPUT_FILE_CART)
 	# Burn image "$(OUTPUT_FILE_CART)" to (E)EPROM of type "$(CART_PART)"
+	@# Show size analysis
+	@$(CALCSIZE) $(OUTPUT_FILE_CART)
 	@# Use -s = no warning for file size mismatch
 	$(MINIPRO) -p "$(CART_PART)" -w $(OUTPUT_FILE_CART)
 
 upload: $(OUTPUT_FILE_APP)
+	@# Show size analysis
+	@$(CALCSIZE) $(OUTPUT_FILE_APP)
 	$(SEND2MONITOR) --dest=$(LOC_CODE) $(OUTPUT_FILE_APP)
