@@ -106,7 +106,7 @@ typedef byte pb_handle;
 //@TODO: Move this selection to softserial instead?
 #ifdef PB_USE_MAME
 	// Using MAME trapped port access instead of hardware
-	#include "mame.h"
+	#include "driver/mame.h"
 	#define pb_getchar mame_getchar
 	#define pb_putchar mame_putchar
 	#define pb_puts mame_put

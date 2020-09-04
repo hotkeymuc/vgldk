@@ -114,27 +114,6 @@ void vgl_sound(word frq, word len) {
 void vgl_sound_note(word n, word len) {
 	word frq;
 	
-	/*
-	// Dynamic 16-bit int
-	x = 0x0090;	// Base frequency
-	switch(d % 12) {
-		case 0:	x = (x * 256) >> 8	break;
-		case 1:	x = (x * 241) >> 8	break;
-		case 2:	x = (x * 228) >> 8	break;
-		case 3:	x = (x * 215) >> 8	break;
-		case 4:	x = (x * 203) >> 8	break;
-		case 5:	x = (x * 191) >> 8	break;
-		case 6:	x = (x * 181) >> 8	break;
-		case 7:	x = (x * 170) >> 8	break;
-		case 8:	x = (x * 161) >> 8	break;
-		case 9:	x = (x * 152) >> 8	break;
-		case 10:	x = (x * 143) >> 8	break;
-		case 11:	x = (x * 135) >> 8	break;
-		case 12:	x = (x * 128) >> 8	break;
-	}
-	*/
-	
-	// My own, working great!
 	switch(n % 12) {
 		case 0:	frq = 0x0900;	break;
 		case 1:	frq = 0x087e;	break;

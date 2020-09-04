@@ -243,7 +243,7 @@ $(OUT_DIR)/%.ihx: %.c $(CRT_REL_FILE)
 # Cartridge
 #%.cart.$(CART_SIZE_KB)kb.bin: %.ihx.bin
 $(OUTPUT_FILE_CART): $(OUTPUT_FILE_HEX_BIN)
-	### Extracting cartridge section from $< ($(ADDR_CART) and up)
+	### Extracting cartridge section from $< ($(ADDR_CART) and $(CART_SIZE_KB) KB up)
 	$(DD) iflag=skip_bytes skip=$(ADDR_CART_DECIMAL) bs=1024 count=$(CART_SIZE_KB) if=$< of=$@ status=none
 	
 	@# Create empty EPROM file filled with FF (full cart size)

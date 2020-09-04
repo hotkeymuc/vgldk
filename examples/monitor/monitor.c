@@ -17,29 +17,30 @@ const word tempAddr = 0xC400;
 char cmd_arg[MAX_INPUT];
 
 
-// Features to include
+// Features to include (affects how big the binary gets)
 //#define MONITOR_HELP	// Include "long" help functionality (needs quite some space for the strings...)
 
 #define MONITOR_SERIAL	// Include serial functions
-//#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use old ASM-based softserial
-#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart
+#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use old ASM-based softserial
+//#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart
 //#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
 
 #define MONITOR_FILES	// Include file system stuff
 
 
-// Commands to include
+// Commands to include (affects how big the binary gets)
 //#define MONITOR_CMD_BEEP
-#define MONITOR_CMD_CLS
-#define MONITOR_CMD_DUMP
-#define MONITOR_CMD_ECHO
+//#define MONITOR_CMD_CLS
+//#define MONITOR_CMD_DUMP
+//#define MONITOR_CMD_ECHO
+//#define MONITOR_CMD_EXIT
 #define MONITOR_CMD_HELP	// Even without MONITOR_HELP, the HELP command can list all commands
-#define MONITOR_CMD_INTERRUPTS
+//#define MONITOR_CMD_INTERRUPTS
 //#define MONITOR_CMD_LOOP
 #define MONITOR_CMD_PEEKPOKE
 //#define MONITOR_CMD_PAUSE
-#define MONITOR_CMD_PORT
-#define MONITOR_CMD_PAUSE
+//#define MONITOR_CMD_PORT
+//#define MONITOR_CMD_PAUSE
 #define MONITOR_CMD_VER
 
 
@@ -49,9 +50,9 @@ char cmd_arg[MAX_INPUT];
 #define ERR_MISSING_ARGUMENT -5
 #define ERR_NOT_IMPLEMENTED -6
 
-
-
-#include <ports.h>
+#ifdef MONITOR_CMD_PORT
+	#include <ports.h>	// For accessing ports dynamically
+#endif
 
 #include <stdiomin.h>	// for printf() putchar() gets() getchar()
 //#include <stdlib.h>	// for atoi()
@@ -93,7 +94,7 @@ byte stricmp(const char *cs, const char *ct) {
   #define HEX_USE_DUMP
   #define HEX_DUMP_WIDTH 8 //((DISPLAY_COLS-6)/3)
 #endif
-#include <hex.h>
+#include <hex.h>	// For hex stuff
 
 void printf_bin(byte v) {
 	byte p;
@@ -220,12 +221,14 @@ int cmd_echo(int argc, char *argv[]) {
 }
 #endif
 
+#ifdef MONITOR_CMD_EXIT
 int cmd_exit(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
 	running = false;
 	return ERR_OK;
 }
+#endif
 
 #ifdef MONITOR_CMD_HELP
 int cmd_help(int argc, char *argv[]);	// Forward declaration, since "help" needs to know all the commands and the commands need to know this function...
@@ -341,7 +344,7 @@ int cmd_peek(int argc, char *argv[]) {
 		printf_byte_pretty(v);
 	}
 	
-	printf("\n");
+	putchar('\n');
 	
 	return ERR_OK;
 }
@@ -432,7 +435,7 @@ int cmd_in(int argc, char *argv[]) {
 	printf_x2(p);
 	putchar(':');
 	printf_byte_pretty(v);
-	printf("\n");
+	putchar('\n');
 	
 	return ERR_OK;
 }
@@ -467,7 +470,7 @@ int cmd_ver(int argc, char *argv[]) {
 		#define str(s) #s
 		printf(" / " xstr(VGLDK_SERIES) );
 	#endif
-	printf("\n");
+	putchar('\n');
 	
 	return ERR_OK;
 }
@@ -486,8 +489,7 @@ int cmd_ver(int argc, char *argv[]) {
 #define PB_USE_MAME	// For testing in MAME
 //#define PB_USE_SOFTSERIAL	// For running on real hardware
 //#define PB_DEBUG_FRAMES
-#define PB_DEBUG_PROTOCOL_ERRORS
-#include <mame.h>
+//#define PB_DEBUG_PROTOCOL_ERRORS
 #include <parabuddy.h>
 #include <fs_parabuddy.h>
 
@@ -519,7 +521,7 @@ int cmd_files_cd(int argc, char *argv[]) {
 	return ERR_OK;
 }
 
-int cmd_files_dir(int argc, char *argv[]) {
+int cmd_files_ls(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
 	file_DIR *dir;
@@ -566,6 +568,9 @@ int cmd_files_cat(int argc, char *argv[]) {
 	return ERR_OK;
 }
 
+
+//#include "driver/mame.h"
+/*
 int cmd_files_iotest(int argc, char *argv[]) {
 	(void) argc; (void) argv;
 	
@@ -581,6 +586,7 @@ int cmd_files_iotest(int argc, char *argv[]) {
 	
 	return ERR_OK;
 }
+*/
 #endif
 
 
@@ -731,7 +737,9 @@ const t_commandEntry COMMANDS[] = {
 	#ifdef MONITOR_CMD_ECHO
 	T_COMMAND_ENTRY("echo" , cmd_echo, "Display text"),
 	#endif
+	#ifdef MONITOR_CMD_EXIT
 	T_COMMAND_ENTRY("exit" , cmd_exit, "End session"),
+	#endif
 	#ifdef MONITOR_CMD_HELP
 	T_COMMAND_ENTRY("help" , cmd_help, "List cmds, explain"),
 	#endif
@@ -764,9 +772,9 @@ const t_commandEntry COMMANDS[] = {
 	// Additional features
 	#ifdef MONITOR_FILES
 	T_COMMAND_ENTRY("cd", cmd_files_cd, "Change dir"),
-	T_COMMAND_ENTRY("dir", cmd_files_dir, "Show entries"),
+	T_COMMAND_ENTRY("ls", cmd_files_ls, "Show entries"),
 	T_COMMAND_ENTRY("cat", cmd_files_cat, "List file"),
-	T_COMMAND_ENTRY("iotest", cmd_files_iotest, "IO test"),
+	//T_COMMAND_ENTRY("iotest", cmd_files_iotest, "IO test"),
 	#endif
 	
 	
@@ -1071,8 +1079,10 @@ void main() __naked {
 	#endif
 	#endif
 	
+	#ifdef MONITOR_CMD_VER
 	// Banner
 	cmd_ver(0, NULL);
+	#endif
 	
 	// Command line loop
 	running = true;
