@@ -11,9 +11,9 @@ NAME = app_hello
 
 # For small loadable apps (without their own I/O):
 VGLDK_SERIES = 0
-LOC_CODE = 0xc400
+LOC_CODE = 0xc800
 #LOC_DATA = 0xe000
-LOC_DATA = 0xd000
+LOC_DATA = 0xc000
 
 all: upload
 #all: app

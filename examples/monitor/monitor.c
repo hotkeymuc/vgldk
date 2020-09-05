@@ -9,7 +9,7 @@
 
 
 const char VERSION[] = "Monitor 1.2";
-const word tempAddr = 0xC400;
+const word tempAddr = 0xC800;
 
 // Setup
 #define MAX_ARGS 8
@@ -21,9 +21,10 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_HELP	// Include "long" help functionality (needs quite some space for the strings...)
 
 #define MONITOR_SERIAL	// Include serial functions
-#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use old ASM-based softserial
-//#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart
+#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart
+//#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use old ASM-based softserial
 //#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
+#define SOFTUART_BAUD 9600
 
 #define MONITOR_FILES	// Include file system stuff
 
@@ -35,13 +36,13 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_CMD_ECHO
 //#define MONITOR_CMD_EXIT
 #define MONITOR_CMD_HELP	// Even without MONITOR_HELP, the HELP command can list all commands
-//#define MONITOR_CMD_INTERRUPTS
+#define MONITOR_CMD_INTERRUPTS
 //#define MONITOR_CMD_LOOP
 #define MONITOR_CMD_PEEKPOKE
 //#define MONITOR_CMD_PAUSE
-//#define MONITOR_CMD_PORT
+#define MONITOR_CMD_PORT
 //#define MONITOR_CMD_PAUSE
-#define MONITOR_CMD_VER
+//#define MONITOR_CMD_VER
 
 
 // Definitions
@@ -486,8 +487,9 @@ int cmd_ver(int argc, char *argv[]) {
 //#include <fs_null.h>
 //#include <fs_internal.h>
 
-#define PB_USE_MAME	// For testing in MAME
+//#define PB_USE_MAME	// For testing in MAME
 //#define PB_USE_SOFTSERIAL	// For running on real hardware
+#define PB_USE_SOFTUART	// For running on real hardware
 //#define PB_DEBUG_FRAMES
 //#define PB_DEBUG_PROTOCOL_ERRORS
 #include <parabuddy.h>
