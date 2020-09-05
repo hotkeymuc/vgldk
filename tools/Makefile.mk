@@ -178,7 +178,7 @@ DD = dd
 MAME = mame
 MINIPRO = minipro
 #REL2APP = python $(TOOLS_DIR)/rel2app.py
-SEND2MONITOR = python $(TOOLS_DIR)/send2monitor.py
+SEND2MONITOR = python3 $(TOOLS_DIR)/send2monitor.py
 CALCSIZE = python $(TOOLS_DIR)/calcsize.py
 
 # Targets
@@ -215,6 +215,7 @@ app:: info $(OUTPUT_FILE_APP)
 	@#$(REL2APP) $(OUTPUT_FILE_REL)
 	@#$(REL2APP) $(OUT_DIR)/$(NAME)
 	@echo App file $(OUTPUT_FILE_APP) was created.
+	@$(CALCSIZE) $(OUTPUT_FILE_APP)
 
 
 $(CRT_REL_FILE): create_out_dir $(CRT_S_FILE)
@@ -250,6 +251,7 @@ $(OUTPUT_FILE_CART): $(OUTPUT_FILE_HEX_BIN)
 	@#dd if=/dev/zero ibs=1k count=$(CART_SIZE_KB) status=none | tr "\000" "\377" >$@
 	@## Copy bin data into it
 	@#dd if=$< of=$@ conv=notrunc
+	@$(CALCSIZE) $(OUTPUT_FILE_CART)
 
 # App
 #%.$(LOC_CODE).app.bin: %.ihx.bin

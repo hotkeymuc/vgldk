@@ -36,6 +36,7 @@ SERIAL_BAUD = 9600	# Software Serial currrently only supports 9600 baud (fixed)
 SERIAL_TIMEOUT = 0.1
 DEST_DEFAULT = 0xc800
 
+MONITOR_PROMPT = '>'
 
 # General
 SHOW_TRAFFIC = True
@@ -135,7 +136,11 @@ class Monitor:
 		
 		if PYTHON3:
 			#self.ser.write(bytes(s, 'ascii'))	# Python3
-			self.ser.write(s)	# s must be binary
+			# s must be bytes
+			if type(s) is bytes:
+				self.ser.write(s)
+			else:
+				self.ser.write(bytes(s, 'ascii'))	# Convert to bytes
 		else:
 			self.ser.write(s)	# Python2
 		
@@ -199,11 +204,13 @@ class Monitor:
 		
 		self.put('Activating console...')
 		while True:
-			self.write('\n')
+			#self.write('\n')
+			self.write(bytes('\n', 'ascii'))
 			
 			# Get banner
 			s = self.readline()
-			if (s == '>'): break
+			if (s.strip().endswith(MONITOR_PROMPT)):
+				break
 		
 		#self.put('Waiting for prompt...')
 		#self.wait_for_prompt()
@@ -212,12 +219,12 @@ class Monitor:
 	def wait_for_prompt(self):
 		while True:
 			s = self.readline()
-			if s == '>':
+			if (s.strip().endswith(MONITOR_PROMPT)):
 				return True
 	
 	def ver(self):
-		comp.write('ver\n')
-		s = comp.readline()
+		self.write('ver\n')
+		s = self.readline()
 		return s.strip()
 	
 	def port_in(self, p):
@@ -249,17 +256,17 @@ class Monitor:
 	
 	def ints(self):
 		# Let interrupts happen
-		#comp.write('ei\ndi\n')
-		comp.write('ints\n')
-		comp.readline()
-		comp.write('\n')
-		comp.readline()
-		comp.readline()
+		#self.write('ei\ndi\n')
+		self.write('ints\n')
+		self.readline()
+		self.write('\n')
+		self.readline()
+		self.readline()
 		
 	
 	def peek(self, a, l=1):
-		comp.write('peek %04x %02x\n' % (a, l))
-		s = comp.readline()
+		self.write('peek %04x %02x\n' % (a, l))
+		s = self.readline()
 		#put(s)
 		while (len(s) > 0) and (s[0] == '>'): s = s[1:]
 		
@@ -284,18 +291,19 @@ class Monitor:
 		return r
 	
 	def dump(self, a, l=16):
-		put(hexdump(comp.peek(a, l), a))
+		put(hexdump(self.peek(a, l), a))
 		
 	def poke(self, a, data):
 		if PYTHON3:
-			comp.write('poke %04x %s\n' % (a, ''.join(['%02x'%b for b in data]) ))
+			self.write('poke %04x %s\n' % (a, ''.join(['%02x'%b for b in data]) ))
 		else:
-			comp.write('poke %04x %s\n' % (a, ''.join(['%02x'%ord(b) for b in data]) ))
-		comp.readline()
+			self.write('poke %04x %s\n' % (a, ''.join(['%02x'%ord(b) for b in data]) ))
+		#self.readline()
+		self.wait_for_prompt()
 	
 	def call(self, a):
-		comp.write('call %04x\n' % a)
-		#comp.readline()
+		self.write('call %04x\n' % a)
+		#self.readline()
 	
 	def upload(self, filename, dest_addr, src_addr=0):
 		# Upload an app

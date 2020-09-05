@@ -8,9 +8,10 @@ VGLDK_SERIES=4000
 
 # Only use upper memory bank?
 LOC_CODE=0x8000
-LOC_DATA=0xc000
+LOC_DATA=0xc400
 
-CART_SIZE_KB=16
+CART_SIZE_KB=8
+#CART_SIZE_KB=16
 
 include ../../tools/Makefile.mk
 

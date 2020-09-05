@@ -16,6 +16,7 @@ PYTHON3 = (sys.version_info.major == 3)
 
 
 import os
+sys.path.append(os.path.join('..', 'monitor'))
 sys.path.append(os.path.join('..', 'examples', 'monitor'))
 import monitor
 
@@ -140,8 +141,8 @@ if __name__ == '__main__':
 	comp.wait_for_monitor()
 	
 	# Disable interrupts
-	comp.write('di\n')
-	comp.wait_for_prompt()
+	#comp.write('di\n')
+	#comp.wait_for_prompt()
 	
 	# Upload app binary
 	comp.upload(filename, dest)
