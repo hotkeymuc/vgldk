@@ -4,6 +4,8 @@
 Some simple hex utils
 */
 
+//#define HEX_USE_DUMP	// Include a "real" hexdump
+
 byte hexDigit(byte c) {
 	if (c < 10)
 		return ('0'+c);

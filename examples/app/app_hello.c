@@ -26,12 +26,19 @@
 
 //void main() __naked {
 //void main() {
-int main() {
+//int main() {
+int main(int argc, char *argv[]) {
 	char c;
 	
 	printf("Hello World!\n");
 	c = getchar();
 	
+	for (c = 0; c < argc; c++) {
+		printf_d(c);
+		putchar(':');
+		printf(argv[c]);
+		putchar('\n');
+	}
 	
 	printf("Key to end");
 	c = getchar();

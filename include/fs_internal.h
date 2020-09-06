@@ -11,16 +11,20 @@ Implementation of fs.h using hard-coded data. Mainly used for testing.
 2019-07-11 Bernhard "HotKey" Slawik
 */
 
+// Internal fs disk
+
 #include "fs.h"
 
 //#define FS_INTERNAL_INCLUDE_TEST_APPS	// For testing: Include external app(s) from "loader" folder as virtual FS
 //#define FS_INTERNAL_CASE_SENSITIVE
 
+#ifndef FS_INTERNAL_DATA
+	#define FS_INTERNAL_NAME "test.txt"
+	#define FS_INTERNAL_DATA "TEST_CONTENTS of fs_internal!\nLine2\n"
+#endif
 
-// Internal fs disk
 // Define some static test files. Only for testing low-level file access.
-//const char TEST_CONTENTS[] = "This is contents of test.txt, hard-baked into the DOS code!";
-const char TEST_CONTENTS[] = "TEST_CONTENTS of fs_internal!\nLine2\n";
+const char fs_int_data[] = FS_INTERNAL_DATA;
 //const char AUTO_CMD_CONTENTS[] = "echo \"This is %TEST% auto.cmd!\"\n";
 
 #ifdef FS_INTERNAL_INCLUDE_TEST_APPS
@@ -29,16 +33,16 @@ const char TEST_CONTENTS[] = "TEST_CONTENTS of fs_internal!\nLine2\n";
 #endif
 
 const file_FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:file_FILE!
-  {
-    "test.txt", // name
-    NULL, // mode
-    NULL, // fs
-    (void*)&TEST_CONTENTS[0], // userData
-    sizeof(TEST_CONTENTS),  // size
-    0 // currentPos
-  },
-
-  /*
+	{
+		FS_INTERNAL_NAME, // name
+		NULL, // mode
+		NULL, // fs
+		(void*)&fs_int_data[0], // userData
+		sizeof(fs_int_data),  // size
+		0 // currentPos
+	},
+	
+	/*
 	{
 		"auto.cmd",
 		NULL,
@@ -47,7 +51,7 @@ const file_FILE FS_INTERNAL_FILES[] = {	// Keep in sync with file.h:file_FILE!
 		sizeof(AUTO_CMD_CONTENTS),
 		0
 	},
-  */
+	*/
 #ifdef FS_INTERNAL_INCLUDE_TEST_APPS
 	{
 		"test.app",
@@ -124,9 +128,9 @@ file_DIR *fs_int_opendir(const char *path) {
 		return NULL;
 	}
 
-  dir = &fs_int_tmpDir; //@FIXME: Using the ONE temp. dir...
-  dir->fs = &fs_internal;
-  //dir->path = path; // this can have weird behaviour
+	dir = &fs_int_tmpDir; //@FIXME: Using the ONE temp. dir...
+	dir->fs = &fs_internal;
+	//dir->path = path; // this can have weird behaviour
 	
 	dir->userData = (file_FILE *)&FS_INTERNAL_FILES[0];
 	dir->count = FS_INTERNAL_FILES_COUNT;

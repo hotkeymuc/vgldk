@@ -263,6 +263,7 @@ void lcd_scroll() {
 	
 	#if LCD_ROWS > 1
 	// Copy from row 1 to row 0
+	//@TODO: memcpy(dst, src, l)
 	p1 = &lcd_buffer[LCD_COLS];
 	for(i = 0; i < (LCD_COLS * (LCD_ROWS-1)); i++) {
 		*p0++ = *p1++;
@@ -270,6 +271,7 @@ void lcd_scroll() {
 	#endif
 	
 	// Fill last row
+	//@TODO: memset(dst, what, count)
 	for(i = 0; i < LCD_COLS; i++) {
 		*p0++ = 0x20;	// Fill with spaces
 	}

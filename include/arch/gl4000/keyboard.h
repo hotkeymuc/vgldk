@@ -46,10 +46,10 @@ __sfr __at KEYBOARD_PORT_COL_IN2 keyboard_port_matrixColIn2;
 #define KEY_ESC (char)27
 const char vgl_key_map[8*8] = {
 	KEY_TAB,	KEY_BREAK,	'e',	'f',	'g',	'i',	'j',	'k',
-	KEY_CAPS, '1', 'Q', 'A', 'Z', KEY_ALT, KEY_SPACE, KEY_INS,
+	KEY_CAPS, '1', 'Q', 'A', 'Y'/*'Z'*/, KEY_ALT, KEY_SPACE, KEY_INS,
 	'2', '3', 'E', 'S', 'D', 'X', 'C', 'W',
 	'4', '5', 'T', 'F', 'G', 'V', 'B', 'R',
-	'6', '7', 'U', 'H', 'J', 'N', 'M', 'Y',
+	'6', '7', 'U', 'H', 'J', 'N', 'M', 'Z' /*'Y'*/,
 	'8', '9', 'O', 'K', 'L', ',', '.', 'I',
 	'0', KEY_REPEAT, '=', ':' /*';'*/, '\'', '/', KEY_SHIFT, 'P',
 	'x', 'y', (char)KEY_CURSOR_LEFT, (char)KEY_CURSOR_RIGHT, KEY_ENTER, KEY_DEL, KEY_ESC, 'z',

@@ -158,10 +158,12 @@ byte strlen(const char *c) {
 }
 
 
-void memcpy(byte *src_addr, byte *dst_addr, word count) {
+void memcpy(byte *dst_addr, byte *src_addr, word count) {
 	word i;
 	byte *ps;
 	byte *pd;
+	
+	//@TODO: Use Opcode for faster copy!!!
 	ps = src_addr;
 	pd = dst_addr;
 	for (i = 0; i < count; i++) {

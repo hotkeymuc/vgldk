@@ -56,7 +56,7 @@ TODO:
 #define PB_COMMAND_END_BOOTLOADER 0x1A
 
 #define PB_COMMAND_PING 0xE0
-#define PB_COMMAND_PING_HOST 0xE1
+//#define PB_COMMAND_PING_HOST 0xE1
 
 //#define PB_COMMAND_SD_INIT 0x20
 //#define PB_COMMAND_SD_EXISTS 0x21
@@ -470,19 +470,23 @@ byte tmpFrame[PB_MAX_FRAME_SIZE];
 
 void pb_sendFrame(byte cmd, byte *v, const byte dataLen) {
 	byte *f;
-	byte l;
+	//byte l;
 	
 	f = &tmpFrame[0];
 	*f++ = 1+dataLen;	// 1=cmd, x=dataLen
 	*f++ = cmd;
 	
-	//@TODO: Use memcpy()
+	// Copy from buffer v to mem f
+	memcpy(f, v, dataLen);
+	
+	/*
 	l = dataLen;
 	while (l > 0) {
 		*f++ = *v++;
 		l--;
 	}
 	// *f = PB_TERMINATOR;
+	*/
 	pb_sendRaw(&tmpFrame[0], 1+1+dataLen);	// 1=len, 1=cmd, x=dataLen
 }
 void pb_sendByte(byte cmd, byte v) {
@@ -547,8 +551,10 @@ byte pb_receiveFrame(byte expectedCmd, byte *v, byte minDataLen, byte *dataLen) 
 		#endif
 		return PB_ERROR_LENGTH;
 	}
+	// Store actual received length back to *dataLen
 	if (dataLen != NULL) *dataLen = l;
 	
+	// Check command byte
 	c = *f++;
 	if (c != expectedCmd) {
 		#ifdef PB_DEBUG_PROTOCOL_ERRORS
@@ -560,14 +566,16 @@ byte pb_receiveFrame(byte expectedCmd, byte *v, byte minDataLen, byte *dataLen) 
 	}
 	
 	// Stuff the rest into v
+	/*
 	while(l > 0) {
 		*v++ = *f++;
 		l--;
 	}
+	*/
+	memcpy(v, f, l);
 	
 	return PB_ERROR_OK;
 }
-
 
 byte pb_receiveByte(byte *v) {
 	return pb_receiveFrame(PB_COMMAND_RETURN_BYTE, v, 1, NULL);
@@ -634,11 +642,17 @@ pb_handle pb_file_opendir(const char *path) {
 	
 	pb_sendAsciiz(PB_COMMAND_FILE_OPENDIR, (char *)path);
 	
+	// Receive handle
+	/*
+	// Stall until OK
 	while (pb_receiveByte(&h) != PB_ERROR_OK) {
 		// Delay / Timeout
 	}
-	
 	return h;
+	*/
+	
+	// Succeed or fail
+	return (pb_receiveByte(&h) == PB_ERROR_OK) ? h : PB_NO_HANDLE;
 }
 
 void pb_file_closedir(pb_handle h) {
@@ -654,52 +668,16 @@ byte pb_file_readdir(pb_handle h, char *name) {
 	//while(pb_receiveFrame(PB_COMMAND_RETURN_DATA, buf, 0, &l) == 1) {}
 	
 	// Receive name
+	/*
 	while (pb_receiveAsciiz(name) != PB_ERROR_OK) {
 		// Wait
 	}
-	
 	return PB_ERROR_OK;
+	*/
+	
+	// Succeed or fail
+	return pb_receiveAsciiz(name);
 }
-
-/*
-byte pb_sd_init() {
-	byte ok;
-	
-	pb_sendFrame(PB_COMMAND_SD_INIT, 0, 0);
-	
-	while (pb_receiveByte(&ok) != 1) {
-		// Delay / Timeout
-	}
-	
-	return ok;
-}
-
-pb_handle pb_sd_open(const char *filename, byte mode) {
-	pb_handle handle;
-	
-	//@TODO: Mount/Driver (SD, SOCK, HOST)!
-	//@TODO: Mode!
-	(void)mode;
-	
-	pb_sendAsciiz(PB_COMMAND_SD_OPEN, (char *)filename);
-	
-	while (pb_receiveByte(&handle) != 1) {
-		// Delay / Timeout
-	}
-	return handle;
-}
-
-byte pb_sd_exists(const char *filename) {
-	byte ex;
-	
-	pb_sendAsciiz(PB_COMMAND_SD_EXISTS, (byte *)filename);
-	while (pb_receiveByte(&ex) != 1) {
-		// Delay / Timeout
-	}
-	return ex;
-}
-*/
-
 
 pb_handle pb_file_open(const char *filename, const char*mode) {
 	pb_handle h;
@@ -709,10 +687,16 @@ pb_handle pb_file_open(const char *filename, const char*mode) {
 	
 	pb_sendAsciiz(PB_COMMAND_FILE_OPEN, (char *)filename);
 	
+	// Receive handle
+	/*
+	// Stall until OK
 	while (pb_receiveByte(&h) != PB_ERROR_OK) {
 		// Delay / Timeout
 	}
 	return h;
+	*/
+	// Succeed or fail
+	return (pb_receiveByte(&h) == PB_ERROR_OK) ? h : PB_NO_HANDLE;
 }
 
 void pb_file_close(byte h) {
@@ -725,10 +709,17 @@ byte pb_file_eof(pb_handle h) {
 	
 	pb_sendByte(PB_COMMAND_FILE_EOF, h);
 	
+	// Get return value
+	/*
+	// Stall until OK
 	while (pb_receiveByte(&r) != PB_ERROR_OK) {
 		// Delay / Timeout
 	}
 	return r;
+	*/
+	
+	// Succeed or fail
+	return (pb_receiveByte(&r) == PB_ERROR_OK) ? r : 1;
 }
 
 
@@ -742,11 +733,16 @@ byte pb_file_read(pb_handle h, byte *buf, byte l) {
 	data.l = l;
 	pb_sendFrame(PB_COMMAND_FILE_READ, (byte*)&data, sizeof(data));
 	
+	// Return data
+	/*
+	// Stall until OK
 	while(pb_receiveFrame(PB_COMMAND_RETURN_DATA, buf, 0, &l) != PB_ERROR_OK) {
 		// Delay / Timeout
 	}
-	
 	return l;
+	*/
+	// Succeed or fail
+	return (pb_receiveFrame(PB_COMMAND_RETURN_DATA, buf, 0, &l) == PB_ERROR_OK) ? l : 0;
 }
 
 byte pb_file_write(pb_handle h, byte *buf, byte l) {
@@ -759,10 +755,16 @@ byte pb_file_write(pb_handle h, byte *buf, byte l) {
 	//data[1] = l;
 	pb_sendFrame(PB_COMMAND_FILE_WRITE, buf, l);
 	
+	// Get bytes written
+	
+	/*
+	// Stall until OK
 	if (pb_receiveByte(&l) != PB_ERROR_OK)
 		return 0;
-	
 	return l;
+	*/
+	// Succeed or fail
+	return (pb_receiveByte(&l) == PB_ERROR_OK) ? l : 0;
 }
 
 /*
@@ -772,7 +774,7 @@ word pb_file_tell(byte handle) {
 void pb_file_seek(byte handle, word o) {
 	PB_COMMAND_FILE_SEEK
 }
-*/
+
 byte pb_file_bytesAvailable(pb_handle h) {
 	byte l;
 	//@TODO: Implement
@@ -780,10 +782,7 @@ byte pb_file_bytesAvailable(pb_handle h) {
 	
 	pb_sendByte(PB_COMMAND_FILE_AVAILABLE, h);
 	
-	if (pb_receiveByte(&l) != PB_ERROR_OK)
-		return 0;
-	
-	return l;
+	return (pb_receiveByte(&l) == PB_ERROR_OK) ? l : 0;
 }
-
+*/
 #endif 	//__PARABUDDY_H

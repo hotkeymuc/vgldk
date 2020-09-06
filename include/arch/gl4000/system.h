@@ -38,11 +38,15 @@ for use with SDCC compiler
 void vgldk_init() __naked {
 	__asm
 		di
+		
+		;; Set stack pointer directly above top of memory.
+		ld	sp, #0xdff0	; Load StackPointer to 0xdff0
 	__endasm;
 	
 	lcd_init();
 	vgl_sound_off();
 	lcd_clear();
+	
 	//main();
 	__asm
 		jp _main

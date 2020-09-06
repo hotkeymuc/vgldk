@@ -4,12 +4,12 @@
 	2020-05-19 Bernhard "HotKey" Slawik
 */
 
-#define VGLDK_VARIABLE_STDIO	// Allow changing putchar/getchar at runtime. Needed for serial I/O function
+#define VGLDK_VARIABLE_STDIO	// Allow changing putchar/getchar at runtime. Needed for serial I/O functions and app loading
 #include <vgldk.h>
 
 
-const char VERSION[] = "Monitor 1.2";
-const word tempAddr = 0xC800;
+const char VERSION[] = "Monitor 1.3";
+const word defaultAddr = 0xC800;	// Default address to load stuff to (e.g. apps)
 
 // Setup
 #define MAX_ARGS 8
@@ -27,7 +27,9 @@ char cmd_arg[MAX_INPUT];
 #define SOFTUART_BAUD 9600
 
 #define MONITOR_FILES	// Include file system stuff
-
+//#define MONITOR_FILES_FS_NULL	// Include FS driver for NULL filesystem
+#define MONITOR_FILES_FS_INTERNAL	// Include FS driver for "internal" ROM data
+//#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
 
 // Commands to include (affects how big the binary gets)
 //#define MONITOR_CMD_BEEP
@@ -35,21 +37,24 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_CMD_DUMP
 //#define MONITOR_CMD_ECHO
 //#define MONITOR_CMD_EXIT
-#define MONITOR_CMD_HELP	// Even without MONITOR_HELP, the HELP command can list all commands
-#define MONITOR_CMD_INTERRUPTS
+//#define MONITOR_CMD_HELP	// Even without MONITOR_HELP, the HELP command can list all commands
+//#define MONITOR_CMD_INTERRUPTS
 //#define MONITOR_CMD_LOOP
 #define MONITOR_CMD_PEEKPOKE
+#define MONITOR_CMD_CALL
 //#define MONITOR_CMD_PAUSE
-#define MONITOR_CMD_PORT
+//#define MONITOR_CMD_PORT
 //#define MONITOR_CMD_PAUSE
 //#define MONITOR_CMD_VER
+#define MONITOR_CMD_LOAD	// Requires MONITOR_FILES
+#define MONITOR_CMD_RUN	// Requires MONITOR_CMD_LOAD and MONITOR_CMD_CALL
 
 
 // Definitions
 #define ERR_OK 0
-#define ERR_COMMAND_UNKNOWN -4
-#define ERR_MISSING_ARGUMENT -5
-#define ERR_NOT_IMPLEMENTED -6
+#define ERR_COMMAND_UNKNOWN -2
+#define ERR_MISSING_ARGUMENT -6
+#define ERR_NOT_IMPLEMENTED -15
 
 #ifdef MONITOR_CMD_PORT
 	#include <ports.h>	// For accessing ports dynamically
@@ -146,6 +151,7 @@ typedef struct {
 
 // Shell state
 byte running;
+word lastAddr;	// temp address
 
 // Internal command implementations
 void parse(char *arg);	// Forward declaration to input parser, needed for cmd_call()
@@ -183,7 +189,7 @@ int cmd_dump(int argc, char *argv[]) {
 	char c;
 	byte l;
 	
-	a = (argc < 2) ? tempAddr : hextow(argv[1]);
+	a = (argc < 2) ? defaultAddr : hextow(argv[1]);
 	
 	l = (argc < 3) ? (4 * 1) : hextob(argv[2]);	// 4 * LCD_ROWS
 	while(a < 0xffff) {
@@ -257,7 +263,7 @@ int cmd_ei(int argc, char *argv[]) {
 	
 	return ERR_OK;
 }
-
+/*
 int cmd_ints(int argc, char *argv[]) {
 	int i;
 	(void)argc;
@@ -273,7 +279,7 @@ int cmd_ints(int argc, char *argv[]) {
 	
 	return ERR_OK;
 }
-
+*/
 #endif
 
 #ifdef MONITOR_CMD_LOOP
@@ -374,24 +380,23 @@ int cmd_poke(int argc, char *argv[]) {
 	return ERR_OK;
 }
 
-word temp;
-typedef int (t_plain_vgldkinit)(t_putchar *, t_getchar *);
-int cmd_call(int argc, char *argv[]) {
-	word a;
+#endif
+
+#ifdef MONITOR_CMD_CALL
+
+// Keep in-sync. with the app's startup (e.g. arch/plain/system.h:vgldk_init())
+//typedef int (t_plain_vgldkinit)(t_putchar *, t_getchar *);
+typedef int (t_plain_vgldkinit)(t_putchar *, t_getchar *, int argc, char *argv[]);
+
+int cmd_call_int(word addr, int argc, char *argv[]) {
 	
-	if (argc < 2) {
-		return ERR_MISSING_ARGUMENT;
-	}
-	
-	a = hextow(argv[1]);
-	temp = a;
-	
-	//@TODO: Push residual arguments on stack (argc-2, argv[2:])
+	lastAddr = addr;	// For ASM/C interoperability reasons this must be a global variable, not a stack thing.
 	
 	#ifdef VGLDK_VARIABLE_STDIO
 		// Just call it and let the compiler/linker take care of the stack
-		return (*(t_plain_vgldkinit *)temp)(p_stdout_putchar, p_stdin_getchar);
-	
+		//return (*(t_plain_vgldkinit *)lastAddr)(p_stdout_putchar, p_stdin_getchar);
+		return (*(t_plain_vgldkinit *)lastAddr)(p_stdout_putchar, p_stdin_getchar, argc, argv);
+		
 		/*
 		// Push STDIO pointers to stack
 		// Apps with plain architecture will get those as parameters.
@@ -401,11 +406,15 @@ int cmd_call(int argc, char *argv[]) {
 			push	hl
 			ld	hl, (_p_stdin_getchar)
 			push	hl
+			// argc
+			// argv
 		__endasm;
 		*/
 	#else
+	// Define this function as __naked to keep the stack (i.e. argc and argv)
+	//@TODO: Push residual arguments on stack (argc-2, argv[2:])
 	__asm
-		ld	hl, (_temp)
+		ld	hl, (_lastAddr)
 		
 		; Trickery: Use "call" to call a label that does not return. That way the "jp" magically becomes a "call"!
 		call	_call_encap	; Call but do not ret there, so PC+3 gets on stack!
@@ -417,7 +426,23 @@ int cmd_call(int argc, char *argv[]) {
 	__endasm;
 	return ERR_OK;
 	#endif
+}
+
+
+int cmd_call(int argc, char *argv[]) {
 	
+	// Determine address, use "defaultAddr" as default
+	if (argc < 2) {
+		lastAddr = defaultAddr;
+	} else {
+		lastAddr = hextow(argv[1]);
+		
+		// Un-shift the address
+		argc--;
+		argv = &argv[1];
+	}
+	
+	return cmd_call_int(lastAddr, argc, argv);
 }
 #endif
 
@@ -482,312 +507,411 @@ int cmd_ver(int argc, char *argv[]) {
 
 // Commands for additional functions
 #ifdef MONITOR_FILES
-
-// File systems
-//#include <fs_null.h>
-//#include <fs_internal.h>
-
-//#define PB_USE_MAME	// For testing in MAME
-//#define PB_USE_SOFTSERIAL	// For running on real hardware
-#define PB_USE_SOFTUART	// For running on real hardware
-//#define PB_DEBUG_FRAMES
-//#define PB_DEBUG_PROTOCOL_ERRORS
-#include <parabuddy.h>
-#include <fs_parabuddy.h>
-
-// Define roots for the root filesystem
-#define FS_ROOT_MOUNTS {\
-	/*{"nul",	&fs_null},*/		\
-	/*{"int",	&fs_internal},*/	\
-	{"pb",	&fs_parabuddy},	\
-}
-
-#include <fs_root.h>
-
-//#define FILEIO_ROOT_FS fs_internal
-#define FILEIO_ROOT_FS fs_root
-#include <fileio.h>
-
-
-int cmd_files_cd(int argc, char *argv[]) {
 	
-	if (argc < 2) {
-		// Show CWD
-		puts(cwd);
-		putchar('\n');
+	#define FILES_BUF_SIZE 32
+	
+	// File systems
+	#ifdef MONITOR_FILES_FS_NULL
+		#include <fs_null.h>
+	#endif
+	
+	#ifdef MONITOR_FILES_FS_INTERNAL
+		#include "../app/out/app_hello.app.0xc800.bin.h"
+		#define FS_INTERNAL_NAME "hello"
+		#define FS_INTERNAL_DATA APP_HELLO_DATA
+		#include <fs_internal.h>
+	#endif
+	
+	#ifdef MONITOR_FILES_FS_PARABUDDY
+		//#define PB_USE_MAME	// For testing in MAME
+		//#define PB_USE_SOFTSERIAL	// For running on real hardware
+		#define PB_USE_SOFTUART	// For running on real hardware
+		//#define PB_DEBUG_FRAMES
+		//#define PB_DEBUG_PROTOCOL_ERRORS
+		#include <parabuddy.h>
+		#include <fs_parabuddy.h>
+	#endif
+	
+	// Define mounts for the root filesystem (automatically)
+	#ifdef __FS_NULL_H
+	  #define FS_ROOT_MOUNT__NUL {"nul", &fs_null},
+	#else
+	  #define FS_ROOT_MOUNT__NUL
+	#endif
+	#ifdef __FS_INTERNAL_H
+	  #define FS_ROOT_MOUNT__INT  {"int", &fs_internal},
+	#else
+	  #define FS_ROOT_MOUNT__INT
+	#endif
+	#ifdef __FS_PARABUDDY_H
+	  #define FS_ROOT_MOUNT__PB  {"pb", &fs_parabuddy},
+	#else
+	  #define FS_ROOT_MOUNT__PB
+	#endif
+	
+	#define FS_ROOT_MOUNTS {\
+	  FS_ROOT_MOUNT__NUL \
+	  FS_ROOT_MOUNT__INT \
+	  FS_ROOT_MOUNT__PB  \
+	}
+	#include <fs_root.h>
+	
+	// Specify which FS to use as root
+	//#define FILEIO_ROOT_FS fs_internal
+	#define FILEIO_ROOT_FS fs_root
+	#include <fileio.h>
+	
+	int cmd_files_cd(int argc, char *argv[]) {
+		
+		if (argc < 2) {
+			/*
+			// Show CWD
+			puts(cwd);
+			putchar('\n');
+			return ERR_OK;
+			*/
+			return ERR_MISSING_ARGUMENT;
+		}
+		
+		// Change directory
+		absPath(argv[1], cwd);	// Overwrite in-place (risky!)
 		return ERR_OK;
 	}
 	
-	// Change directory
-	absPath(argv[1], cwd);	// Overwrite in-place (risky!)
-	return ERR_OK;
-}
-
-int cmd_files_ls(int argc, char *argv[]) {
-	(void) argc; (void) argv;
-	
-	file_DIR *dir;
-	dirent *de;
-	
-	dir = opendir(cwd);
-	if (dir == NULL) return errno;
-	
-	while (de = readdir(dir)) {
-		printf((char *)de->name);
-		putchar(' ');
-		//printf_d(de->size);
-		//putchar('\n');
+	int cmd_files_ls(int argc, char *argv[]) {
+		(void) argc; (void) argv;
+		
+		file_DIR *dir;
+		dirent *de;
+		
+		dir = opendir(cwd);
+		if (dir == NULL) return errno;
+		
+		while (de = readdir(dir)) {
+			printf((char *)de->name);
+			putchar(' ');
+			//printf_d(de->size);
+			//putchar('\n');
+		}
+		putchar('\n');
+		closedir(dir);
+		
+		return ERR_OK;
 	}
-	putchar('\n');
-	closedir(dir);
-	
-	return ERR_OK;
-}
 
-#define FILES_BUF_SIZE 32
-int cmd_files_cat(int argc, char *argv[]) {
-	file_FILE *f;
-	size_t l;
-	char buf[FILES_BUF_SIZE];
-	
-	if (argc < 2) return ERR_MISSING_ARGUMENT;
-	
-	// Open file
-	f = fopen(argv[1], "r");
-	if (f == NULL) return errno;
-	
-	// Read file buffer-by-buffer
-	//while(feof(f) == 0) {
-	do {
-		l = fread(&buf[0], 1, FILES_BUF_SIZE-1, f);
-		buf[l] = '\0';	// Terminate string
-		if (l > 0)
-			printf(buf);
-	} while (l > 0);
-	fclose(f);
-	//putchar('\n');	// final LF?
-	
-	return ERR_OK;
-}
-
-
-//#include "driver/mame.h"
-/*
-int cmd_files_iotest(int argc, char *argv[]) {
-	(void) argc; (void) argv;
-	
-	if (argc < 2) {
-		#ifdef __MAME_H
-		printf_x2(mame_getchar());
-		#endif
-	} else {
-		#ifdef __MAME_H
-		mame_put(argv[1], strlen(argv[1]));
-		#endif
+	int cmd_files_cat(int argc, char *argv[]) {
+		file_FILE *f;
+		size_t l;
+		char buf[FILES_BUF_SIZE];
+		
+		if (argc < 2) return ERR_MISSING_ARGUMENT;
+		
+		// Open file
+		f = fopen(argv[1], "r");
+		if (f == NULL) return errno;
+		
+		// Read file buffer-by-buffer
+		//while(feof(f) == 0) {
+		do {
+			l = fread(&buf[0], 1, FILES_BUF_SIZE-1, f);
+			if (l > 0) {
+				buf[l] = '\0';	// Terminate string
+				printf(buf);
+			}
+		} while (l > 0);
+		fclose(f);
+		//putchar('\n');	// final LF?
+		
+		return ERR_OK;
 	}
 	
-	return ERR_OK;
-}
-*/
+	
+	#ifdef MONITOR_CMD_LOAD
+	int cmd_files_load_int(char *filename, word addr) {
+		file_FILE *f;
+		size_t l;
+		char buf[FILES_BUF_SIZE];
+		byte *pp;
+		
+		// Open file
+		f = fopen(filename, "r");
+		if (f == NULL) return errno;
+		
+		// Read file buffer-by-buffer
+		pp = (byte *)addr;
+		while(1) {
+			l = fread(&buf[0], 1, FILES_BUF_SIZE, f);
+			if (l <= 0) break;
+			
+			// Copy from buffer to mem
+			memcpy(pp, &buf[0], l);
+			pp += l;
+			
+		}
+		fclose(f);
+		
+		// Display stats
+		//printf_d((word)pp - a); printf(" to "); printf_x4(a); putchar('\n');
+		printf_x4(addr); putchar('-'); printf_x4((word)pp); putchar('\n');
+		
+		return ERR_OK;
+	}
+	
+	int cmd_files_load(int argc, char *argv[]) {
+		
+		if (argc < 2) return ERR_MISSING_ARGUMENT;
+		
+		// Determine destination address (if given)
+		if (argc > 2)
+			lastAddr = hextow(argv[2]);	// Use arg
+		else
+			lastAddr = defaultAddr;	// Use defaultAddr
+		
+		return cmd_files_load_int(argv[1], lastAddr);
+	}
+	#endif
+	
+	#ifdef MONITOR_CMD_RUN
+	int cmd_files_run(int argc, char *argv[]) {
+		
+		if (argc < 2) return ERR_MISSING_ARGUMENT;
+		
+		// Determine destination address
+		lastAddr = defaultAddr;
+		
+		// Load file
+		cmd_files_load_int(argv[1], lastAddr);	// Restrict to two args: argv[0]=RUN argv[1]=filename
+		
+		// ...and call
+		//return cmd_call(argc-1, &argv[1]);
+		return cmd_call_int(lastAddr, argc-1, &argv[1]);	// Unshift by one (filename becomes command name)
+	}
+	#endif
+
+	//#include "driver/mame.h"
+	/*
+	int cmd_files_iotest(int argc, char *argv[]) {
+		(void) argc; (void) argv;
+		
+		if (argc < 2) {
+			#ifdef __MAME_H
+			printf_x2(mame_getchar());
+			#endif
+		} else {
+			#ifdef __MAME_H
+			mame_put(argv[1], strlen(argv[1]));
+			#endif
+		}
+		
+		return ERR_OK;
+	}
+	*/
 #endif
 
 
 #ifdef MONITOR_SERIAL
-
-#ifdef MONITOR_SERIAL_USE_SOFTSERIAL
-	// Use old (but trusted) arch specific ASM based softserial
-	#include <softserial.h>
-#endif
-
-#ifdef MONITOR_SERIAL_USE_SOFTUART
-	// Use C softuart
-	#include "driver/softuart.h"
-
-	// Make softuart compatible with softserial
-	#define serial_getchar_nonblocking softuart_receiveByte
-	#define serial_putchar softuart_sendByte
-	char serial_getchar() {
+	
+	#ifdef MONITOR_SERIAL_USE_SOFTSERIAL
+		// Use old (but trusted) arch specific ASM based softserial
+		#include <softserial.h>
+	#endif
+	
+	#ifdef MONITOR_SERIAL_USE_SOFTUART
+		// Use C softuart
+		#include "driver/softuart.h"
+		
+		// Make softuart compatible with softserial
+		#define serial_getchar_nonblocking softuart_receiveByte
+		#define serial_putchar softuart_sendByte
+		char serial_getchar() {
+			int c;
+			c = -1;
+			while (c < 0) {
+				c = serial_getchar_nonblocking();
+			}
+			return c;
+		}
+		word serial_gets(char *buffer) {
+			char *pb;
+			int c;
+			
+			pb = buffer;
+			do {
+				c = serial_getchar();
+				if (c == 10) break;
+				*pb++ = c;
+			} while(c != 10);
+			
+			*pb++ = 0;	// Terminate
+			return (word)pb - (word)buffer;	// Return L
+		}
+		void serial_puts(char *buffer) {
+			char *pb;
+			pb = buffer;
+			while (*pb != 0) {
+				serial_putchar(*pb++);
+			}
+		}
+	#endif
+	
+	/*
+	int cmd_serial_test(int argc, char *argv[]) {
+		int c = 0;
+		
+		(void)argc;
+		(void)argv;
+		
+		c = serial_isReady();
+		printf("isReady=");
+		printf_x2(c);
+		printf("\n");
+		
+		return ERR_OK;
+	}
+	*/
+	
+	#ifdef VGLDK_VARIABLE_STDIO
+	// Allow switching STDIO to serial (onl available when built with VARIABLE_STDIO)
+	int cmd_serial_io(int argc, char *argv[]) {
+		(void)argc;
+		(void)argv;
+		
+		if (p_stdout_putchar != (t_putchar *)&serial_putchar) {
+			// Use serial as stdio
+			p_stdout_putchar = (t_putchar *)&serial_putchar;
+			p_stdin_getchar = (t_getchar *)&serial_getchar;
+			
+			//p_stdin_gets = (t_gets *)&serial_gets;
+			//p_stdin_inkey = (t_inkey *)&serial_inkey;
+			
+			stdio_echo = 0;	// Serial works better without gets echo
+		} else {
+			// Back to normal
+			stdio_init();
+		}
+		
+		/*
+		while(1) {
+			serial_gets(cmd_arg);
+			parse(cmd_arg);
+		}
+		*/
+		return ERR_OK;
+	}
+	#endif
+	
+	int cmd_serial_get(int argc, char *argv[]) {
 		int c;
+		
+		(void)argc;
+		(void)argv;
+		
+		//c = serial_getchar();
 		c = -1;
 		while (c < 0) {
 			c = serial_getchar_nonblocking();
+			//printf_d(c);
 		}
-		return c;
-	}
-	word serial_gets(char *buffer) {
-		char *pb;
-		int c;
 		
-		pb = buffer;
-		do {
-			c = serial_getchar();
-			if (c == 10) break;
-			*pb++ = c;
-		} while(c != 10);
+		printf_x2(c);
 		
-		*pb++ = 0;	// Terminate
-		return (word)pb - (word)buffer;	// Return L
+		return ERR_OK;
 	}
-	void serial_puts(char *buffer) {
-		char *pb;
-		pb = buffer;
-		while (*pb != 0) {
-			serial_putchar(*pb++);
+	int cmd_serial_gets(int argc, char *argv[]) {
+		char *buffer;
+		
+		(void)argc;
+		(void)argv;
+		
+		buffer = &cmd_arg[0];
+		serial_gets(buffer);
+		printf(buffer);
+		
+		return ERR_OK;
+	}
+	int cmd_serial_put(int argc, char *argv[]) {
+		int i;
+		
+		for(i = 1; i < argc; i++) {
+			if (i > 1) serial_putchar(' ');
+			serial_puts(argv[i]);
 		}
+		//printf("\n");
+		return ERR_OK;
 	}
-#endif
-
-/*
-int cmd_serial_test(int argc, char *argv[]) {
-	int c = 0;
-	
-	(void)argc;
-	(void)argv;
-	
-	c = serial_isReady();
-	printf("isReady=");
-	printf_x2(c);
-	printf("\n");
-	
-	return ERR_OK;
-}
-*/
-
-#ifdef VGLDK_VARIABLE_STDIO
-// Allow switching STDIO to serial (onl available when built with VARIABLE_STDIO)
-int cmd_serial_io(int argc, char *argv[]) {
-	(void)argc;
-	(void)argv;
-	
-	if (p_stdout_putchar != (t_putchar *)&serial_putchar) {
-		// Use serial as stdio
-		p_stdout_putchar = (t_putchar *)&serial_putchar;
-		p_stdin_getchar = (t_getchar *)&serial_getchar;
-		
-		//p_stdin_gets = (t_gets *)&serial_gets;
-		//p_stdin_inkey = (t_inkey *)&serial_inkey;
-		
-		stdio_echo = 0;	// Serial works better without gets echo
-	} else {
-		// Back to normal
-		stdio_init();
-	}
-	
-	/*
-	while(1) {
-		serial_gets(cmd_arg);
-		parse(cmd_arg);
-	}
-	*/
-	return ERR_OK;
-}
-#endif
-
-int cmd_serial_get(int argc, char *argv[]) {
-	int c;
-	
-	(void)argc;
-	(void)argv;
-	
-	//c = serial_getchar();
-	c = -1;
-	while (c < 0) {
-		c = serial_getchar_nonblocking();
-		//printf_d(c);
-	}
-	
-	printf_x2(c);
-	
-	return ERR_OK;
-}
-int cmd_serial_gets(int argc, char *argv[]) {
-	char *buffer;
-	
-	(void)argc;
-	(void)argv;
-	
-	buffer = &cmd_arg[0];
-	serial_gets(buffer);
-	printf(buffer);
-	
-	return ERR_OK;
-}
-int cmd_serial_put(int argc, char *argv[]) {
-	int i;
-	
-	for(i = 1; i < argc; i++) {
-		if (i > 1) serial_putchar(' ');
-		serial_puts(argv[i]);
-	}
-	//printf("\n");
-	return ERR_OK;
-}
 #endif
 
 
 // List of internal calls
 const t_commandEntry COMMANDS[] = {
 	#ifdef MONITOR_CMD_BEEP
-	T_COMMAND_ENTRY("beep", cmd_beep, "Make sound"),
+		T_COMMAND_ENTRY("beep", cmd_beep, "Make sound"),
 	#endif
 	#ifdef MONITOR_CMD_CLS
-	T_COMMAND_ENTRY("cls"  , cmd_cls, "Clear screen"),
+		T_COMMAND_ENTRY("cls"  , cmd_cls, "Clear screen"),
 	#endif
 	#ifdef MONITOR_CMD_DUMP
-	T_COMMAND_ENTRY("dump" , cmd_dump, "Hex dump"),
+		T_COMMAND_ENTRY("dump" , cmd_dump, "Hex dump"),
 	#endif
 	#ifdef MONITOR_CMD_ECHO
-	T_COMMAND_ENTRY("echo" , cmd_echo, "Display text"),
+		T_COMMAND_ENTRY("echo" , cmd_echo, "Display text"),
 	#endif
 	#ifdef MONITOR_CMD_EXIT
-	T_COMMAND_ENTRY("exit" , cmd_exit, "End session"),
+		T_COMMAND_ENTRY("exit" , cmd_exit, "End session"),
 	#endif
 	#ifdef MONITOR_CMD_HELP
-	T_COMMAND_ENTRY("help" , cmd_help, "List cmds, explain"),
+		T_COMMAND_ENTRY("help" , cmd_help, "List cmds, explain"),
 	#endif
 	#ifdef MONITOR_CMD_INTERRUPTS
-	T_COMMAND_ENTRY("di" , cmd_di, "Disable interrupts"),
-	T_COMMAND_ENTRY("ei" , cmd_ei, "Enable interrupts"),
-	T_COMMAND_ENTRY("ints" , cmd_ints, "Let ints happen"),
+		T_COMMAND_ENTRY("di" , cmd_di, "Disable interrupts"),
+		T_COMMAND_ENTRY("ei" , cmd_ei, "Enable interrupts"),
+		//T_COMMAND_ENTRY("ints" , cmd_ints, "Let ints happen"),
 	#endif
 	#ifdef MONITOR_CMD_LOOP
-	T_COMMAND_ENTRY("loop" , cmd_loop, "Run command in loop"),
+		T_COMMAND_ENTRY("loop" , cmd_loop, "Run command in loop"),
 	#endif
 	#ifdef MONITOR_CMD_PORT
-	T_COMMAND_ENTRY("in" , cmd_in, "Read port"),
-	T_COMMAND_ENTRY("out" , cmd_out, "Output to port"),
+		T_COMMAND_ENTRY("in" , cmd_in, "Read port"),
+		T_COMMAND_ENTRY("out" , cmd_out, "Output to port"),
 	#endif
-	
 	#ifdef MONITOR_CMD_PAUSE
-	T_COMMAND_ENTRY("pause", cmd_pause, "Wait for key"),
+		T_COMMAND_ENTRY("pause", cmd_pause, "Wait for key"),
 	#endif
 	#ifdef MONITOR_CMD_PEEKPOKE
-	T_COMMAND_ENTRY("peek", cmd_peek, "View mem"),
-	T_COMMAND_ENTRY("poke", cmd_poke, "Modfiy mem"),
-	T_COMMAND_ENTRY("call", cmd_call, "Call mem"),
+		T_COMMAND_ENTRY("peek", cmd_peek, "View mem"),
+		T_COMMAND_ENTRY("poke", cmd_poke, "Modfiy mem"),
+	#endif
+	#ifdef MONITOR_CMD_CALL
+		T_COMMAND_ENTRY("call", cmd_call, "Call mem"),
 	#endif
 	#ifdef MONITOR_CMD_VER
-	T_COMMAND_ENTRY("ver"  , cmd_ver, "Version"),
+		T_COMMAND_ENTRY("ver"  , cmd_ver, "Version"),
 	#endif
 	
 	
 	// Additional features
 	#ifdef MONITOR_FILES
-	T_COMMAND_ENTRY("cd", cmd_files_cd, "Change dir"),
-	T_COMMAND_ENTRY("ls", cmd_files_ls, "Show entries"),
-	T_COMMAND_ENTRY("cat", cmd_files_cat, "List file"),
-	//T_COMMAND_ENTRY("iotest", cmd_files_iotest, "IO test"),
+		T_COMMAND_ENTRY("cd", cmd_files_cd, "Change dir"),
+		T_COMMAND_ENTRY("ls", cmd_files_ls, "Show entries"),
+		T_COMMAND_ENTRY("cat", cmd_files_cat, "List file"),
+		//T_COMMAND_ENTRY("iotest", cmd_files_iotest, "IO test"),
+		#ifdef MONITOR_CMD_LOAD
+			T_COMMAND_ENTRY("load", cmd_files_load, "Load file to addr"),
+		#endif
+		#ifdef MONITOR_CMD_RUN
+			T_COMMAND_ENTRY("run", cmd_files_run, "Load & Call"),
+		#endif
 	#endif
 	
 	
 	#ifdef MONITOR_SERIAL
-	//T_COMMAND_ENTRY("stest", cmd_serial_test, "Serial test"),
-	#ifdef VGLDK_VARIABLE_STDIO
-	T_COMMAND_ENTRY("sio", cmd_serial_io, "Switch STDIO to serial"),
-	#endif
-	T_COMMAND_ENTRY("sget", cmd_serial_get, "Serial get"),
-	T_COMMAND_ENTRY("sgets", cmd_serial_gets, "Serial gets"),
-	T_COMMAND_ENTRY("sput", cmd_serial_put, "Serial put"),
+		//T_COMMAND_ENTRY("stest", cmd_serial_test, "Serial test"),
+		#ifdef VGLDK_VARIABLE_STDIO
+			T_COMMAND_ENTRY("sio", cmd_serial_io, "Switch STDIO to serial"),
+		#endif
+		T_COMMAND_ENTRY("sget", cmd_serial_get, "Serial get"),
+		T_COMMAND_ENTRY("sgets", cmd_serial_gets, "Serial gets"),
+		T_COMMAND_ENTRY("sput", cmd_serial_put, "Serial put"),
 	#endif
 
 };
@@ -1049,19 +1173,19 @@ void main() __naked {
 		// If serial cable is connected: Ask for which I/O to use
 		
 		#ifdef VGLDK_VARIABLE_STDIO
-		printf("CR to activate\n");
-		serial_puts("CR to activate\n");
+		printf("Press CR\n");
+		serial_puts("Press CR\n");
 		
 		while(1) {
 			c = serial_getchar_nonblocking();
 			if ((c == 10) || (c == 13)) {
-				printf("Serial mode\n");
+				printf("Serial\n");
 				cmd_serial_io(0, NULL);
 				break;
 			}
 			c = keyboard_inkey();
 			if ((c == 10) || (c == 13)) {
-				printf("OK\n");
+				printf("Term\n");
 				break;
 			}
 		}
@@ -1101,9 +1225,8 @@ void main() __naked {
 	}
 	// Exited...
 	
-	printf("Bye!");
+	//printf("Bye!");
 	
 	// Off into the abyss...
-	
 	
 }

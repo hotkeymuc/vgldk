@@ -1,5 +1,5 @@
-#ifndef __FS_BUSBUDDY_H
-#define __FS_BUSBUDDY_H
+#ifndef __FS_PARABUDDY_H
+#define __FS_PARABUDDY_H
 
 /*
 
@@ -64,25 +64,7 @@ void fs_pb_mount(const char *options) {
 	
 	fs_pb_mounted = 0;
 	
-	/*
-	// Init ParallelBuddy
-	//printf("bf_init()...");
-	//bf_init();	// This might crash the emulation
-	//printf("OK\n");
-	
-	// Init SD card via BusBuddy
-	puts("sd_init()...");
-	ok = pb_sd_init();
-	if (ok == 1) {
-		puts("OK\n");
-		fs_pb_mounted = 1;
-		
-	} else {
-		//printf("failed %d.\n", ok);
-		puts("failed "); printf_d(ok); putchar('\n');
-		fs_pb_mounted = 0;
-	}
-	*/
+	//@TODO: PING ParallelBuddy
 }
 
 

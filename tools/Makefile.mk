@@ -180,6 +180,7 @@ MINIPRO = minipro
 #REL2APP = python $(TOOLS_DIR)/rel2app.py
 SEND2MONITOR = python3 $(TOOLS_DIR)/send2monitor.py
 CALCSIZE = python $(TOOLS_DIR)/calcsize.py
+BIN2H = python $(TOOLS_DIR)/bin2h.py
 
 # Targets
 .PHONY: info clean emu burn
@@ -215,6 +216,8 @@ app:: info $(OUTPUT_FILE_APP)
 	@#$(REL2APP) $(OUTPUT_FILE_REL)
 	@#$(REL2APP) $(OUT_DIR)/$(NAME)
 	@echo App file $(OUTPUT_FILE_APP) was created.
+	$(BIN2H) $(OUTPUT_FILE_APP) $(OUTPUT_FILE_APP).h
+	@echo App.h file $(OUTPUT_FILE_APP).h was created.
 	@$(CALCSIZE) $(OUTPUT_FILE_APP)
 
 
