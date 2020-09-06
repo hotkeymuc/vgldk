@@ -12,7 +12,7 @@ VTech Genius Leader Keyboard
 
 
 // BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
-// This also makes the parallel port wiggle, so it might interfere with serial/parallel communication!
+// This also makes the parallel port wiggle, so it interferes with serial/parallel communication!
 #define KEYBOARD_LATCH
 
 // Ports

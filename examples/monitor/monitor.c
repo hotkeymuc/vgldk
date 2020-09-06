@@ -8,7 +8,7 @@
 #include <vgldk.h>
 
 
-const char VERSION[] = "Monitor 1.3";
+const char VERSION[] = "Monitor 1.4";
 const word defaultAddr = 0xC800;	// Default address to load stuff to (e.g. apps)
 
 // Setup
@@ -18,7 +18,7 @@ char cmd_arg[MAX_INPUT];
 
 
 // Features to include (affects how big the binary gets)
-//#define MONITOR_HELP	// Include "long" help functionality (needs quite some space for the strings...)
+//#define MONITOR_HELP_LONG	// Include "long" help functionality (needs quite some space for the strings...)
 
 #define MONITOR_SERIAL	// Include serial functions
 #define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart
@@ -28,8 +28,8 @@ char cmd_arg[MAX_INPUT];
 
 #define MONITOR_FILES	// Include file system stuff
 //#define MONITOR_FILES_FS_NULL	// Include FS driver for NULL filesystem
-#define MONITOR_FILES_FS_INTERNAL	// Include FS driver for "internal" ROM data
-//#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
+//#define MONITOR_FILES_FS_INTERNAL	// Include FS driver for "internal" ROM data
+#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
 
 // Commands to include (affects how big the binary gets)
 //#define MONITOR_CMD_BEEP
@@ -37,15 +37,15 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_CMD_DUMP
 //#define MONITOR_CMD_ECHO
 //#define MONITOR_CMD_EXIT
-//#define MONITOR_CMD_HELP	// Even without MONITOR_HELP, the HELP command can list all commands
+#define MONITOR_CMD_HELP	// Even without MONITOR_HELP_LONG, the HELP command can list all commands
 //#define MONITOR_CMD_INTERRUPTS
 //#define MONITOR_CMD_LOOP
-#define MONITOR_CMD_PEEKPOKE
+#define MONITOR_CMD_PEEKPOKE	// Required for uploading via serial
 #define MONITOR_CMD_CALL
 //#define MONITOR_CMD_PAUSE
 //#define MONITOR_CMD_PORT
 //#define MONITOR_CMD_PAUSE
-//#define MONITOR_CMD_VER
+//#define MONITOR_CMD_VER	// ~54 bytes
 #define MONITOR_CMD_LOAD	// Requires MONITOR_FILES
 #define MONITOR_CMD_RUN	// Requires MONITOR_CMD_LOAD and MONITOR_CMD_CALL
 
@@ -135,13 +135,13 @@ typedef struct {
 	const char *name;
 	t_commandCall call;
 	
-	#ifdef MONITOR_HELP
+	#ifdef MONITOR_HELP_LONG
 	const char *help;
 	#endif
 	
 } t_commandEntry;
 
-#ifdef MONITOR_HELP
+#ifdef MONITOR_HELP_LONG
 	// Include help string
 	#define T_COMMAND_ENTRY(n, c, h) {n, c, h}
 #else
@@ -154,8 +154,8 @@ byte running;
 word lastAddr;	// temp address
 
 // Internal command implementations
-void parse(char *arg);	// Forward declaration to input parser, needed for cmd_call()
-int eval(int argc, char *argv[]);	// Forward declaration to input parser, needed for cmd_call()
+void parse(char *arg);	// Forward declaration to input parser, needed for batch functionality
+int eval(int argc, char *argv[]);	// Forward declaration to input parser, needed for batch functions
 
 
 #ifdef MONITOR_CMD_BEEP
@@ -164,9 +164,7 @@ int cmd_beep(int argc, char *argv[]) {
 	if (argc <= 1) {
 		beep();
 	} else {
-		
 		vgl_sound_note(atoi(argv[1]), (argc > 2) ? atoi(argv[2]) : 500);
-		
 	}
 	return ERR_OK;
 }
@@ -183,7 +181,6 @@ int cmd_cls(int argc, char *argv[]) {
 #endif
 
 #ifdef MONITOR_CMD_DUMP
-
 int cmd_dump(int argc, char *argv[]) {
 	word a;
 	char c;
@@ -263,23 +260,6 @@ int cmd_ei(int argc, char *argv[]) {
 	
 	return ERR_OK;
 }
-/*
-int cmd_ints(int argc, char *argv[]) {
-	int i;
-	(void)argc;
-	(void)argv;
-	
-	cmd_ei(0, NULL);
-	for(i = 0; i < 0x80; i++) {
-		__asm
-			nop
-		__endasm;
-	}
-	cmd_di(0, NULL);
-	
-	return ERR_OK;
-}
-*/
 #endif
 
 #ifdef MONITOR_CMD_LOOP
@@ -290,7 +270,6 @@ int cmd_loop(int argc, char *argv[]) {
 		
 		eval(argc-1, &argv[1]);
 		
-		
 		//c = inkey();
 		c = getchar();
 		
@@ -298,10 +277,7 @@ int cmd_loop(int argc, char *argv[]) {
 		#ifdef KEY_ESCAPE
 		if (c == KEY_ESCAPE) break;
 		#endif
-		
-		
 	}
-	
 	return ERR_OK;
 }
 #endif
@@ -346,7 +322,6 @@ int cmd_peek(int argc, char *argv[]) {
 		
 	} else {
 		// Peek one (pretty)
-		
 		v = *((byte *)a);
 		printf_byte_pretty(v);
 	}
@@ -355,20 +330,17 @@ int cmd_peek(int argc, char *argv[]) {
 	
 	return ERR_OK;
 }
+
 int cmd_poke(int argc, char *argv[]) {
 	word a;
 	byte v;
 	byte *b;
 	
-	if (argc < 3) {
-		return ERR_MISSING_ARGUMENT;
-	}
+	if (argc < 3) return ERR_MISSING_ARGUMENT;
 	
 	a = hextow(argv[1]);
-	//v = hextow(argv[2]);
-	//*((byte *)a) = v;
 	
-	// Allow multiple
+	// Allow poking multiple values
 	b = argv[2];
 	do {
 		v = hextob(b);
@@ -384,13 +356,13 @@ int cmd_poke(int argc, char *argv[]) {
 
 #ifdef MONITOR_CMD_CALL
 
-// Keep in-sync. with the app's startup (e.g. arch/plain/system.h:vgldk_init())
+// Keep this declaration in-sync. with the app's startup (e.g. arch/plain/system.h:vgldk_init())
 //typedef int (t_plain_vgldkinit)(t_putchar *, t_getchar *);
 typedef int (t_plain_vgldkinit)(t_putchar *, t_getchar *, int argc, char *argv[]);
 
 int cmd_call_int(word addr, int argc, char *argv[]) {
 	
-	lastAddr = addr;	// For ASM/C interoperability reasons this must be a global variable, not a stack thing.
+	lastAddr = addr;	// For ASM/C interoperability reasons this must be a global variable, not a value on stack
 	
 	#ifdef VGLDK_VARIABLE_STDIO
 		// Just call it and let the compiler/linker take care of the stack
@@ -532,7 +504,7 @@ int cmd_ver(int argc, char *argv[]) {
 		#include <fs_parabuddy.h>
 	#endif
 	
-	// Define mounts for the root filesystem (automatically)
+	// Define mounts for the root filesystem (automatically, as macros)
 	#ifdef __FS_NULL_H
 	  #define FS_ROOT_MOUNT__NUL {"nul", &fs_null},
 	#else
@@ -549,14 +521,15 @@ int cmd_ver(int argc, char *argv[]) {
 	  #define FS_ROOT_MOUNT__PB
 	#endif
 	
+	// Create the full list of available file system mounts
 	#define FS_ROOT_MOUNTS {\
-	  FS_ROOT_MOUNT__NUL \
-	  FS_ROOT_MOUNT__INT \
-	  FS_ROOT_MOUNT__PB  \
+		FS_ROOT_MOUNT__NUL \
+		FS_ROOT_MOUNT__INT \
+		FS_ROOT_MOUNT__PB  \
 	}
 	#include <fs_root.h>
 	
-	// Specify which FS to use as root
+	// Specify which FS to use as the root (usually fs_root, but can be fs_int to save space)
 	//#define FILEIO_ROOT_FS fs_internal
 	#define FILEIO_ROOT_FS fs_root
 	#include <fileio.h>
@@ -598,7 +571,7 @@ int cmd_ver(int argc, char *argv[]) {
 		
 		return ERR_OK;
 	}
-
+	
 	int cmd_files_cat(int argc, char *argv[]) {
 		file_FILE *f;
 		size_t l;
@@ -650,11 +623,16 @@ int cmd_ver(int argc, char *argv[]) {
 		}
 		fclose(f);
 		
+		/*
 		// Display stats
-		//printf_d((word)pp - a); printf(" to "); printf_x4(a); putchar('\n');
-		printf_x4(addr); putchar('-'); printf_x4((word)pp); putchar('\n');
+		printf_x4(addr);
+		putchar('-');
+		printf_x4((word)pp);
+		putchar('\n');
+		*/
 		
-		return ERR_OK;
+		// Return length
+		return (int)((word)pp - addr);
 	}
 	
 	int cmd_files_load(int argc, char *argv[]) {
@@ -667,12 +645,14 @@ int cmd_ver(int argc, char *argv[]) {
 		else
 			lastAddr = defaultAddr;	// Use defaultAddr
 		
+		// Continue with the actual implementation
 		return cmd_files_load_int(argv[1], lastAddr);
 	}
 	#endif
 	
 	#ifdef MONITOR_CMD_RUN
 	int cmd_files_run(int argc, char *argv[]) {
+		int l;
 		
 		if (argc < 2) return ERR_MISSING_ARGUMENT;
 		
@@ -680,14 +660,22 @@ int cmd_ver(int argc, char *argv[]) {
 		lastAddr = defaultAddr;
 		
 		// Load file
-		cmd_files_load_int(argv[1], lastAddr);	// Restrict to two args: argv[0]=RUN argv[1]=filename
+		l = cmd_files_load_int(argv[1], lastAddr);	// Restrict to two args: argv[0]=RUN argv[1]=filename
+		if (l < 0)
+			return l;
+		/*
+		// Display stats
+		printf_x4(lastAddr);
+		putchar('-');
+		printf_x4((word)lastAddr + l);
+		putchar('\n');
+		*/
 		
-		// ...and call
-		//return cmd_call(argc-1, &argv[1]);
-		return cmd_call_int(lastAddr, argc-1, &argv[1]);	// Unshift by one (filename becomes command name)
+		// ...and call using the actual implementation
+		return cmd_call_int(lastAddr, argc-1, &argv[1]);	// Unshift args by one (filename becomes command name)
 	}
 	#endif
-
+	
 	//#include "driver/mame.h"
 	/*
 	int cmd_files_iotest(int argc, char *argv[]) {
@@ -717,7 +705,7 @@ int cmd_ver(int argc, char *argv[]) {
 	#endif
 	
 	#ifdef MONITOR_SERIAL_USE_SOFTUART
-		// Use C softuart
+		// Use the C bases "Soft UART"
 		#include "driver/softuart.h"
 		
 		// Make softuart compatible with softserial
@@ -771,7 +759,7 @@ int cmd_ver(int argc, char *argv[]) {
 	*/
 	
 	#ifdef VGLDK_VARIABLE_STDIO
-	// Allow switching STDIO to serial (onl available when built with VARIABLE_STDIO)
+	// Allow switching STDIO to serial (onl available when built with VGLDK_VARIABLE_STDIO)
 	int cmd_serial_io(int argc, char *argv[]) {
 		(void)argc;
 		(void)argv;
@@ -890,6 +878,7 @@ const t_commandEntry COMMANDS[] = {
 	
 	
 	// Additional features
+	
 	#ifdef MONITOR_FILES
 		T_COMMAND_ENTRY("cd", cmd_files_cd, "Change dir"),
 		T_COMMAND_ENTRY("ls", cmd_files_ls, "Show entries"),
@@ -902,7 +891,6 @@ const t_commandEntry COMMANDS[] = {
 			T_COMMAND_ENTRY("run", cmd_files_run, "Load & Call"),
 		#endif
 	#endif
-	
 	
 	#ifdef MONITOR_SERIAL
 		//T_COMMAND_ENTRY("stest", cmd_serial_test, "Serial test"),
@@ -929,35 +917,34 @@ int cmd_help(int argc, char *argv[]) {
 			//printf("%s", COMMANDS[i].name);
 			puts(COMMANDS[i].name);
 			
-			#ifdef MONITOR_HELP
+			#ifdef MONITOR_HELP_LONG
 			//printf(": ");
 			//printf(COMMANDS[i].help);
 			//putchar('\n');
 			#endif
 		}
-		printf("\n");
+		putchar('\n');
 		return ERR_OK;
-		
 	}
 	
-	#ifdef MONITOR_HELP
-	// Specific help
-	for(i = 0; i < (sizeof(COMMANDS) / sizeof(t_commandEntry)); i++) {
-		if (stricmp(argv[1], COMMANDS[i].name) == 0) {
-			//printf("%s: %s\n", COMMANDS[i].name, COMMANDS[i].help);
-			printf(COMMANDS[i].name);
-			printf(": ");
-			printf(COMMANDS[i].help);
-			putchar('\n');
-			return ERR_OK;
+	#ifdef MONITOR_HELP_LONG
+		// Specific help
+		for(i = 0; i < (sizeof(COMMANDS) / sizeof(t_commandEntry)); i++) {
+			if (stricmp(argv[1], COMMANDS[i].name) == 0) {
+				//printf("%s: %s\n", COMMANDS[i].name, COMMANDS[i].help);
+				printf(COMMANDS[i].name);
+				printf(": ");
+				printf(COMMANDS[i].help);
+				putchar('\n');
+				return ERR_OK;
+			}
 		}
-	}
-	//printf("%s?\n", argv[1]);
-	//printf(argv[1]); printf("?\n");
-	return ERR_COMMAND_UNKNOWN;
+		//printf("%s?\n", argv[1]);
+		//printf(argv[1]); printf("?\n");
+		return ERR_COMMAND_UNKNOWN;
 	#else
-	(void)argv;
-	return ERR_NOT_IMPLEMENTED;
+		(void)argv;
+		return ERR_NOT_IMPLEMENTED;
 	#endif
 }
 #endif
@@ -1005,13 +992,15 @@ int eval(int argc, char *argv[]) {
 	}
 	*/
 	
-	
-	// Internal commands
+	// Check internal commands
 	for(i = 0; i < (sizeof(COMMANDS) / sizeof(t_commandEntry)); i++) {
 		if (stricmp(argv[0], COMMANDS[i].name) == 0) {
 			return COMMANDS[i].call(argc, argv);
 		}
 	}
+	
+	//@TODO: When using files: Check if there is a match in current directory
+	//if (fexists(argv[0]) cmd_files_run(...)
 	
 	//printf("\"%s\"?\n", argv[0]);
 	putchar('"'); printf(argv[0]); printf("\"?\n");
@@ -1020,15 +1009,16 @@ int eval(int argc, char *argv[]) {
 
 
 void parse(char *s) {
-	// Parse a string into argv[], including quotes, escape sequences and variables
+	// Parse an input string into argv[], including handling of quotes, escape sequences and variables
+	
 	int r;
 	char arg[MAX_INPUT];	// Destination string (slightly modified from original string)
 	char *argv[MAX_ARGS];	// Pointers withing arg
 	int argc;
 	char *sc;	// Source pointer
 	char *ac;	// arg pointer
-	char *varNameP;	// For parsing variable names
-	char *varValP;	// For parsing variable names
+	//char *varNameP;	// For parsing variable names
+	//char *varValP;	// For parsing variable names
 	char c;
 	byte isEscape;
 	byte isQuote;
@@ -1057,13 +1047,14 @@ void parse(char *s) {
 	isEscape = 0;
 	isQuote = 0;
 	isVar = 0;
-	varNameP = sc;
-	varValP = ac;
+	//varNameP = sc;
+	//varValP = ac;
 	
 	while (c != 0x00) {
 		c = *sc;
 		
 		if (isEscape) {
+			// Escaped characters
 			switch(c) {
 				case 'r': c = '\r'; break;
 				case 'n': c = '\n'; break;
@@ -1094,7 +1085,9 @@ void parse(char *s) {
 			// And stop
 			return;
 		}
+		/*
 		if (c == '%') {
+			// Variables
 			if (isVar == 0) {
 				isVar = 1;
 				varNameP = ac;
@@ -1110,6 +1103,7 @@ void parse(char *s) {
 				isVar = 0;
 			}
 		} else
+		*/
 		if (c == 0x0a) {
 			*ac++ = 0x00;	// Terminate string at first new line
 			break;
@@ -1134,12 +1128,11 @@ void parse(char *s) {
 	if (r != 0) {
 		//printf("Exit code %d\n", r);
 		//printf("Exit code "); printf_d(r); printf("\n");
-		printf("Exit code ");
+		printf("Exit ");
 		printf("0x"); printf_x2(r);
-		printf("\n");
+		putchar('\n');
 	}
 }
-
 
 
 void main() __naked {
@@ -1160,9 +1153,6 @@ void main() __naked {
 	//drives[1] = &fs_parabuddy;
 	
 	// CWD
-	//cwd[0] = 'A';
-	//cwd[1] = FILEIO_DRIVE_DELIMITER;
-	//cwd[2] = 0;
 	cwd[0] = FILE_PATH_DELIMITER;
 	cwd[1] = 0;
 	#endif

@@ -21,8 +21,8 @@ def human_readable(s, rom_info=True):
 	stats = [
 		'0x%06X' % s,
 		'% 6d Bytes' % s,
-		'% 8.3f KByte' % (s/1024.0),
-		'% 8.3f Kbit' % ((s*8) / 1024.0)
+		'% 7.3f KByte' % (s/1024.0),
+		'% 7.3f Kbit' % ((s*8) / 1024.0)
 	]
 	
 	if rom_info:
@@ -32,8 +32,8 @@ def human_readable(s, rom_info=True):
 		stats += [
 			'fits in',
 			'% 4d KByte' % (sCeil // 1024),
-			'% 6d Kbit' % ((sCeil*8) // 1024),
-			'ROM'
+			'% 4d Kbit' % ((sCeil*8) // 1024),
+			#'ROM'
 		]
 	r = sep.join(stats)
 	return r
@@ -60,9 +60,14 @@ if __name__ == '__main__':#
 	
 	put('Free space: %s' % human_readable(l_full - l, rom_info=False))
 	#put('Free space: %d Bytes' % (l_full - l))
-	"""
-	if (l >= l_full):
-		put('WARNING: Binary image is FULL!')
+	
+	# Check if file is an "aligned" binary (power of two)
+	l_log = math.log(l_full, 2)
+	if (l_full == math.pow(2, l_log)):
+		if (l >= l_full):
+			put('WARNING: Binary image is full!')
+			sys.exit(1)	# Throw error return code
 	else:
-		put('Free space: %d Bytes' % (l_full - l))
-	"""
+		# Unaligned
+		pass
+	sys.exit(0)

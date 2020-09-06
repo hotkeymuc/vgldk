@@ -6,7 +6,15 @@ Keyboard matrix for the VTech Genius LEADER 6000SL / PreComputer Prestige
 
 
 TODO:
-	Turn on/off CAPS LOCK LED:
+	* Use __sfr port access variables instead of chunky "port_out_...()" functions!
+		#define KEYBOARD_PORT_ROW_OUT 0x40
+		#define KEYBOARD_PORT_COL_IN 0x41
+		#define KEYBOARD_PORT_COL_IN2 0x42
+		__sfr __at KEYBOARD_PORT_ROW_OUT keyboard_port_matrixRowOut;
+		__sfr __at KEYBOARD_PORT_COL_IN keyboard_port_matrixColIn;
+		__sfr __at KEYBOARD_PORT_COL_IN2 keyboard_port_matrixColIn2;
+	
+	* Turn on/off CAPS LOCK LED:
 		OUT 0x21, bit 6, bit 7 or 0xE0 (default)
 			bit 6 (0x20) = CAPS LOCK light
 
@@ -89,18 +97,18 @@ __endasm;
 typedef byte keycode_t;
 typedef byte scancode_t;
 
-// Map scancode to keycode
-const keycode_t KEY_CODES[8*16] = {
+// Map scancode to keycode (i.e. char)
+const keycode_t KEY_CODES[8*8*2] = {
 	KEY_MOUSE_LMB,  '1', '9', 'e', '(', 'g', KEY_LEFT_SHIFT, ',',
 	KEY_MOUSE_RMB,  '2', '0', 'r', '+', 'h', 'z', '.',
 	KEY_TOUCH_UP ,  '3', '\'', 't', KEY_INSERT, 'j', 'x', '-',
 	KEY_TOUCH_LMB,  '4', ')', 'y', KEY_CAPS, 'k', 'c', KEY_UP,
 	KEY_TOUCH_RMB,  '5', KEY_BACKSPACE, 'u', 'a', 'l', 'v', KEY_RIGHT_SHIFT,
 	KEY_TOUCH_DOWN, '6', KEY_ESCAPE, 'i', 's', '\\', 'b', KEY_HELP,
-	               '?', '7', 'q', 'o', 'd', '/', 'n', KEY_SYMBOL, 
+	                '?', '7', 'q', 'o', 'd', '/', 'n', KEY_SYMBOL, 
 	KEY_OFF,        '8', 'w', 'p', 'f', KEY_ENTER, 'm', KEY_ANSWER,
 	
-	               KEY_SPACE, KEY_ACTIVITY_WORDGAMES, KEY_PLAYER, 0,0,0,0,0,
+	KEY_SPACE, KEY_ACTIVITY_WORDGAMES, KEY_PLAYER, 0,0,0,0,0,
 	KEY_ALT, KEY_ACTIVITY_MATH, KEY_LEVEL, 0,0,0,0,0,
 	KEY_REPEAT, KEY_ACTIVITY_TRIVIA, KEY_CARTRIDGE, 0,0,0,0,0,
 	KEY_LEFT, KEY_ACTIVITY_LOGIC, KEY_ACTIVITY_BUSINESS, 0,0,0,0,0,
@@ -112,6 +120,7 @@ const keycode_t KEY_CODES[8*16] = {
 
 #define KEYBOARD_PRESSED_MAX 6
 #define KEYBOARD_BUFFER_MAX 8
+#define KEYBOARD_SCANCODE_INVALID 0xff
 
 #define KEYBOARD_MODIFIER_SHIFT 1
 #define KEYBOARD_MODIFIER_ALT 2
@@ -147,7 +156,7 @@ byte keyboard_ispressed() {
 	// Activate ALL matrix lines
 	port_out_0x40(0x00);
 	
-	// Get both matrix return values
+	// Get both matrix return values (active LOW, so ANDing them will yield zeros if any of the lines is zero)
 	b = (port_in_0x41() & port_in_0x42());
 	
 	// Disable ALL matrix lines
@@ -195,7 +204,7 @@ void keyboard_update() {
 				if (!(b & (1 << mx))) {
 					// Store scan code
 					if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
-						keyboard_pressed_new[keyboard_num_pressed_new++] = 0x40 + my*8 + mx;
+						keyboard_pressed_new[keyboard_num_pressed_new++] = (8*8) + my*8 + mx;
 				}
 			}
 		}
@@ -207,11 +216,11 @@ void keyboard_update() {
 		for (j = 0; j < keyboard_num_pressed_new; j++) {
 			if (keyboard_pressed_new[j] == scancode) {
 				// Key is still pressed
-				scancode = 0xff;
+				scancode = KEYBOARD_SCANCODE_INVALID;
 				break;
 			}
 		}
-		if (scancode != 0xff) {
+		if (scancode != KEYBOARD_SCANCODE_INVALID) {
 			// Key was released
 			keycode = KEY_CODES[scancode];
 			//printf("KeyUp%02X", scancode);
@@ -237,11 +246,11 @@ void keyboard_update() {
 		for (j = 0; j < keyboard_num_pressed; j++) {
 			if (keyboard_pressed[j] == scancode) {
 				// Key was already pressed
-				scancode = 0xff;
+				scancode = KEYBOARD_SCANCODE_INVALID;
 				break;
 			}
 		}
-		if (scancode != 0xff) {
+		if (scancode != KEYBOARD_SCANCODE_INVALID) {
 			// Key was previously unknown
 			
 			// Handle key press
@@ -294,7 +303,6 @@ void keyboard_update() {
 		}
 	}
 	
-	
 }
 
 #define KEY_CHARCODE_NONE 0
@@ -303,13 +311,14 @@ byte keyboard_inkey() {
 	
 	keyboard_update();
 	
+	// Check if a new key has been put to the buffer
 	if (keyboard_buffer_in != keyboard_buffer_out) {
 		
 		// Get from buffer
 		charcode = keyboard_buffer[keyboard_buffer_out];
 		keyboard_buffer_out = (keyboard_buffer_out + 1) % KEYBOARD_BUFFER_MAX;
 		
-		// Return
+		// Return it
 		return charcode;
 	} else {
 		// No key
@@ -322,6 +331,7 @@ byte keyboard_getchar() {
 	byte charcode;
 	
 	while((charcode = keyboard_inkey()) == KEY_CHARCODE_NONE) {
+		// Block
 	}
 	
 	return charcode;

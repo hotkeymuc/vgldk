@@ -1,7 +1,7 @@
 # VGLDK
 A development kit (SDK) for the Z80 based VTech "Genius LEADER" line of learning computers (aka. "PreComputer", "YENO MisterX", "Genio" or "Compusavant")
 
-This is not a usable development environment, yet. For some working proof-of-concept stuff, visit the [Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking) and get started using the zipped snapshots of "VGL CP/M" and other SDCC code examples.
+This is still heavily work in progress, but usable. For some working proof-of-concept stuff, visit the [Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking) and get started using the zipped snapshots of "VGL CP/M" and other SDCC code examples.
 
 
 ## Target platforms
@@ -46,6 +46,7 @@ This is not a usable development environment, yet. For some working proof-of-con
 * Run `make emu` to start MAME with the compiled cartridge
 * Run `make burn` to burn the cartridge ROM image to an EEPROM using MiniPro
 * For speedy development you can connect a 5V TTL USB-to-serial adaptor to the VTech's parallel port (TX to BUSY, RX to DATA) and upload "apps" using `make app` and `make upload` (device must be running the monitor ROM)
+* Take a look at the ParallelBuddy Arduino sketch which allows accessing files from SD card or from network
 
 ## History
 * Started as a stand-alone reverse engineering project in late 2016
@@ -59,4 +60,4 @@ This is not a usable development environment, yet. For some working proof-of-con
 * [Discussion on the Z88DK forum](https://www.z88dk.org/forum/viewtopic.php?id=10055)
 * [VTech hardware development](https://www.thingiverse.com/thing:3108809)
 
-2020-08-28 Bernhard "HotKey" Slawik
+2020-09-07 Bernhard "HotKey" Slawik
