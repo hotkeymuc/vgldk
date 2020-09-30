@@ -16,6 +16,7 @@ So I implemented my own minimal one to be used in my "DOS".
 #define ERR_DRIVE_INVALID -3
 #define ERR_TIMEOUT -4
 #define ERR_UNSUPPORTED -5
+#define ERR_NOT_READY -6
 
 #define FILE_PATH_DELIMITER '/'
 
