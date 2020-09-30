@@ -10,7 +10,10 @@ VGLDK_SERIES = 6000
 # For small loadable apps (without their own I/O):
 #VGLDK_SERIES = 0
 #LOC_CODE = 0xc800
-#LOC_DATA = 0xc100
+#LOC_DATA = 0xc000
+
+# If you need some more...
+#CART_SIZE_KB=16
 
 all: cart
 #all: app

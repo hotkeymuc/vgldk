@@ -345,6 +345,28 @@ void lcd_scroll_cb_scroll() {
 }
 */
 
+void lcd_putchar_at(byte x, byte y, char c) {
+	byte o;
+	
+	// Calculate DDRAM offset
+	o = x + (y * LCD_COLS);
+	
+	// Set DDRAM insert point for data
+	lcd_writeControl(LCD_SETDDRAMADDR | lcd_map[o]);
+	
+	// Actually display
+	lcd_writeData(c);
+	
+	/*
+	#ifndef lcd_MINIMAL
+	// Store in buffer (for scrolling)
+	lcd_buffer[o] = c;
+	
+	lcd_set_cursor();
+	#endif
+	*/
+}
+
 void lcd_putchar(byte c) {
 	byte o;
 	
@@ -388,6 +410,8 @@ void lcd_putchar(byte c) {
 			lcd_y = 0;
 		#endif
 	}
+	
+	//lcd_putchar_at(lcd_x, lcd_y, c);
 	
 	// Calculate DDRAM offset
 	o = lcd_x + (lcd_y * LCD_COLS);

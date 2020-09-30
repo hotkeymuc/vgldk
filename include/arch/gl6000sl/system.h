@@ -174,8 +174,8 @@ Intro sound port accesses at 0x2x?:
 // Display
 // It is graphical, so there is no distinct number
 // Let's chose some average values
-#define DISPLAY_COLS 40
-#define DISPLAY_ROWS 10
+//#define LCD_COLS 40
+//#define LCD_ROWS 10
 #include "lcd.h"
 
 // Keyboard

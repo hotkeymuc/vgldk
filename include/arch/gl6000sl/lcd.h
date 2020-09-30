@@ -20,6 +20,10 @@ byte lcd_y = 0;
 const byte font_w = 8;
 const byte font_h = 8;
 #define font_data font_console_8x8
+//#define LCD_COLS (LCD_W/font_w)
+//#define LCD_ROWS (LCD_H/font_h)
+#define LCD_COLS 30
+#define LCD_ROWS 12
 
 
 void port_out_0x31(byte a) __naked {(void)a;
@@ -193,6 +197,10 @@ void lcd_scroll(int dy) {
 	}
 }
 
+void lcd_putchar_at(byte x, byte y, char c) {
+	drawGlyph(x*font_w, y*font_h, c);
+}
+
 void lcd_putchar(byte c) {
 	
 	if (c == '\r') {
@@ -201,32 +209,32 @@ void lcd_putchar(byte c) {
 	} else
 	if (c == '\n') {
 		lcd_x = 0;
-		lcd_y += font_h;
+		lcd_y ++;
 		c = 0;	// Stop handling it
 	} else
 	if (c == '\b') {
-		if (lcd_x > font_w)
-			lcd_x -= font_w;
-		drawGlyph(lcd_x, lcd_y, ' ');
+		if (lcd_x > 0)
+			lcd_x --;
+		drawGlyph(lcd_x*font_w, lcd_y*font_h, ' ');
 		c = 0;	// Stop handling it
 	}
 	
-	if (lcd_x + font_w > lcd_w) {
+	if (((lcd_x+1)*font_w) >= lcd_w) {
 		lcd_x = 0;
-		lcd_y += font_h;
+		lcd_y ++;
 	}
 	
 	
-	if (lcd_y + font_h > lcd_h) {
+	if (((lcd_y+1)*font_h) > lcd_h) {
 		// We are at end of screen
-		lcd_scroll((lcd_y + font_h) - lcd_h);
+		lcd_scroll(((lcd_y+1) * font_h) - lcd_h);
 	}
 	
 	
 	if (c > 0) {
-		drawGlyph(lcd_x, lcd_y, c);
+		drawGlyph(lcd_x*font_w, lcd_y*font_h, c);
 		
-		lcd_x += font_w;
+		lcd_x ++;
 	}
 	
 }
