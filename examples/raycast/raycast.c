@@ -1,8 +1,14 @@
 /*
+	Raycast
+	=======
 	
 	A crappy ass raycaster
 	- no trigonometry
 	- no perspective correction
+	
+	Keys:
+		* Cursor keys or WASD: Rotate/Move
+		* N,M: Strafe
 	
 	2020-07-07 Bernhard "HotKey" Slawik
 */
@@ -11,17 +17,19 @@
 //#define GFX_MODE
 
 #if VGLDK_SERIES == 6000
+	// GL6000SL defaults to GFX mod e(although it can also do text mode)
 	#define GFX_MODE
 #else
+	// Default is text mode
 	#define TEXT_MODE
 #endif
 
 
-
-#define lcd_MINIMAL	// Use minimal text mode (no scrolling)
+#define lcd_MINIMAL	// Use minimal text mode (disable scrolling)
 #include <vgldk.h>
 #include <stdiomin.h>
 
+// Helper to show some text
 #define alert(s) { lcd_x = 0; lcd_y = 0; puts(s); getchar(); }
 //#define alert(s) ;
 
@@ -49,16 +57,24 @@ SINTABLE_VALUE_TYPE _cos(SINTABLE_INDEX_TYPE a) {
 }
 
 
-#define FOV (SINTABLE_SIZE / 8)
-#define OVERSAMPLE_POS 8	// Player coordinate is scaled by this
-#define SPEED_MOVE (OVERSAMPLE_POS/2)
-#define SPEED_TURN 6
+// Settings
+#define FOV (SINTABLE_SIZE / 6)	// Field of view
+#define OVERSAMPLE_POS 8	// Player coordinate scale
+#define SPEED_MOVE (OVERSAMPLE_POS/2)	// Speed for moving forward/back
+#define SPEED_STRAFE (OVERSAMPLE_POS/2)	// Speed for moving sideways
+#define SPEED_TURN 8	// Speed for turning
+#define PERSPECTIVE_CORRECTION	// Remove fish-eye (hack)
+
+// Player state
+int player_x;
+int player_z;
+int player_a;
 
 
 // Map
 #define LEVEL_W 16
 #define LEVEL_H 16
-#define LEVEL_BLOCK_FREE ' '
+#define LEVEL_BLOCK_FREE ' '	// Which character means "can walk there"?
 const char LEVEL[LEVEL_W][LEVEL_H] = {
 	{'#','#','#','#','#','#','#','#','#','#','#','#',' ',' ',' ','#'},
 	{'#',' ',' ',' ',' ',' ','%',' ',' ','?',' ',' ',' ',' ',' ','#'},
@@ -90,16 +106,15 @@ const char LEVEL[LEVEL_W][LEVEL_H] = {
 		lcd_y = y;
 		lcd_putchar(c);
 	}
-*/
-	
+	*/
 	
 	#define CHAR_CEIL ' '
 	#define CHAR_WALL 'X'
 	#define CHAR_FLOOR ':'
 	//#define CHAR_FLOOR ' '
 	
-	
 	#define MAX_DEPTH 8
+	// Column graphics
 	const char COL_PATTERNS[MAX_DEPTH][SCREEN_H] = {
 		{
 			CHAR_WALL,
@@ -162,26 +177,24 @@ const char LEVEL[LEVEL_W][LEVEL_H] = {
 	
 	
 	void drawCol(byte x, int z, char b) {
-	byte y;
-	char c;
-	
-	z /= OVERSAMPLE_RAY;
-	if (z >= MAX_DEPTH) z = MAX_DEPTH-1;	// z clip
-	
-	(void)b;	// Current block character
-	
-	for(y = 0; y < SCREEN_H; y++) {
-		c = COL_PATTERNS[z][y];
-		if (c == CHAR_WALL) c = b;
-		lcd_putchar_at(x, y, c);
+		// Draw one column of graphics
+		byte y;
+		char c;
+		
+		z /= OVERSAMPLE_RAY;
+		if (z >= MAX_DEPTH) z = MAX_DEPTH-1;	// z clip
+		
+		for(y = 0; y < SCREEN_H; y++) {
+			c = COL_PATTERNS[z][y];
+			if (c == CHAR_WALL) c = b;	// Replace wall character by block character
+			lcd_putchar_at(x, y, c);
+		}
 	}
-	
-}
 #endif
 
 #ifdef GFX_MODE
-	#define OVERSAMPLE_RAY 4	// When pathtracing use enhanced z resolution
-
+	#define OVERSAMPLE_RAY 4	// Enhanced ray cast resolution - This hugely increases calculation time!
+	
 	//#define SCREEN_W 240
 	//#define SCREEN_W 30
 	//#define SCREEN_H 100
@@ -189,82 +202,91 @@ const char LEVEL[LEVEL_W][LEVEL_H] = {
 	// We are drawing 8 bits at a time
 	#define SCREEN_W (LCD_W/8)
 	#define SCREEN_H LCD_H
-	#define MAX_DEPTH 10
-void drawVLine(int x, int y1, int h, byte c) {
-	byte *p;
-	int y;
-	if (y1 < 0) y1 = 0;
-	if (y1+h > SCREEN_H) h = SCREEN_H - y1;
+	#define MAX_DEPTH 16
 	
-	//c = 0xff = black
-	for(y = y1; y < y1+h; y++) {
-		//p = (byte *)lcd_addr + (y * lcd_w + x) / 8;
-		p = (byte *)lcd_addr + (y * lcd_w/8 + x);
-		*p = c;
-	}
-}
-
-void drawCol(int x, int z, char b) {
-	byte c;
-	byte h;
-	byte y;
-	byte yStart;
-	
-	byte *p;
-	byte fbstep;
-	
-	if (z > OVERSAMPLE_RAY*MAX_DEPTH-1) z = OVERSAMPLE_RAY*MAX_DEPTH-1;	// z clip
-	
-	switch(b) {
-		case LEVEL_BLOCK_FREE:	c = 0x00; break;
-		case '?':	c = 1+8+64; break;
-		case '%':	c = 0x55; break;
-		case '#':	c = 0xff; break;
-		default:
-			c = 1+16;
+	#define FB_INC (LCD_W/8)	// How far to increment on the frame buffer to be on next line
+	void drawVLine(int x, int y1, int h, byte c) {
+		byte *p;
+		int y;
+		if (y1 < 0) y1 = 0;
+		if (y1+h > SCREEN_H) h = SCREEN_H - y1;
+		
+		//c = 0xff = black
+		p = (byte *)lcd_addr + y1*FB_INC + x;
+		for(y = y1; y < y1+h; y++) {
+			//p = (byte *)lcd_addr + (y * lcd_w + x) / 8;
+			//p = (byte *)lcd_addr + (y * lcd_w/8 + x);
+			*p = c;
+			p += FB_INC;
+		}
 	}
 	
-	//drawVLine(x, SCREEN_H/2 - z*2, z*4, c);
-	//drawVLine(x, z * (SCREEN_H / (MAX_DEPTH*2)), SCREEN_H - z * (SCREEN_H / MAX_DEPTH), c);
-	//h = (MAX_DEPTH * SCREEN_H * OVERSAMPLE_RAY*OVERSAMPLE_RAY) / (z*z + 1);
-	h = (MAX_DEPTH * SCREEN_H * OVERSAMPLE_RAY*OVERSAMPLE_RAY) / (z*z + 2);
-	if (h > SCREEN_H) h = SCREEN_H;
-	//else if (h < 0) h = 0;
-	
-	yStart = SCREEN_H/2 - h/2;
-	
-	fbstep = lcd_w/8;
-	// Ceiling
-	y = 0;
-	p = (byte *)(lcd_addr + x);	//(lcd_addr + (y * lcd_w/8 + x));
-	while(y < yStart) {
-		//*(byte *)(lcd_addr + (y * lcd_w/8 + x)) = 0x00;	//((y%2==0) ? 0x00 : 0xaa);
-		*p = 0x00;
-		//*p = (y%2==0) ? (1+16) : (4+64);
-		p += fbstep;
-		y++;
+	void drawCol(int x, int z, char b) {
+		// Draw one column of graphics
+		
+		byte c;
+		unsigned int h;
+		//word zz;
+		byte y;
+		byte yStart;
+		
+		byte *p;
+		
+		if (z > OVERSAMPLE_RAY*MAX_DEPTH-1) z = OVERSAMPLE_RAY*MAX_DEPTH-1;	// z clip
+		
+		switch(b) {
+			case LEVEL_BLOCK_FREE:	c = 0x00; break;
+			case '?':	c = 1+8+64; break;
+			case '%':	c = 0x55; break;
+			case '#':	c = 0xff; break;
+			default:
+				c = 1+16;
+		}
+		
+		
+		// Calculate the height of the wall column
+		//h = (MAX_DEPTH * SCREEN_H * OVERSAMPLE_RAY) / (z*4 + 1);
+		
+		// This is the tricky part (making it look nice)
+		//h = (SCREEN_H * OVERSAMPLE_RAY*OVERSAMPLE_RAY) / (1 + z*z);
+		//h = (SCREEN_H * OVERSAMPLE_RAY) / (1 + 3*z);
+		h = (SCREEN_H * OVERSAMPLE_RAY) / (1 + z);
+		
+		if (h > SCREEN_H) h = SCREEN_H;
+		//else if (h < 0) h = 0;
+		
+		// Draw column
+		yStart = SCREEN_H/2 - h/2;
+		
+		// Ceiling
+		y = 0;
+		p = (byte *)(lcd_addr + x);	//(y * lcd_w/8 + x));
+		while(y < yStart) {
+			*p = 0x00;	// white
+			//*p = ((y%2==0) ? 0x55 : 0xaa);	// 50% gray
+			//*p = (y%2==0) ? (1+16) : (4+64);	// 25% gray
+			p += FB_INC;
+			y++;
+		}
+		
+		// Wall
+		drawVLine(x, yStart, h, c);
+		
+		// Floor
+		y = yStart + h;
+		p = (byte *)(lcd_addr + (y * lcd_w/8 + x));
+		while(y < SCREEN_H) {
+			//*(byte *)(lcd_addr + (y * lcd_w/8 + x)) = ((y%2==0) ? 0x55 : 0xaa);
+			//*p = ((y%2==0) ? 0x55 : 0xaa);	// 50% gray
+			*p = (y%2==0) ? (1+16) : (4+64);	// 25% gray
+			//*p = ((y%2==0) ? 0x55 : 0xaa);	// stripes
+			p += FB_INC;
+			y++;
+		}
+		
 	}
-	
-	drawVLine(x, yStart, h, c);
-	
-	y = yStart + h;
-	p = (byte *)(lcd_addr + (y * lcd_w/8 + x));
-	// Floor
-	while(y < SCREEN_H) {
-		//*(byte *)(lcd_addr + (y * lcd_w/8 + x)) = ((y%2==0) ? 0x55 : 0xaa);
-		*p = ((y%2==0) ? 0x55 : 0xaa);	// 50% gray
-		//*p = ((y%2==0) ? 0x55 : 0xaa);	// 25% gray
-		*p = (y%2==0) ? (1+16) : (4+64);	// 25% gray
-		p += fbstep;
-		y++;
-	}
-	
-}
 #endif
 
-int player_x;
-int player_z;
-int player_a;
 
 
 void drawScreen() {
@@ -272,8 +294,14 @@ void drawScreen() {
 	byte iz;
 	
 	int a;
-	SINTABLE_VALUE_TYPE dx;
-	SINTABLE_VALUE_TYPE dz;
+	int ar;
+	#ifdef PERSPECTIVE_CORRECTION
+		int dx;
+		int dz;
+	#else
+		SINTABLE_VALUE_TYPE dx;
+		SINTABLE_VALUE_TYPE dz;
+	#endif
 	
 	int x;
 	int z;
@@ -282,43 +310,55 @@ void drawScreen() {
 	//lcd_clear();
 	
 	for(ix = 0; ix < SCREEN_W; ix++) {
-		a = player_a + (FOV/2) - ((ix * FOV) / (SCREEN_W-1));
+		ar = (FOV/2) - ((ix * FOV) / (SCREEN_W-1));	// Relative angle
+		a = player_a + ar;
 		if (a < 0) a += SINTABLE_SIZE;
 		
 		dx = _sin(a);
 		dz = _cos(a);
 		
+		#ifdef PERSPECTIVE_CORRECTION
+			// Simple perspective correction: When shooting +-45 degrees, the ray should march sqrt(2) times as fast (or the result should be divided by sqrt(2))
+			if (ar < 0) ar = -ar;	// abs()
+			dx = (dx * (1 + (SINTABLE_SIZE/2 + ar)) / (SINTABLE_SIZE/3));
+			dz = (dz * (1 + (SINTABLE_SIZE/2 + ar)) / (SINTABLE_SIZE/3));
+		#endif
+		
+		
+		// Cast ray
 		b = '?';
 		for(iz = 0; iz < MAX_DEPTH*OVERSAMPLE_RAY; iz++) {
-			//x = (player_x + (dx * iz * OVERSAMPLE) / (SINTABLE_SCALE*OVERSAMPLE_RAY)) / OVERSAMPLE;
-			//z = (player_z + (dz * iz * OVERSAMPLE) / (SINTABLE_SCALE*OVERSAMPLE_RAY)) / OVERSAMPLE;
+		//for(iz = 0; iz < MAX_DEPTH*OVERSAMPLE_RAY; iz += (1 + iz/16)) {	// Speed up in the distance
 			
+			// Ray position
 			x = player_x + (OVERSAMPLE_POS * dx * iz) / (SINTABLE_SCALE*OVERSAMPLE_RAY);
 			x /= OVERSAMPLE_POS;
 			
 			z = player_z + (OVERSAMPLE_POS * dz * iz) / (SINTABLE_SCALE*OVERSAMPLE_RAY);
 			z /= OVERSAMPLE_POS;
 			
+			// Check bounds
 			if ((x < 0) || (x >= LEVEL_W) || (z < 0) || (z >= LEVEL_H)) {
 				b = LEVEL_BLOCK_FREE;	//'!';
 				break;
 			}
 			
+			// Check if we hit something
 			b = LEVEL[z][x];
 			if (b != LEVEL_BLOCK_FREE) {
 				// Hit a block
 				
-				//@TODO: Now go back slower or calculate the real distance
+				//@TODO: Refine: Now go back slower or calculate the real distance
 				
 				//drawCol(ix, iz, b);
 				break;
 			}
 		}
 		
-		if (b == LEVEL_BLOCK_FREE)
-			drawCol(ix, MAX_DEPTH*OVERSAMPLE_RAY, b);
-		else
-			drawCol(ix, iz, b);
+		//if (b == LEVEL_BLOCK_FREE)
+		//	drawCol(ix, MAX_DEPTH*OVERSAMPLE_RAY, b);
+		//else
+		drawCol(ix, iz, b);
 		
 	}
 }
@@ -327,8 +367,9 @@ void drawScreen() {
 
 void main() {
 	char c;
-	int move_a;
-	int move_z;
+	int move_a;	// Rotation
+	int move_x;	// Strafe
+	int move_z;	// Move forward
 	//SINTABLE_VALUE_TYPE sx;
 	//SINTABLE_VALUE_TYPE sz;
 	int sx;
@@ -355,6 +396,7 @@ void main() {
 		
 		// Check keyboard
 		move_a = 0;
+		move_x = 0;
 		move_z = 0;
 		
 		c = getchar();
@@ -367,7 +409,7 @@ void main() {
 			#ifdef KEY_LEFT
 			case KEY_LEFT:
 			#endif
-				move_a = -1;
+				move_a = 1;
 				break;
 			case 'd':
 			case 'D':
@@ -377,7 +419,7 @@ void main() {
 			#ifdef KEY_RIGHT
 			case KEY_RIGHT:
 			#endif
-				move_a = 1;
+				move_a = -1;
 				break;
 			
 			case 'w':
@@ -394,25 +436,39 @@ void main() {
 			#endif
 				move_z = -1;
 				break;
+			
+			case 'n':
+			case 'N':
+				move_x = -1;
+				break;
+			case 'm':
+			case 'M':
+				move_x = 1;
+				break;
+
 		}
 		
 		
 		// Handle movement
-		if ((move_a != 0) || (move_z != 0)) {
+		if ((move_a != 0) || (move_x != 0) || (move_z != 0)) {
 			//player_a = (player_a + SINTABLE_SIZE - (move_a * SPEED_TURN)) % SINTABLE_SIZE;
 			
-			player_a -= (move_a * SPEED_TURN);
+			player_a += (move_a * SPEED_TURN);
 			if (player_a < 0) player_a += SINTABLE_SIZE;
 			else player_a = player_a % SINTABLE_SIZE;
 			
-			sx = _sin(player_a);
-			sz = _cos(player_a);
+			// Movement forward/back
+			sx  = move_z * _sin(player_a) * SPEED_MOVE;
+			sz  = move_z * _cos(player_a) * SPEED_MOVE;
+			
+			// Movement sideways
+			sx -= move_x * _sin(player_a + SINTABLE_SIZE/4) * SPEED_STRAFE;
+			sz -= move_x * _cos(player_a + SINTABLE_SIZE/4) * SPEED_STRAFE;
 			//sz = _sin(player_a + SINTABLE_SIZE/4);
 			
-			
-			// Move
-			player_x += (move_z * SPEED_MOVE * sx) / SINTABLE_SCALE;
-			player_z += (move_z * SPEED_MOVE * sz) / SINTABLE_SCALE;
+			// Move player position
+			player_x += sx / SINTABLE_SCALE;
+			player_z += sz / SINTABLE_SCALE;
 			
 			// Clip to map boundaries
 			if (player_x < 0) {
@@ -433,15 +489,13 @@ void main() {
 				player_z = (LEVEL_H-1)*OVERSAMPLE_POS;
 			}
 			
-			
-			
 			// Into wall? Move back!
 			//while
 			if (LEVEL[player_z/OVERSAMPLE_POS][player_x/OVERSAMPLE_POS] != LEVEL_BLOCK_FREE) {
 				alert("Bump!");
 				
-				player_x -= (move_z * sx * SPEED_MOVE) / SINTABLE_SCALE;
-				player_z -= (move_z * sz * SPEED_MOVE) / SINTABLE_SCALE;
+				player_x -= sx / SINTABLE_SCALE;
+				player_z -= sz / SINTABLE_SCALE;
 			}
 			
 			
