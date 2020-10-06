@@ -3,8 +3,6 @@
 	=======
 	
 	A crappy ass raycaster
-	- no trigonometry
-	- no perspective correction
 	
 	Keys:
 		* Cursor keys or WASD: Rotate/Move
@@ -317,14 +315,6 @@ void drawScreen() {
 		dx = _sin(a);
 		dz = _cos(a);
 		
-		#ifdef PERSPECTIVE_CORRECTION
-			// Simple perspective correction: When shooting +-45 degrees, the ray should march sqrt(2) times as fast (or the result should be divided by sqrt(2))
-			if (ar < 0) ar = -ar;	// abs()
-			dx = (dx * (1 + (SINTABLE_SIZE/2 + ar)) / (SINTABLE_SIZE/3));
-			dz = (dz * (1 + (SINTABLE_SIZE/2 + ar)) / (SINTABLE_SIZE/3));
-		#endif
-		
-		
 		// Cast ray
 		b = '?';
 		for(iz = 0; iz < MAX_DEPTH*OVERSAMPLE_RAY; iz++) {
@@ -354,6 +344,15 @@ void drawScreen() {
 				break;
 			}
 		}
+		
+		#ifdef PERSPECTIVE_CORRECTION
+			// Fish eye correction hack
+			// dis1 = abs(int(dis1 * costable[abs(x - colsh)]/ans))	# // OVER
+			//iz = _cos((a + SINTABLE_SIZE - FOV/2) % SINTABLE_SIZE) * iz / dx;
+			if (ar < 0) ar = -ar;	// abs()
+			iz = (iz * (1 + (SINTABLE_SIZE/2 + ar)) / (SINTABLE_SIZE/3));
+			if (iz < 0) iz = -iz;
+		#endif
 		
 		//if (b == LEVEL_BLOCK_FREE)
 		//	drawCol(ix, MAX_DEPTH*OVERSAMPLE_RAY, b);
