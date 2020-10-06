@@ -1,9 +1,5 @@
 /*
-	A crappy ass raycaster
-	- no rotations
-	- no perspective
-	- no trigonometry
-	- no perspective correction
+	A non-working raycaster
 	
 	2020-07-07 Bernhard "HotKey" Slawik
 */

@@ -2,7 +2,7 @@
 	Raycast
 	=======
 	
-	Raycaster after MAHNKE
+	Raycaster modeled after "MAHNKE QBasic", but optimized.
 	
 	Keys:
 		* Cursor keys or WASD: Rotate/Move

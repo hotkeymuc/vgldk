@@ -2,7 +2,7 @@
 	Raycast
 	=======
 	
-	A crappy ass raycaster
+	A nice, but very slow raycaster
 	
 	Keys:
 		* Cursor keys or WASD: Rotate/Move
