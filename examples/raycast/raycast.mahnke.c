@@ -41,6 +41,9 @@
 #define alert(s) { lcd_x = 0; lcd_y = 0; puts(s); getchar(); }
 //#define alert(s) ;
 
+
+//#define FISHEYE_CORRECTION
+
     
 
 
@@ -92,7 +95,7 @@ int player_a;
 #define angtol 0	//(angf / 256)	// Resolution of edge finder, keep it around 1-2 degrees or 2-4 columns
 
 // Field of view
-#define fovangf (angf / 6)	// Keep it around angf/6
+#define fovangf (angf / 8)	// Keep it around angf/6
 
 #define OVER 4	// Oversample coordinates
 #define DRAW_DIST 16	// Maximum drawing distance (inner loop)
@@ -430,15 +433,16 @@ void drawScreen() {
 			
 			
 			if (dis1 != -1) {
-				// Fisheye correction
-				/*
-				//@TODO: Numerical unstable
-				//dis1 = abs(int(dis1 * costable[abs((x-colsh)*fovangf//cols)]/ans))	# // OVER
-				ancheck = (x-colsh)*fovangf / cols;
-				if (ancheck < 0) ancheck = -ancheck;
-				dis1 = (dis1 * _cos(ancheck)) / ans;
-				*/
-				dis1 = (SINTABLE_OVER * dis1) / ans;
+				#ifdef FISHEYE_CORRECTION
+					// Fisheye correction
+					//@TODO: Numerical unstable
+					//dis1 = abs(int(dis1 * costable[abs((x-colsh)*fovangf//cols)]/ans))	# // OVER
+					ancheck = (x-colsh)*fovangf / cols;
+					if (ancheck < 0) ancheck = -ancheck;
+					dis1 = (dis1 * _cos(ancheck)) / ans;
+				#else
+					dis1 = (SINTABLE_OVER * dis1) / ans;
+				#endif
 				if (dis1 < 0) dis1 = -dis1;
 				
 				//texoff1 = (abs(player.x_over + actdef1) / OVER) % tex_w;
@@ -447,10 +451,9 @@ void drawScreen() {
 				texoff1 = texoff1 % tex_w;
 			}
 			
-			
 		}
 		
-		// Horizontal wall detection
+		// Vertical wall detection
 		nblockx2 = 0;
 		nblocky2 = 0;
 		fblock2 = LEVEL_BLOCK_FREE;
@@ -496,15 +499,16 @@ void drawScreen() {
 			
 			
 			if (dis2 != -1) {
-				// Fisheye correction
-				/*
-				//@TODO: Numerical unstable
-				//dis2 = abs(int(dis2 * costable[abs((x-colsh)*fovangf//cols)]/anc))	# // OVER
-				ancheck = (x-colsh)*fovangf / cols;
-				if (ancheck < 0) ancheck = -ancheck;
-				dis2 = (dis2 * _cos(ancheck)) / anc;
-				*/
-				dis2 = (SINTABLE_OVER * dis2) / anc;
+				#ifdef FISHEYE_CORRECTION
+					// Fisheye correction
+					//@TODO: Numerical unstable
+					//dis2 = abs(int(dis2 * costable[abs((x-colsh)*fovangf//cols)]/anc))	# // OVER
+					ancheck = (x-colsh)*fovangf / cols;
+					if (ancheck < 0) ancheck = -ancheck;
+					dis2 = (dis2 * _cos(ancheck)) / anc;
+				#else
+					dis2 = (SINTABLE_OVER * dis2) / anc;
+				#endif
 				if (dis2 < 0) dis2 = -dis2;
 				
 				//texoff2 = (abs(player.x_over + actdef2) / OVER) % tex_w;
@@ -512,7 +516,6 @@ void drawScreen() {
 				if (texoff2 < 0) texoff2 = -texoff2;
 				texoff2 = texoff2 % tex_w;
 			}
-			
 			
 		}
 		
@@ -559,6 +562,81 @@ void drawScreen() {
 			drawCol(x, dis1, fblock1);
 		}
 		
+		//@TODO: Port my ASCII renderer
+		/*
+		# Draw ASCII
+		if (USE_ASCII) and (x % ASCII_STEP == 0):
+			ax:int = x // ASCII_STEP
+			
+			# Clear column
+			#for ay in range(ASCII_ROWS): ascii_buffer[ay][ax] = ' '
+			
+			# Show corners
+			if (dis1 == 0):
+				alinehd = 0
+			else:
+				alinehd = round(wall_height_over * 2*ASCII_ROWS / dis1)
+			
+			ah1 = round(ASCII_ROWS - alinehd/2 - 1)	# "-1" to allow independent rounding of top/bottom
+			ay1 = ah1 // 2
+			if (ay1 >= 0) and (ay1 < ASCII_ROWS):
+				ac = '-' if ah1%2 == 0 else '_'
+				#if (vertical == last_vertical):
+				#	if (last_y1 < ay1): ac = '\\'
+				#	if (last_y1 > ay1): ac = '/'
+				ascii_buffer[ay1][ax] = ac
+			
+			ah2 = round(ASCII_ROWS + alinehd/2)
+			ay2 = ah2 // 2
+			if (ay2 >= 0) and (ay2 < ASCII_ROWS):
+				ac = '-' if ah2%2 == 0 else '_'
+				#if (vertical == last_vertical):
+				#	if (last_y2 < ay2): ac = '\\'
+				#	if (last_y2 > ay2): ac = '/'
+				ascii_buffer[ay2][ax] = ac
+			
+			# Sky
+			if (ay1 > 0):
+				for ay in range(0, ay1): ascii_buffer[ay][ax] = ' '
+			
+			# Wall
+			if (ay1+1 < ay2):
+				for ay in range(max(ay1+1, 0), min(ay2, ASCII_ROWS)):
+					
+					# Show block character
+					#ascii_buffer[ay][ax] = chr(64 + fblock1)
+					
+					# Solid
+					#ascii_buffer[ay][ax] = '#'
+					ascii_buffer[ay][ax] = ' '
+			
+			# Floor
+			if (ay2 < ASCII_ROWS-1):
+				for ay in range(ay2+1, ASCII_ROWS): ascii_buffer[ay][ax] = ':'
+			
+			
+			# Calc edge
+			if (ax > 0) and ((last_vertical != vertical) or (last_nblockx != nblockx1) or (last_nblocky != nblocky1)):
+				# Changed orientation: Show edge!
+				# Edge should span the maximum of both heights
+				ay1m = min(ay1, last_y1)
+				ay2m = max(ay2, last_y2)
+				ay = ay1m
+				while (ay <= ay2m):
+					if (ay >= 0) and (ay < ASCII_ROWS):
+						c = ascii_buffer[ay][ax]
+						if (c == '-') or (c == '_'): ascii_buffer[ay][ax] = '+'
+						else:
+							ascii_buffer[ay][ax] = '|'
+					ay += 1
+			
+			last_y1 = ay1
+			last_y2 = ay2
+			last_nblockx = nblockx1
+			last_nblocky = nblocky1
+			last_vertical = vertical
+			last_dis = dis1
+		*/
 		
 	}
 }
