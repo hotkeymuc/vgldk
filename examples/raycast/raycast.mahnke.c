@@ -43,7 +43,7 @@
 #define alert(s) { lcd_x = 0; lcd_y = 0; puts(s); getchar(); }
 //#define alert(s) ;
 
-//#define FISHEYE_CORRECTION
+#define FISHEYE_CORRECTION
 #define DRAW_DIST 4	// Maximum drawing distance (inner loop). If too big there will be z-wrap-arounds.
 #define OVER 1	// Oversample coordinates (increases overall spacial resolution)
 
@@ -99,7 +99,7 @@ int player_a;
 #define angtol (angf / 128)
 
 // Field of view
-#define fovangf (angf / 2)	// Keep it around angf/6
+#define fovangf (angf / 4)	// Keep it around angf/6
 
 
 //const byte tex_w = 64;	// Width of textures
@@ -528,9 +528,10 @@ void drawScreen() {
 					//dis1 = abs(int(dis1 * costable[abs((x-colsh)*fovangf//cols)]/ans))	# // OVER
 					ancheck = (x-colsh)*fovangf / cols;
 					if (ancheck < 0) ancheck = -ancheck;
-					anc = _cos(ancheck);
+					//anc = _cos(ancheck);
 					//if (anc < 0) anc = -anc;
-					dis1 = (dis1 * anc) / ans;
+					//dis1 = (dis1 * anc) / ans;
+					dis1 = (dis1 * _cos(ancheck)) / ans;
 				#else
 					dis1 = ((SINTABLE_OVER * dis1) / ans);
 				#endif
@@ -599,9 +600,10 @@ void drawScreen() {
 					//dis2 = abs(int(dis2 * costable[abs((x-colsh)*fovangf//cols)]/anc))	# // OVER
 					ancheck = (x-colsh)*fovangf / cols;
 					if (ancheck < 0) ancheck = -ancheck;
-					ans = _cos(ancheck);
+					//ans = _cos(ancheck);
 					//if (ans < 0) ans = -ans;
-					dis2 = (dis2 * ans) / anc;
+					//dis2 = (dis2 * ans) / anc;
+					dis2 = (dis2 * _cos(ancheck)) / anc;
 				#else
 					dis2 = ((SINTABLE_OVER * dis2) / anc);
 				#endif
