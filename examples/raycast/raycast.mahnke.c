@@ -17,7 +17,7 @@
 	// GL6000SL defaults to GFX mod e(although it can also do text mode)
 	#define GFX_MODE
 	
-	#define GFX_BLOCKY	// Use simple/fast byte-wise mode (8th of the horiz. resolution, but patterns)
+	//#define GFX_BLOCKY	// Use simple/fast byte-wise mode (8th of the horiz. resolution, but patterns)
 	
 	#ifdef GFX_BLOCKY
 		// We are drawing 8 bits at a time
@@ -457,10 +457,10 @@ void drawScreen() {
 	signed int dis1;
 	signed int dis2;
 	signed int rest;
-	signed int actdef1;
-	signed int actdef2;
-	signed int shortx, normalx;
-	signed int shorty, normaly;
+	signed int actx;
+	signed int acty;
+	signed int normalx;
+	signed int normaly;
 	
 	signed char nblockx1, nblocky1, texoff1;
 	signed char nblockx2, nblocky2, texoff2;
@@ -469,7 +469,7 @@ void drawScreen() {
 	byte vertical;
 	
 	//lcd_clear();
-	for(x = 0; x < cols; x += colstep) {
+	for (x = 0; x < cols; x += colstep) {
 		an = (player_a + angf + (x * fovangf) / cols - fovangh) % angf;
 		
 		ans = _sin(an);
@@ -479,24 +479,19 @@ void drawScreen() {
 		nblockx1 = 0;
 		nblocky1 = 0;
 		fblock1 = LEVEL_BLOCK_FREE;
-		dir1 = 0;
 		dis1 = 0;
-		actdef1 = 0;
 		texoff1 = 0;
 		ancheck = an % angh;
 		if ((ancheck >= angtol) && (ancheck <= angtol2)) {
 			dir1 = (an > angh) ? -1 : 1;
 			
-			//rest:int = abs((player.y_over % grid_y_over) - (dir1 * grid_y_over)) % grid_y_over
 			rest = (player_y_over % grid_y_over) - (dir1 * grid_y_over);
 			if (rest < 0) rest = -rest;
 			rest = rest % grid_y_over;
 			if ((rest == 0) && (dir1 > 0)) rest = grid_y_over;	// Prevent flicker at player x=128, y=192
 			
-			shortx = (rest * dir1 * anc) / ans;	// Short X
-			//shortx = (int)((long)rest * (long)dir1 * (long)anc) / ans;	// Short X
-			actdef1 = shortx;
-			nblockx1 = (player_x_over + shortx) / grid_x_over;
+			actx = player_x_over + (rest * dir1 * anc) / ans;	// Short X
+			nblockx1 = actx / grid_x_over;
 			nblocky1 = (player_y_over / grid_y_over) + dir1;
 			if ((nblockx1 >= 0) && (nblockx1 < levelmap_w)) {
 				fblock1 = levelmap[nblocky1][nblockx1];
@@ -505,12 +500,9 @@ void drawScreen() {
 					dis1 = rest;
 				} else {
 					normalx = (grid_y_over * dir1 * anc) / ans;
-					//normalx = (int)((long)grid_y_over * (long)dir1 * (long)anc) / ans;
-					
-					for(count = 1; count < DRAW_DIST; count++) {
-						actdef1 += normalx;
-						nblockx1 = (player_x_over + actdef1) / grid_x_over;	// trunc!
-						//nblockx1 = (int)(((long)player_x_over + actdef1) / grid_x_over);	// trunc!
+					for (count = 1; count < DRAW_DIST; count++) {
+						actx += normalx;
+						nblockx1 = actx / grid_x_over;	// trunc!
 						nblocky1 += dir1;
 						//if ((nblockx1 >= 0) && (nblockx1 < levelmap_w) && (nblocky1 >= 0) && (nblocky1 < levelmap_h)) {
 						//if ((nblockx1 >= 0) && (nblockx1 < levelmap_w)) {
@@ -546,8 +538,8 @@ void drawScreen() {
 				#endif
 				if (dis1 < 0) dis1 = -dis1;
 				
-				//texoff1 = (abs(player.x_over + actdef1) / OVER) % tex_w;
-				texoff1 = (player_x_over + actdef1) / OVER;
+				//texoff1 = (abs(player.x_over + actx) / OVER) % tex_w;
+				texoff1 = actx / OVER;
 				if (texoff1 < 0) texoff1 = -texoff1;
 				texoff1 = texoff1 % tex_w;
 			}
@@ -558,24 +550,19 @@ void drawScreen() {
 		nblockx2 = 0;
 		nblocky2 = 0;
 		fblock2 = LEVEL_BLOCK_FREE;
-		dir2 = 0;
 		dis2 = 0;
-		actdef2 = 0;
 		texoff2 = 0;
 		ancheck = (an + angq) % angh;
 		if ((ancheck >= angtol) && (ancheck <= angtol2)) {
 			dir2 = ((an % angtq) > angq) ? -1 : 1;
 			
-			//rest = abs((player.x_over % grid_x_over) - (dir2 * grid_x_over)) % grid_x_over
 			rest = (player_x_over % grid_x_over) - (dir2 * grid_x_over);
 			if (rest < 0) rest = -rest;
 			rest = rest % grid_x_over;
 			if ((rest == 0) && (dir2 > 0)) rest = grid_x_over;	// Prevent flicker at player x=128, y=192
 			
-			shorty = rest * dir2 * ans / anc;
-			//shorty = (int)((long)rest * (long)dir2 * (long)ans) / anc;
-			actdef2 = shorty;
-			nblocky2 = (player_y_over + shorty) / grid_y_over;
+			acty = player_y_over + rest * dir2 * ans / anc;	// Short Y
+			nblocky2 = acty / grid_y_over;
 			nblockx2 = (player_x_over / grid_x_over) + dir2;
 			if ((nblocky2 >= 0) && (nblocky2 < levelmap_h)) {
 				fblock2 = levelmap[nblocky2][nblockx2];
@@ -584,12 +571,10 @@ void drawScreen() {
 					dis2 = rest;
 				} else {
 					normaly = grid_x_over * dir2 * ans / anc;
-					//normaly = (int)((long)grid_x_over * (long)dir2 * (long)ans) / anc;
 					
-					for(count = 1; count < DRAW_DIST; count++) {
-						actdef2 += normaly;
-						nblocky2 = (player_y_over + actdef2) / grid_y_over;	// trunc!
-						//nblocky2 = (int)(((long)player_y_over + actdef2) / grid_y_over);	// trunc!
+					for (count = 1; count < DRAW_DIST; count++) {
+						acty += normaly;
+						nblocky2 = acty / grid_y_over;	// trunc!
 						nblockx2 += dir2;
 						//if ((nblockx2 >= 0) && (nblockx2 < levelmap_w) && (nblocky2 >= 0) && (nblocky2 < levelmap_h)) {
 						//if ((nblocky2 >= 0) && (nblocky2 < levelmap_h)) {
@@ -624,8 +609,7 @@ void drawScreen() {
 				#endif
 				if (dis2 < 0) dis2 = -dis2;
 				
-				//texoff2 = (abs(player.x_over + actdef2) / OVER) % tex_w;
-				texoff2 = (player_y_over + actdef2) / OVER;
+				texoff2 = acty / OVER;
 				if (texoff2 < 0) texoff2 = -texoff2;
 				texoff2 = texoff2 % tex_w;
 			}
@@ -653,7 +637,6 @@ void drawScreen() {
 			
 			nblockx1 = nblockx2;
 			nblocky1 = nblocky2;
-			actdef1 = actdef2;
 			dir1 = dir2;
 		}
 		
