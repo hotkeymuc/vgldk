@@ -85,8 +85,6 @@ int player_a;
 #define SPEED_TURN (SINTABLE_SIZE/32)	// Speed for turning
 
 
-//const byte cols = 20;
-//const byte rows = 4;
 //const byte cols = SCREEN_W;
 //const byte rows = SCREEN_H;
 #define cols SCREEN_W
@@ -101,7 +99,7 @@ int player_a;
 #define angtol (angf / 128)
 
 // Field of view
-#define fovangf (angf / 4)	// Keep it around angf/6
+#define fovangf (angf / 2)	// Keep it around angf/6
 
 
 //const byte tex_w = 64;	// Width of textures
