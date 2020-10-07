@@ -291,7 +291,9 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	void drawVLine_fine(int x, int y1, int y2, byte c) {
 		byte *p;
 		int y;
-		byte c_andor;
+		//byte c_andor;
+		byte c_or;
+		byte c_and;
 		
 		
 		//if (h <= 0) return;
@@ -305,24 +307,38 @@ const char levelmap[levelmap_w][levelmap_h] = {
 		
 		p = (byte *)lcd_addr + y1*FB_INC + (x >> 3);
 		
-		// Determine the bitmask
-		c_andor = 1 << (7 - (x & 0x07));
+		// Create the bitmask
+		c_or = 1 << (7 - (x & 0x07));
+		/*
 		if (c > 0) {
 			// Color it (increase it / set bits via OR)
 			//for(y = 0; y < h; y++) {
 			for(y = y1; y < y2; y++) {
-				*p |= c_andor;
+				*p |= c_or;
 				p += FB_INC;
 			}
 		} else {
 			// De-color it (decrease it / unset bits via AND)
-			c_andor = 0xff - c_andor;
+			c_and = 0xff - c_or;
 			//for(y = 0; y < h; y++) {
 			for(y = y1; y < y2; y++) {
-				*p &= c_andor;
+				*p &= c_and;
 				p += FB_INC;
 			}
 		}
+		*/
+		// Allow patterns
+		c_and = 0xff - c_or;
+		//for(y = 0; y < h; y++) {
+		for(y = y1; y < y2; y++) {
+			if (c & (1 << (y%8)) > 0)
+				*p |= c_or;
+			else
+				*p &= c_and;
+			
+			p += FB_INC;
+		}
+		
 	}
 	
 	
