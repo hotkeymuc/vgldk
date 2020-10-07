@@ -17,7 +17,7 @@
 	// GL6000SL defaults to GFX mod e(although it can also do text mode)
 	#define GFX_MODE
 	
-	//#define GFX_BLOCKY	// Use simple byte-wise mode (8th of the horiz. resolution, but patterns)
+	#define GFX_BLOCKY	// Use simple/fast byte-wise mode (8th of the horiz. resolution, but patterns)
 	
 	#ifdef GFX_BLOCKY
 		// We are drawing 8 bits at a time
@@ -44,7 +44,7 @@
 //#define alert(s) ;
 
 #define FISHEYE_CORRECTION
-#define OVER 1	// Oversample coordinates
+#define OVER 1	// Oversample coordinates (increases overall spacial resolution)
 
 
 
@@ -97,12 +97,12 @@ int player_a;
 //#define angf (cols / 4)
 #define angf SINTABLE_SIZE
 //const byte angtol = angf / 256;	// Resolution of edge finder, keep it around 1-2 degrees or 2-4 columns
-#define angtol 2	//(angf / 256)	// Resolution of edge finder, keep it around 1-2 degrees or 2-4 columns
+#define angtol (angf / 64)
 
 // Field of view
 #define fovangf (angf / 4)	// Keep it around angf/6
 
-#define DRAW_DIST 8	// Maximum drawing distance (inner loop)
+#define DRAW_DIST 4	// Maximum drawing distance (inner loop). If too big there will be z-wrap-arounds.
 
 //const byte tex_w = 64;	// Width of textures
 //const byte tex_h = 64;	// Height of textures
@@ -114,12 +114,9 @@ int player_a;
 //const int grid_x = 64;	// Width of level blocks
 //const int grid_y = 64;	// Length of level blocks
 //const int wall_height = 64;	// Height of level blocks
-//#define grid_x 64	// Width of level blocks
-//#define grid_y 64	// Length of level blocks
-//#define wall_height 64	// Height of level blocks
-#define grid_x 32	// Width of level blocks
-#define grid_y 32	// Length of level blocks
-#define wall_height 32	// Height of level blocks
+#define grid_x 64	// Width of level blocks
+#define grid_y 64	// Length of level blocks
+#define wall_height 64	// Height of level blocks
 
 
 // Map
@@ -169,7 +166,6 @@ const char levelmap[levelmap_w][levelmap_h] = {
 
 
 #ifdef TEXT_MODE
-	#define OVERSAMPLE_RAY 1	// When pathtracing use enhanced z resolution
 	/*
 	void lcd_putchar_at(int x, int y, char c) {
 		lcd_x = x;
@@ -183,9 +179,9 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	#define CHAR_FLOOR ':'
 	//#define CHAR_FLOOR ' '
 	
-	#define MAX_DEPTH DRAW_DIST
+	#define NUM_COL_PATTERNS 8
 	// Column graphics
-	const char COL_PATTERNS[MAX_DEPTH][SCREEN_H] = {
+	const char COL_PATTERNS[NUM_COL_PATTERNS][SCREEN_H] = {
 		{
 			CHAR_WALL,
 			CHAR_WALL,
@@ -246,29 +242,30 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	};
 	
 	
-	void drawCol(byte x, int z, char b) {
+	void drawColumn(byte x, int z, char b) {
 		// Draw one column of graphics
 		byte y;
 		char c;
 		
-		z /= OVERSAMPLE_RAY;
-		if (z >= MAX_DEPTH) z = MAX_DEPTH-1;	// z clip
 		
-		for(y = 0; y < SCREEN_H; y++) {
+		
+		z /= grid_y_over;
+		if ((z <= 0) || (z >= NUM_COL_PATTERNS)) z = NUM_COL_PATTERNS-1;	// z clip
+		lcd_putchar_at(x, 1, '0'+z);
+		
+		
+		for(y = 2; y < SCREEN_H; y++) {
 			c = COL_PATTERNS[z][y];
-			if (c == CHAR_WALL) c = b;	// Replace wall character by block character
+			//if (c == CHAR_WALL) c = b;	// Replace wall character by block character
 			lcd_putchar_at(x, y, c);
 		}
+		
 	}
 #endif
 
 #ifdef GFX_MODE
-	#define OVERSAMPLE_RAY 1	// Enhanced ray cast resolution - This hugely increases calculation time!
-	
-	#define MAX_DEPTH (DRAW_DIST*OVER)
 	
 	#define FB_INC (LCD_W/8)	// How far to increment on the frame buffer to be on next line
-	
 	
 	void drawVLine_blocky(int x, int y1, int h, byte c) {
 		byte *p;
@@ -305,33 +302,40 @@ const char levelmap[levelmap_w][levelmap_h] = {
 		//y2 = y1 + h;
 		if (y2 >= SCREEN_H) y2 = SCREEN_H - 1;
 		
+		// Start offset in frame buffer
 		p = (byte *)lcd_addr + y1*FB_INC + (x >> 3);
 		
-		// Create the bitmask
+		// Create the bitmask for that pixel column
 		c_or = 1 << (7 - (x & 0x07));
-		/*
-		if (c > 0) {
+		
+		//if (c > 0) {
+		if (c == 0xff) {
 			// Color it (increase it / set bits via OR)
 			//for(y = 0; y < h; y++) {
-			for(y = y1; y < y2; y++) {
+			for(y = y1; y <= y2; y++) {
 				*p |= c_or;
 				p += FB_INC;
 			}
-		} else {
+			return;
+		}
+		
+		//else {
+		if (c == 0x00) {
 			// De-color it (decrease it / unset bits via AND)
-			c_and = 0xff - c_or;
+			c_and = 0xff ^ c_or;
 			//for(y = 0; y < h; y++) {
-			for(y = y1; y < y2; y++) {
+			for(y = y1; y <= y2; y++) {
 				*p &= c_and;
 				p += FB_INC;
 			}
+			return;
 		}
-		*/
+		
 		// Allow patterns
-		c_and = 0xff - c_or;
+		c_and = 0xff ^ c_or;
 		//for(y = 0; y < h; y++) {
-		for(y = y1; y < y2; y++) {
-			if (c & (1 << (y%8)) > 0)
+		for(y = y1; y <= y2; y++) {
+			if ((c & (1 << (y%8))) > 0)
 				*p |= c_or;
 			else
 				*p &= c_and;
@@ -342,30 +346,23 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	}
 	
 	
-	void drawCol(int x, int z, char b) {
+	void drawColumn(int x, int z, char b) {
 		// Draw one column of graphics
-		
 		
 		byte c;
 		unsigned int h;
-		//word zz;
 		byte y;
 		byte yStart;
 		
+		#ifdef GFX_BLOCKY
 		byte *p;
+		#endif
 		
 		if (z < 1) {
 			h = 0;
 		} else {
 			//if (z > OVERSAMPLE_RAY*MAX_DEPTH-1) z = OVERSAMPLE_RAY*MAX_DEPTH-1;	// z clip
 			
-			// Calculate the height of the wall column
-			//h = (MAX_DEPTH * SCREEN_H * OVERSAMPLE_RAY) / (z*4 + 1);
-			
-			// This is the tricky part (making it look nice)
-			//h = (SCREEN_H * OVERSAMPLE_RAY*OVERSAMPLE_RAY) / (1 + z*z);
-			//h = (SCREEN_H * OVERSAMPLE_RAY) / (1 + 3*z);
-			//h = (SCREEN_H * OVERSAMPLE_RAY) / (1 + z);
 			h = (wall_height_over * rows) / z;
 			h = h / OVER;
 			
@@ -416,14 +413,17 @@ const char levelmap[levelmap_w][levelmap_h] = {
 			// Bit-wise "fine" mode
 			
 			// Ceiling
-			drawVLine_fine(x, 0, yStart, 0x00);
+			drawVLine_fine(x, 0, yStart-1, 0x00);
 			
 			// Wall
 			y = yStart + h;
 			drawVLine_fine(x, yStart, y, c);
 			
 			// Floor
-			drawVLine_fine(x, y, rows, 0x00);
+			//drawVLine_fine(x, y, rows, 0x00);	// white
+			//drawVLine_fine(x, y, rows, ((y%2==0) ? 0x55 : 0xaa));	// 50% gray
+			drawVLine_fine(x, y+1, rows, (x%2==0) ? (1+16) : (4+64));	// 25% gray
+			//drawVLine_fine(x, y, rows, ((y%2==0) ? 0x55 : 0xaa));	// stripes
 			
 		#endif
 		
@@ -500,7 +500,6 @@ void drawScreen() {
 				} else {
 					//dis1 = -1;
 					normalx = ((int)grid_y_over * (int)dir1 * (int)anc) / (int)ans;
-					//if (normalx > grid_y_over*3) alert("Skipping more than grid!");
 					
 					for(count = 1; count < DRAW_DIST; count++) {
 						actdef1 += normalx;
@@ -511,12 +510,11 @@ void drawScreen() {
 						if ((nblockx1 < 0) || (nblockx1 >= levelmap_w)) {
 							fblock1 = LEVEL_BLOCK_FREE;	// resp. LEVEL_BLOCK_OOB
 							break;
-						} else {
-							fblock1 = levelmap[nblocky1][nblockx1];
-							if (fblock1 != LEVEL_BLOCK_FREE) {
-								dis1 = (int)rest + (int)count * (int)grid_y_over;
-								break;
-							}
+						}
+						fblock1 = levelmap[nblocky1][nblockx1];
+						if (fblock1 != LEVEL_BLOCK_FREE) {
+							dis1 = (int)rest + (int)count * (int)grid_y_over;
+							break;
 						}
 					}
 				}
@@ -526,7 +524,6 @@ void drawScreen() {
 			if (dis1 != -1) {
 				#ifdef FISHEYE_CORRECTION
 					// Fisheye correction
-					//@TODO: Numerical unstable
 					//dis1 = abs(int(dis1 * costable[abs((x-colsh)*fovangf//cols)]/ans))	# // OVER
 					ancheck = (x-colsh)*fovangf / cols;
 					if (ancheck < 0) ancheck = -ancheck;
@@ -574,6 +571,7 @@ void drawScreen() {
 				} else {
 					//dis2 = -1;
 					normaly = (int)grid_x_over * (int)dir2 * (int)ans / (int)anc;
+					
 					for(count = 1; count < DRAW_DIST; count++) {
 						actdef2 += normaly;
 						nblocky2 = (player_y_over + actdef2) / grid_y_over;	// trunc!
@@ -583,12 +581,11 @@ void drawScreen() {
 						if ((nblocky2 < 0) || (nblocky2 >= levelmap_h)) {
 							fblock2 = LEVEL_BLOCK_FREE;	// resp. LEVEL_BLOCK_OOB
 							break;
-						} else {
-							fblock2 = levelmap[nblocky2][nblockx2];
-							if (fblock2 != LEVEL_BLOCK_FREE) {
-								dis2 = rest + (int)count * grid_x_over;
-								break;
-							}
+						}
+						fblock2 = levelmap[nblocky2][nblockx2];
+						if (fblock2 != LEVEL_BLOCK_FREE) {
+							dis2 = rest + (int)count * grid_x_over;
+							break;
 						}
 					}
 				}
@@ -598,7 +595,6 @@ void drawScreen() {
 			if (dis2 != -1) {
 				#ifdef FISHEYE_CORRECTION
 					// Fisheye correction
-					//@TODO: Numerical unstable
 					//dis2 = abs(int(dis2 * costable[abs((x-colsh)*fovangf//cols)]/anc))	# // OVER
 					ancheck = (x-colsh)*fovangf / cols;
 					if (ancheck < 0) ancheck = -ancheck;
@@ -617,7 +613,7 @@ void drawScreen() {
 		}
 		
 		
-		//dir2 = -1;	//@FIXME: For testing: Only show horiz. walls
+		//dis1 = -1;	// For testing: Only show result of one intersection
 		
 		// Determine which of the ones (H/V) to use
 		vertical = 0;
@@ -648,7 +644,7 @@ void drawScreen() {
 		
 		// Actually draw the column
 		//if (fblock1 != LEVEL_BLOCK_FREE) {
-		drawCol(x, dis1, fblock1);
+		drawColumn(x, dis1, fblock1);
 		//}
 		
 		/*
@@ -768,7 +764,8 @@ void main() {
 	//player_a = 3 * SINTABLE_SIZE / 4;	// Look upwards
 	//player_a = 2 * SINTABLE_SIZE / 4;	// Look left
 	player_a = 1 * SINTABLE_SIZE / 4;	// Look down
-	player_a = 0;	// Look right
+	//player_a = 0;	// Look right
+	//player_a = 32;	// Look down/right
 	
 	while(1) {
 		
