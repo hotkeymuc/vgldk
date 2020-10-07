@@ -43,7 +43,8 @@
 #define alert(s) { lcd_x = 0; lcd_y = 0; puts(s); getchar(); }
 //#define alert(s) ;
 
-#define FISHEYE_CORRECTION
+//#define FISHEYE_CORRECTION
+#define DRAW_DIST 4	// Maximum drawing distance (inner loop). If too big there will be z-wrap-arounds.
 #define OVER 1	// Oversample coordinates (increases overall spacial resolution)
 
 
@@ -97,12 +98,11 @@ int player_a;
 //#define angf (cols / 4)
 #define angf SINTABLE_SIZE
 //const byte angtol = angf / 256;	// Resolution of edge finder, keep it around 1-2 degrees or 2-4 columns
-#define angtol (angf / 64)
+#define angtol (angf / 128)
 
 // Field of view
 #define fovangf (angf / 4)	// Keep it around angf/6
 
-#define DRAW_DIST 4	// Maximum drawing distance (inner loop). If too big there will be z-wrap-arounds.
 
 //const byte tex_w = 64;	// Width of textures
 //const byte tex_h = 64;	// Height of textures
@@ -134,11 +134,11 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','?'},
 	{'#',' ',' ',' ',' ',' ',' ', 32,' ',' ',' ',' ',' ',' ',' ','?'},
 	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#'},
-	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#'},
-	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#'},
-	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#'},
-	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#'},
-	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#'},
+	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#','%',' ','%','#'},
+	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#',' ',' ',' ','#'},
+	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#',' ',' ',' ','#'},
+	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#',' ',' ',' ','#'},
+	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#',' ',' ',' ','#'},
 	{'#','#','#','#','#','#','#','#','#','#','#','#','#','#','#','#'},
 };
 
@@ -363,8 +363,9 @@ const char levelmap[levelmap_w][levelmap_h] = {
 		} else {
 			//if (z > OVERSAMPLE_RAY*MAX_DEPTH-1) z = OVERSAMPLE_RAY*MAX_DEPTH-1;	// z clip
 			
-			h = (wall_height_over * rows) / z;
-			h = h / OVER;
+			//h = (wall_height_over * rows) / z;
+			//h = h / OVER;
+			h = (wall_height * rows) / z;
 			
 			if (h > SCREEN_H) h = SCREEN_H;
 			//else if (h < 0) h = 0;
@@ -444,24 +445,28 @@ void drawScreen() {
 	*/
 	
 	signed int x;
+	signed int count;
+	
 	//SINTABLE_INDEX_TYPE an, ancheck;
 	signed int an, ancheck;
 	//SINTABLE_VALUE_TYPE ans, anc;
 	signed int ans, anc;
-	signed int count;
-	signed int rest;
-	byte vertical;
 	
+	signed char dir1;
+	signed char dir2;
+	signed int dis1;
+	signed int dis2;
+	signed int rest;
+	signed int actdef1;
+	signed int actdef2;
 	signed int shortx, normalx;
 	signed int shorty, normaly;
 	
-	signed char nblockx1, nblocky1;
-	signed char nblockx2, nblocky2;
+	signed char nblockx1, nblocky1, texoff1;
+	signed char nblockx2, nblocky2, texoff2;
 	byte fblock1;
 	byte fblock2;
-	signed int dir1, dis1, actdef1, texoff1;
-	signed int dir2, dis2, actdef2, texoff2;
-	
+	byte vertical;
 	
 	//lcd_clear();
 	for(x = 0; x < cols; x += colstep) {
@@ -475,7 +480,7 @@ void drawScreen() {
 		nblocky1 = 0;
 		fblock1 = LEVEL_BLOCK_FREE;
 		dir1 = 0;
-		dis1 = -1;
+		dis1 = 0;
 		actdef1 = 0;
 		texoff1 = 0;
 		ancheck = an % angh;
@@ -483,12 +488,13 @@ void drawScreen() {
 			dir1 = (an > angh) ? -1 : 1;
 			
 			//rest:int = abs((player.y_over % grid_y_over) - (dir1 * grid_y_over)) % grid_y_over
-			rest = (int)(player_y_over % grid_y_over) - ((int)dir1 * (int)grid_y_over);
+			rest = (player_y_over % grid_y_over) - (dir1 * grid_y_over);
 			if (rest < 0) rest = -rest;
 			rest = rest % grid_y_over;
 			if ((rest == 0) && (dir1 > 0)) rest = grid_y_over;	// Prevent flicker at player x=128, y=192
 			
-			shortx = ((int)rest * (int)dir1 * (int)anc) / (int)ans;
+			shortx = (rest * dir1 * anc) / ans;	// Short X
+			//shortx = (int)((long)rest * (long)dir1 * (long)anc) / ans;	// Short X
 			actdef1 = shortx;
 			nblockx1 = (player_x_over + shortx) / grid_x_over;
 			nblocky1 = (player_y_over / grid_y_over) + dir1;
@@ -498,22 +504,25 @@ void drawScreen() {
 					// Standing in front of a block
 					dis1 = rest;
 				} else {
-					//dis1 = -1;
-					normalx = ((int)grid_y_over * (int)dir1 * (int)anc) / (int)ans;
+					normalx = (grid_y_over * dir1 * anc) / ans;
+					//normalx = (int)((long)grid_y_over * (long)dir1 * (long)anc) / ans;
 					
 					for(count = 1; count < DRAW_DIST; count++) {
 						actdef1 += normalx;
 						nblockx1 = (player_x_over + actdef1) / grid_x_over;	// trunc!
+						//nblockx1 = (int)(((long)player_x_over + actdef1) / grid_x_over);	// trunc!
 						nblocky1 += dir1;
 						//if ((nblockx1 >= 0) && (nblockx1 < levelmap_w) && (nblocky1 >= 0) && (nblocky1 < levelmap_h)) {
 						//if ((nblockx1 >= 0) && (nblockx1 < levelmap_w)) {
-						if ((nblockx1 < 0) || (nblockx1 >= levelmap_w)) {
+						//if ((nblockx1 < 0) || (nblockx1 >= levelmap_w)) {
+						if ((nblockx1 < 0) || (nblockx1 >= levelmap_w) || (nblocky1 < 0) || (nblocky1 >= levelmap_h)) {
 							fblock1 = LEVEL_BLOCK_FREE;	// resp. LEVEL_BLOCK_OOB
 							break;
 						}
 						fblock1 = levelmap[nblocky1][nblockx1];
 						if (fblock1 != LEVEL_BLOCK_FREE) {
-							dis1 = (int)rest + (int)count * (int)grid_y_over;
+							dis1 = rest + count * grid_y_over;
+							//dis1 = (int)(rest + (long)count * grid_y_over);
 							break;
 						}
 					}
@@ -521,15 +530,19 @@ void drawScreen() {
 			}
 			
 			
-			if (dis1 != -1) {
+			if (dis1 != 0) {
+				// Make sure we don't get negative
+				//if (ans < 0) ans = -ans;
 				#ifdef FISHEYE_CORRECTION
 					// Fisheye correction
 					//dis1 = abs(int(dis1 * costable[abs((x-colsh)*fovangf//cols)]/ans))	# // OVER
 					ancheck = (x-colsh)*fovangf / cols;
 					if (ancheck < 0) ancheck = -ancheck;
-					dis1 = (dis1 * _cos(ancheck)) / ans;
+					anc = _cos(ancheck);
+					//if (anc < 0) anc = -anc;
+					dis1 = (dis1 * anc) / ans;
 				#else
-					dis1 = ((int)SINTABLE_OVER * (int)dis1) / (int)ans;
+					dis1 = ((SINTABLE_OVER * dis1) / ans);
 				#endif
 				if (dis1 < 0) dis1 = -dis1;
 				
@@ -546,7 +559,7 @@ void drawScreen() {
 		nblocky2 = 0;
 		fblock2 = LEVEL_BLOCK_FREE;
 		dir2 = 0;
-		dis2 = -1;
+		dis2 = 0;
 		actdef2 = 0;
 		texoff2 = 0;
 		ancheck = (an + angq) % angh;
@@ -554,12 +567,13 @@ void drawScreen() {
 			dir2 = ((an % angtq) > angq) ? -1 : 1;
 			
 			//rest = abs((player.x_over % grid_x_over) - (dir2 * grid_x_over)) % grid_x_over
-			rest = (int)(player_x_over % grid_x_over) - ((int)dir2 * grid_x_over);
+			rest = (player_x_over % grid_x_over) - (dir2 * grid_x_over);
 			if (rest < 0) rest = -rest;
 			rest = rest % grid_x_over;
 			if ((rest == 0) && (dir2 > 0)) rest = grid_x_over;	// Prevent flicker at player x=128, y=192
 			
-			shorty = (int)rest * (int)dir2 * (int)ans / (int)anc;
+			shorty = rest * dir2 * ans / anc;
+			//shorty = (int)((long)rest * (long)dir2 * (long)ans) / anc;
 			actdef2 = shorty;
 			nblocky2 = (player_y_over + shorty) / grid_y_over;
 			nblockx2 = (player_x_over / grid_x_over) + dir2;
@@ -569,22 +583,25 @@ void drawScreen() {
 					// Standing in front of a block
 					dis2 = rest;
 				} else {
-					//dis2 = -1;
-					normaly = (int)grid_x_over * (int)dir2 * (int)ans / (int)anc;
+					normaly = grid_x_over * dir2 * ans / anc;
+					//normaly = (int)((long)grid_x_over * (long)dir2 * (long)ans) / anc;
 					
 					for(count = 1; count < DRAW_DIST; count++) {
 						actdef2 += normaly;
 						nblocky2 = (player_y_over + actdef2) / grid_y_over;	// trunc!
+						//nblocky2 = (int)(((long)player_y_over + actdef2) / grid_y_over);	// trunc!
 						nblockx2 += dir2;
 						//if ((nblockx2 >= 0) && (nblockx2 < levelmap_w) && (nblocky2 >= 0) && (nblocky2 < levelmap_h)) {
 						//if ((nblocky2 >= 0) && (nblocky2 < levelmap_h)) {
-						if ((nblocky2 < 0) || (nblocky2 >= levelmap_h)) {
+						//if ((nblocky2 < 0) || (nblocky2 >= levelmap_h)) {
+						if ((nblocky2 < 0) || (nblocky2 >= levelmap_h) || (nblockx2 < 0) || (nblockx2 >= levelmap_w)) {
 							fblock2 = LEVEL_BLOCK_FREE;	// resp. LEVEL_BLOCK_OOB
 							break;
 						}
 						fblock2 = levelmap[nblocky2][nblockx2];
 						if (fblock2 != LEVEL_BLOCK_FREE) {
-							dis2 = rest + (int)count * grid_x_over;
+							dis2 = rest + count * grid_x_over;
+							//dis2 = (int)(rest + (long)count * grid_x_over);
 							break;
 						}
 					}
@@ -592,15 +609,18 @@ void drawScreen() {
 			}
 			
 			
-			if (dis2 != -1) {
+			if (dis2 != 0) {
+				//if (anc < 0) anc = -anc;
 				#ifdef FISHEYE_CORRECTION
 					// Fisheye correction
 					//dis2 = abs(int(dis2 * costable[abs((x-colsh)*fovangf//cols)]/anc))	# // OVER
 					ancheck = (x-colsh)*fovangf / cols;
 					if (ancheck < 0) ancheck = -ancheck;
-					dis2 = (dis2 * _cos(ancheck)) / anc;
+					ans = _cos(ancheck);
+					//if (ans < 0) ans = -ans;
+					dis2 = (dis2 * ans) / anc;
 				#else
-					dis2 = ((int)SINTABLE_OVER * (int)dis2) / (int)anc;
+					dis2 = ((SINTABLE_OVER * dis2) / anc);
 				#endif
 				if (dis2 < 0) dis2 = -dis2;
 				
@@ -613,22 +633,19 @@ void drawScreen() {
 		}
 		
 		
-		//dis1 = -1;	// For testing: Only show result of one intersection
+		//dis2 = 0;	// For testing: Only show result of one intersection
 		
 		// Determine which of the ones (H/V) to use
 		vertical = 0;
-		if ((dis1 == -1) && (dis2 != -1)) {
+		if ((dis1 == 0) && (dis2 != 0)) {
 			dis1 = dis2;
 			vertical = 1;
 		}
-		if ((dis2 != -1) && (dis1 != -1) && (dis2 < dis1)) {
+		if ((dis2 != 0) && (dis1 != 0) && (dis2 < dis1)) {
 			dis1 = dis2;
 			vertical = 1;
 		}
-		/*
-		if (dis1 == -1)
-			dis1 = 0;
-		*/
+		
 		if (vertical == 1) {
 			// Use values of vertical intersection
 			texoff1 = texoff2;
@@ -743,9 +760,9 @@ void drawScreen() {
 
 void main() {
 	char c;
-	int move_a;	// Rotation
-	int move_x;	// Strafe
-	int move_z;	// Move forward
+	signed char move_a;	// Rotation
+	signed char move_x;	// Strafe
+	signed char move_z;	// Move forward
 	//SINTABLE_VALUE_TYPE sx;
 	//SINTABLE_VALUE_TYPE sz;
 	int ans, anc;
@@ -759,13 +776,13 @@ void main() {
 	//player_x_over = 29 * grid_x * OVER;
 	//player_y_over = (57 - 3) * grid_y * OVER;
 	player_x_over = levelmap_w/2 * grid_x_over;
-	//player_y_over = levelmap_h/2 * grid_y_over;
-	player_y_over = 3 * grid_y_over;
+	player_y_over = levelmap_h/2 * grid_y_over;
+	//player_y_over = 3 * grid_y_over;
 	//player_a = 3 * SINTABLE_SIZE / 4;	// Look upwards
 	//player_a = 2 * SINTABLE_SIZE / 4;	// Look left
-	player_a = 1 * SINTABLE_SIZE / 4;	// Look down
+	//player_a = 1 * SINTABLE_SIZE / 4;	// Look down
 	//player_a = 0;	// Look right
-	//player_a = 32;	// Look down/right
+	player_a = 32;	// Look down/right
 	
 	while(1) {
 		
