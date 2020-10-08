@@ -177,6 +177,16 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	}
 	*/
 	
+	
+	// For ASCII mode
+	signed int last_y1, last_y2;
+	signed char last_nblockx, last_nblocky;
+	//signed int last_dis;
+	byte last_vertical;
+	int ay, ay1, ay2, alinehd, ah1, ah2;
+	char ac;
+	char ascii_buffer[rows];
+	
 	/*
 	// Pre-defined patterns
 	#define CHAR_CEIL ' '
@@ -259,8 +269,112 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	*/
 	
 	// Use dynamic drawing
-	//void drawColumn(int x, int y1, int y2, int last_y1, int last_y2, ...) {
-	//}
+	void drawColumn(int x, int dis, char fblock, signed char nblockx, signed char nblocky, byte vertical) {
+		if (x == 0) {
+			// Init
+			last_y1 = 0;
+			last_y2 = rows-1;	//ASCII_ROWS-1
+			last_nblockx = 0;
+			last_nblocky = 0;
+			//last_dis = 0;
+			last_vertical = 0;
+		}
+		
+		// Draw ASCII
+		(void)fblock;	// Prevent warning
+		
+		// Show corners
+		if (dis <= 0) {
+			alinehd = 0;
+		} else {
+			alinehd = (wall_height_over * rows) / (1+dis);
+		}
+		
+		//ah1 = (rows - alinehd/2) - 1;	// "-1" to allow independent rounding of top/bottom
+		ah1 = (rows - (alinehd+1)/2);	// "-1" to allow independent rounding of top/bottom
+		ay1 = ah1 / 2;
+		if ((ay1 >= 0) && (ay1 < rows)) {
+			ac = (ah1 % 2 == 0) ? '-' : '_';
+			//if (vertical == last_vertical):
+			//	if (last_y1 < ay1): ac = '\\'
+			//	if (last_y1 > ay1): ac = '/'
+			ascii_buffer[ay1] = ac;
+		}
+		
+		ah2 = (rows + alinehd/2);
+		ay2 = ah2 / 2;
+		if ((ay2 >= 0) && (ay2 < rows)) {
+			//if (ay1 == ay2) ac = '='; else	// Collapse
+			ac = (ah2 % 2 == 0) ? '-' : '_';
+			//if (vertical == last_vertical):
+			//	if (last_y2 < ay2): ac = '\\'
+			//	if (last_y2 > ay2): ac = '/'
+			ascii_buffer[ay2] = ac;
+		}
+		
+		// Sky
+		if (ay1 > 0) {
+			for (ay = 0; ay < ay1; ay++) {
+				ascii_buffer[ay] = ' ';
+			}
+		}
+		
+		// Wall
+		if (ay1+1 < ay2) {
+			for (ay = ((ay1+1>0) ? ay1+1 : 0); ay < ((ay2 < rows) ? ay2 : rows); ay++) {
+				// Show block character
+				//ascii_buffer[ay] = (64 + fblock);
+				
+				// Solid
+				//ascii_buffer[ay] = '#';
+				ascii_buffer[ay] = ' ';
+			}
+		}
+		// Floor
+		if (ay2 < rows-1) {
+			for (ay = ay2+1; ay < rows; ay++) {
+				ascii_buffer[ay] = ':';
+			}
+		}
+		
+		
+		// Calc edge
+		if ((x > 0) && ((last_vertical != vertical) || (last_nblockx != nblockx) || (last_nblocky != nblocky))) {
+			// Changed orientation: Show edge!
+			// Edge should span the maximum of both heights
+			for (ay = ((ay1 < last_y1) ? ay1 : last_y1); ay <= ((ay2 > last_y2) ? ay2 : last_y2); ay++) {
+				if ((ay >= 0) && (ay < rows)) {
+					ac = ascii_buffer[ay];
+					if (ac == '=')
+						ascii_buffer[ay] = '#';
+					else
+					if ((ac == '-') || (ac == '_'))
+						ascii_buffer[ay] = '+';
+					else
+						ascii_buffer[ay] = '|';
+				}
+			}
+		}
+		
+		// Debug
+		//ascii_buffer[0] = '0' + ay1;
+		//ascii_buffer[1] = '0' + alinehd;
+		//ascii_buffer[3] = '0' + ay2;
+		
+		// Draw
+		for (ay = 0; ay < rows; ay++) {
+			lcd_putchar_at(x, ay, ascii_buffer[ay]);
+		}
+		
+		last_y1 = ay1;
+		last_y2 = ay2;
+		last_nblockx = nblockx;
+		last_nblocky = nblocky;
+		last_vertical = vertical;
+		//last_dis = dis;
+		
+		
+	}
 	
 #endif
 
@@ -457,24 +571,6 @@ void drawScreen() {
 	byte vertical;
 	
 	
-	// For ASCII mode
-	signed int last_y1, last_y2;
-	signed char last_nblockx, last_nblocky;
-	signed int last_dis;
-	byte last_vertical;
-	int ay, ay1, ay2, alinehd, ah1, ah2;
-	char ac;
-	char ascii_buffer[rows];
-	
-	// For ASCII mode
-	last_y1 = 0;
-	last_y2 = rows-1;	//ASCII_ROWS-1
-	last_nblockx = 0;
-	last_nblocky = 0;
-	last_dis = 0;
-	last_vertical = 0;
-	
-	
 	//lcd_clear();
 	for (x = 0; x < cols; x += colstep) {
 		an = (player_a + angf + (x * fovangf) / cols - fovangh) % angf;
@@ -663,99 +759,11 @@ void drawScreen() {
 		
 		
 		// Actually draw the column
-		#ifdef GFX_MODE
-			drawColumn(x, dis1, fblock1);
+		#ifdef TEXT_MODE
+			// Text mode requires more info (for edge detection)
+			drawColumn(x, dis1, fblock1, nblockx1, nblocky1, vertical);
 		#else
-			// Draw ASCII
-			// Show corners
-			if (dis1 <= 0) {
-				alinehd = 0;
-			} else {
-				alinehd = (wall_height_over * rows) / (1+dis1);
-			}
-			
-			//ah1 = (rows - alinehd/2) - 1;	// "-1" to allow independent rounding of top/bottom
-			ah1 = (rows - (alinehd+1)/2);	// "-1" to allow independent rounding of top/bottom
-			ay1 = ah1 / 2;
-			if ((ay1 >= 0) && (ay1 < rows)) {
-				ac = (ah1 % 2 == 0) ? '-' : '_';
-				//if (vertical == last_vertical):
-				//	if (last_y1 < ay1): ac = '\\'
-				//	if (last_y1 > ay1): ac = '/'
-				ascii_buffer[ay1] = ac;
-			}
-			
-			ah2 = (rows + alinehd/2);
-			ay2 = ah2 / 2;
-			if ((ay2 >= 0) && (ay2 < rows)) {
-				//if (ay1 == ay2) ac = '='; else	// Collapse
-				ac = (ah2 % 2 == 0) ? '-' : '_';
-				//if (vertical == last_vertical):
-				//	if (last_y2 < ay2): ac = '\\'
-				//	if (last_y2 > ay2): ac = '/'
-				ascii_buffer[ay2] = ac;
-			}
-			
-			// Sky
-			if (ay1 > 0) {
-				for (ay = 0; ay < ay1; ay++) {
-					ascii_buffer[ay] = ' ';
-				}
-			}
-			
-			// Wall
-			if (ay1+1 < ay2) {
-				for (ay = ((ay1+1>0) ? ay1+1 : 0); ay < ((ay2 < rows) ? ay2 : rows); ay++) {
-					// Show block character
-					//ascii_buffer[ay] = (64 + fblock1);
-					
-					// Solid
-					//ascii_buffer[ay] = '#';
-					ascii_buffer[ay] = ' ';
-				}
-			}
-			// Floor
-			if (ay2 < rows-1) {
-				for (ay = ay2+1; ay < rows; ay++) {
-					ascii_buffer[ay] = ':';
-				}
-			}
-			
-			
-			// Calc edge
-			if ((x > 0) && ((last_vertical != vertical) || (last_nblockx != nblockx1) || (last_nblocky != nblocky1))) {
-				// Changed orientation: Show edge!
-				// Edge should span the maximum of both heights
-				for (ay = ((ay1 < last_y1) ? ay1 : last_y1); ay <= ((ay2 > last_y2) ? ay2 : last_y2); ay++) {
-					if ((ay >= 0) && (ay < rows)) {
-						ac = ascii_buffer[ay];
-						if (ac == '=')
-							ascii_buffer[ay] = '#';
-						else
-						if ((ac == '-') || (ac == '_'))
-							ascii_buffer[ay] = '+';
-						else
-							ascii_buffer[ay] = '|';
-					}
-				}
-			}
-			
-			// Debug
-			//ascii_buffer[0] = '0' + ay1;
-			//ascii_buffer[1] = '0' + alinehd;
-			//ascii_buffer[3] = '0' + ay2;
-			
-			// Draw
-			for (ay = 0; ay < rows; ay++) {
-				lcd_putchar_at(x, ay, ascii_buffer[ay]);
-			}
-			
-			last_y1 = ay1;
-			last_y2 = ay2;
-			last_nblockx = nblockx1;
-			last_nblocky = nblocky1;
-			last_vertical = vertical;
-			last_dis = dis1;
+			drawColumn(x, dis1, fblock1);
 		#endif
 		
 		/*
