@@ -4,6 +4,9 @@
 	
 	Raycaster modeled after "MAHNKE QBasic", but optimized.
 	
+	General limitations:
+		* The product of sinetable resolution, grid size, map size and resolution must be kept at a sweet spot or it leads to integer overflows.
+	
 	Keys:
 		* Cursor keys or WASD: Rotate/Move
 	
@@ -43,9 +46,12 @@
 #define alert(s) { lcd_x = 0; lcd_y = 0; puts(s); getchar(); }
 //#define alert(s) ;
 
-#define FISHEYE_CORRECTION
-#define DRAW_DIST 4	// Maximum drawing distance (inner loop). If too big there will be z-wrap-arounds.
-#define OVER 1	// Oversample coordinates (increases overall spacial resolution)
+#define FISHEYE_CORRECTION	// Apply fisheye correction
+#define DRAW_DIST 16	// Maximum drawing distance (inner loop).
+#define OVER 2	// Oversample coordinates (increases overall spacial resolution)
+#define UNDER 4	// Undersample depth to keep values in range
+
+
 
 
 
@@ -65,7 +71,6 @@ const SINTABLE_VALUE_TYPE SINTABLE[256] = {
 	 -90,  -88,  -85,  -83,  -81,  -78,  -76,  -73,  -71,  -68,  -65,  -63,  -60,  -57,  -54,  -51,  -49,  -46,  -43,  -40,  -37,  -34,  -31,  -28,  -25,  -22,  -19,  -16,  -12,   -9,   -6,   -3
 };
 // end of auto-generated sine table
-
 
 
 SINTABLE_VALUE_TYPE _sin(SINTABLE_INDEX_TYPE a) {
@@ -361,9 +366,9 @@ const char levelmap[levelmap_w][levelmap_h] = {
 		} else {
 			//if (z > OVERSAMPLE_RAY*MAX_DEPTH-1) z = OVERSAMPLE_RAY*MAX_DEPTH-1;	// z clip
 			
-			//h = (wall_height_over * rows) / z;
+			h = (wall_height_over * rows) / z;
 			//h = h / OVER;
-			h = (wall_height * rows) / z;
+			//h = (wall_height * rows) / z;
 			
 			if (h > SCREEN_H) h = SCREEN_H;
 			//else if (h < 0) h = 0;
@@ -455,8 +460,8 @@ void drawScreen() {
 	signed int dis1;
 	signed int dis2;
 	signed int rest;
-	signed int actx;
-	signed int acty;
+	unsigned int actx;
+	unsigned int acty;
 	signed int normalx;
 	signed int normaly;
 	
@@ -464,6 +469,7 @@ void drawScreen() {
 	signed char nblockx2, nblocky2, texoff2;
 	byte fblock1;
 	byte fblock2;
+	
 	byte vertical;
 	
 	//lcd_clear();
@@ -498,21 +504,20 @@ void drawScreen() {
 					dis1 = rest;
 				} else {
 					normalx = (grid_y_over * dir1 * anc) / ans;
+					//normalx = (grid_y * dir1 * anc) / ans;
 					for (count = 1; count < DRAW_DIST; count++) {
 						actx += normalx;
-						nblockx1 = actx / grid_x_over;	// trunc!
+						nblockx1 = (actx / grid_x_over);	// trunc!
+						//nblockx1 = (actx / grid_x);	// trunc!
 						nblocky1 += dir1;
-						//if ((nblockx1 >= 0) && (nblockx1 < levelmap_w) && (nblocky1 >= 0) && (nblocky1 < levelmap_h)) {
-						//if ((nblockx1 >= 0) && (nblockx1 < levelmap_w)) {
-						//if ((nblockx1 < 0) || (nblockx1 >= levelmap_w)) {
-						if ((nblockx1 < 0) || (nblockx1 >= levelmap_w) || (nblocky1 < 0) || (nblocky1 >= levelmap_h)) {
+						if ((nblockx1 < 0) || (nblockx1 >= levelmap_w)) {
+						//if ((nblockx1 < 0) || (nblockx1 >= levelmap_w) || (nblocky1 < 0) || (nblocky1 >= levelmap_h)) {
 							fblock1 = LEVEL_BLOCK_FREE;	// resp. LEVEL_BLOCK_OOB
 							break;
 						}
 						fblock1 = levelmap[nblocky1][nblockx1];
 						if (fblock1 != LEVEL_BLOCK_FREE) {
 							dis1 = rest + count * grid_y_over;
-							//dis1 = (int)(rest + (long)count * grid_y_over);
 							break;
 						}
 					}
@@ -531,9 +536,11 @@ void drawScreen() {
 					//anc = _cos(ancheck);
 					//if (anc < 0) anc = -anc;
 					//dis1 = (dis1 * anc) / ans;
-					dis1 = (dis1 * _cos(ancheck)) / ans;
+					//dis1 = (dis1 * _cos(ancheck)) / ans;
+					dis1 = (((dis1/UNDER) * _cos(ancheck)) / ans) * UNDER;
 				#else
-					dis1 = ((SINTABLE_OVER * dis1) / ans);
+					//dis1 = ((SINTABLE_OVER * dis1) / ans);
+					dis1 = (((SINTABLE_OVER/UNDER) * dis1) / ans) * UNDER;
 				#endif
 				if (dis1 < 0) dis1 = -dis1;
 				
@@ -560,7 +567,7 @@ void drawScreen() {
 			rest = rest % grid_x_over;
 			if ((rest == 0) && (dir2 > 0)) rest = grid_x_over;	// Prevent flicker at player x=128, y=192
 			
-			acty = player_y_over + rest * dir2 * ans / anc;	// Short Y
+			acty = player_y_over + (rest * dir2 * ans) / anc;	// Short Y
 			nblocky2 = acty / grid_y_over;
 			nblockx2 = (player_x_over / grid_x_over) + dir2;
 			if ((nblocky2 >= 0) && (nblocky2 < levelmap_h)) {
@@ -569,23 +576,21 @@ void drawScreen() {
 					// Standing in front of a block
 					dis2 = rest;
 				} else {
-					normaly = grid_x_over * dir2 * ans / anc;
-					
+					normaly = (grid_x_over * dir2 * ans) / anc;
+					//normaly = (grid_x * dir2 * ans) / anc;
 					for (count = 1; count < DRAW_DIST; count++) {
 						acty += normaly;
-						nblocky2 = acty / grid_y_over;	// trunc!
+						nblocky2 = (acty / grid_y_over);	// trunc!
+						//nblocky2 = (acty / grid_y);	// trunc!
 						nblockx2 += dir2;
-						//if ((nblockx2 >= 0) && (nblockx2 < levelmap_w) && (nblocky2 >= 0) && (nblocky2 < levelmap_h)) {
-						//if ((nblocky2 >= 0) && (nblocky2 < levelmap_h)) {
-						//if ((nblocky2 < 0) || (nblocky2 >= levelmap_h)) {
-						if ((nblocky2 < 0) || (nblocky2 >= levelmap_h) || (nblockx2 < 0) || (nblockx2 >= levelmap_w)) {
+						if ((nblocky2 < 0) || (nblocky2 >= levelmap_h)) {
+						//if ((nblocky2 < 0) || (nblocky2 >= levelmap_h) || (nblockx2 < 0) || (nblockx2 >= levelmap_w)) {
 							fblock2 = LEVEL_BLOCK_FREE;	// resp. LEVEL_BLOCK_OOB
 							break;
 						}
 						fblock2 = levelmap[nblocky2][nblockx2];
 						if (fblock2 != LEVEL_BLOCK_FREE) {
 							dis2 = rest + count * grid_x_over;
-							//dis2 = (int)(rest + (long)count * grid_x_over);
 							break;
 						}
 					}
@@ -603,9 +608,11 @@ void drawScreen() {
 					//ans = _cos(ancheck);
 					//if (ans < 0) ans = -ans;
 					//dis2 = (dis2 * ans) / anc;
-					dis2 = (dis2 * _cos(ancheck)) / anc;
+					//dis2 = (dis2 * _cos(ancheck)) / anc;
+					dis2 = (((dis2/UNDER) * _cos(ancheck)) / anc) * UNDER;
 				#else
-					dis2 = ((SINTABLE_OVER * dis2) / anc);
+					//dis2 = ((SINTABLE_OVER * dis2) / anc);
+					dis2 = (((SINTABLE_OVER/UNDER) * dis2) / anc) * UNDER;
 				#endif
 				if (dis2 < 0) dis2 = -dis2;
 				
@@ -613,6 +620,16 @@ void drawScreen() {
 				if (texoff2 < 0) texoff2 = -texoff2;
 				texoff2 = texoff2 % tex_w;
 			}
+			
+			
+			/*
+			// DEBUG
+			if (x == 2) {
+				lcd_x = 0; lcd_y = 6; printf_d(dis2 / 256);
+				lcd_x = 0; lcd_y = 7; printf_d(dis2 % 256);
+				getchar();
+			}
+			*/
 			
 		}
 		

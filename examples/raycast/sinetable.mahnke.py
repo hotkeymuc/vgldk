@@ -3,15 +3,16 @@ import math
 #cols = 20
 #angf = cols*4
 #angf = 128
-angf = 256
+#angf = 2*256
 #grid = 64
 #OVER = 1
 
 
 # Sine table
 SINTABLE_INDEX_TYPE = 'unsigned char'
+SINTABLE_SIZE = 256
 #SINTABLE_INDEX_TYPE = 'unsigned int'
-SINTABLE_SIZE = angf
+#SINTABLE_SIZE = 512
 
 SINTABLE_VALUE_TYPE = 'signed char'
 SINTABLE_OVER = 127
