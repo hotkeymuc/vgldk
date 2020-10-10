@@ -37,6 +37,7 @@
 	#define SCREEN_H LCD_ROWS
 #endif
 
+#define DRAW_EDGES	// When drawing: Include vertical stripes between blocks/corners
 
 #define lcd_MINIMAL	// Use minimal text mode (disable scrolling)
 #include <vgldk.h>
@@ -168,6 +169,15 @@ const char levelmap[levelmap_w][levelmap_h] = {
 #define angtol2 (angh - angtol)	// Other edge finder angle
 
 
+#ifdef DRAW_EDGES
+	// For edge detection
+	signed int last_y1, last_y2;
+	signed char last_nblockx, last_nblocky;
+	//signed int last_dis;
+	byte last_vertical;
+#endif
+
+
 #ifdef TEXT_MODE
 	/*
 	void lcd_putchar_at(int x, int y, char c) {
@@ -177,12 +187,6 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	}
 	*/
 	
-	
-	// For ASCII mode
-	signed int last_y1, last_y2;
-	signed char last_nblockx, last_nblocky;
-	//signed int last_dis;
-	byte last_vertical;
 	int ay, ay1, ay2, alinehd, ah1, ah2;
 	char ac;
 	char ascii_buffer[rows];
@@ -270,6 +274,7 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	
 	// Use dynamic drawing
 	void drawColumn(int x, int dis, char fblock, signed char nblockx, signed char nblocky, byte vertical) {
+		#ifdef DRAW_EDGES
 		if (x == 0) {
 			// Init
 			last_y1 = 0;
@@ -279,6 +284,7 @@ const char levelmap[levelmap_w][levelmap_h] = {
 			//last_dis = 0;
 			last_vertical = 0;
 		}
+		#endif
 		
 		// Draw ASCII
 		(void)fblock;	// Prevent warning
@@ -338,6 +344,7 @@ const char levelmap[levelmap_w][levelmap_h] = {
 		}
 		
 		
+		#ifdef DRAW_EDGES
 		// Calc edge
 		if ((x > 0) && ((last_vertical != vertical) || (last_nblockx != nblockx) || (last_nblocky != nblocky))) {
 			// Changed orientation: Show edge!
@@ -355,6 +362,7 @@ const char levelmap[levelmap_w][levelmap_h] = {
 				}
 			}
 		}
+		#endif
 		
 		// Debug
 		//ascii_buffer[0] = '0' + ay1;
@@ -366,13 +374,20 @@ const char levelmap[levelmap_w][levelmap_h] = {
 			lcd_putchar_at(x, ay, ascii_buffer[ay]);
 		}
 		
+		
+		#ifdef DRAW_EDGES
 		last_y1 = ay1;
 		last_y2 = ay2;
 		last_nblockx = nblockx;
 		last_nblocky = nblocky;
 		last_vertical = vertical;
 		//last_dis = dis;
-		
+		#else
+			// Suppress warnings for unused vars
+			(void)nblockx;
+			(void)nblocky;
+			(void)vertical;
+		#endif
 		
 	}
 	
@@ -381,6 +396,7 @@ const char levelmap[levelmap_w][levelmap_h] = {
 #ifdef GFX_MODE
 	
 	#define FB_INC (LCD_W/8)	// How far to increment on the frame buffer to be on next line
+	
 	
 	void drawVLine_blocky(int x, int y1, int h, byte c) {
 		byte *p;
@@ -461,35 +477,52 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	}
 	
 	
-	void drawColumn(int x, int z, char b) {
+	
+	
+	//void drawColumn(int x, int z, char b) {
+	void drawColumn(int x, int dis, char fblock, signed char nblockx, signed char nblocky, byte vertical) {
 		// Draw one column of graphics
 		
 		byte c;
 		unsigned int h;
-		byte y;
-		byte yStart;
 		
+		int y1, y2;
 		#ifdef GFX_BLOCKY
-		byte *p;
+			int y;
+			byte *p;
 		#endif
 		
-		if (z < 1) {
+		
+		#ifdef DRAW_EDGES
+			if (x == 0) {
+				// Init
+				last_y1 = 0;
+				last_y2 = rows-1;	//ASCII_ROWS-1
+				last_nblockx = 0;
+				last_nblocky = 0;
+				//last_dis = 0;
+				last_vertical = 0;
+			}
+		#endif
+		
+		if (dis < 1) {
 			h = 0;
 		} else {
-			//if (z > OVERSAMPLE_RAY*MAX_DEPTH-1) z = OVERSAMPLE_RAY*MAX_DEPTH-1;	// z clip
 			
-			h = (wall_height_over * rows) / z;
+			h = (wall_height_over * rows) / dis;
 			//h = h / OVER;
 			//h = (wall_height * rows) / z;
 			
 			if (h > SCREEN_H) h = SCREEN_H;
 			//else if (h < 0) h = 0;
+			
 		}
 		// Draw column
-		yStart = SCREEN_H/2 - h/2;
+		y1 = SCREEN_H/2 - h/2;
+		y2 = SCREEN_H/2 + h/2;
 		
 		// Wall pattern
-		switch(b) {
+		switch(fblock) {
 			case LEVEL_BLOCK_FREE:	c = 0x00; break;
 			case '?':	c = 1+8+64; break;
 			case '%':	c = 0x55; break;
@@ -498,12 +531,13 @@ const char levelmap[levelmap_w][levelmap_h] = {
 				c = 1+16;
 		}
 		
+		
 		#ifdef GFX_BLOCKY
 			// 8-bit at once "blocky" mode
 			// Ceiling
 			y = 0;
 			p = (byte *)(lcd_addr + x);	//(y * lcd_w/8 + x));
-			while(y < yStart) {
+			while(y < y1) {
 				*p = 0x00;	// white
 				//*p = ((y%2==0) ? 0x55 : 0xaa);	// 50% gray
 				//*p = (y%2==0) ? (1+16) : (4+64);	// 25% gray
@@ -512,11 +546,11 @@ const char levelmap[levelmap_w][levelmap_h] = {
 			}
 			
 			// Wall
-			drawVLine_blocky(x, yStart, h, c);
+			drawVLine_blocky(x, y1, y2, c);
 			
 			// Floor
-			y = yStart + h;
-			p = (byte *)(lcd_addr + (y * lcd_w/8 + x));
+			y = y2;
+			p = (byte *)(lcd_addr + (y2 * lcd_w/8 + x));
 			while(y < SCREEN_H) {
 				//*(byte *)(lcd_addr + (y * lcd_w/8 + x)) = ((y%2==0) ? 0x55 : 0xaa);
 				//*p = ((y%2==0) ? 0x55 : 0xaa);	// 50% gray
@@ -529,20 +563,51 @@ const char levelmap[levelmap_w][levelmap_h] = {
 			// Bit-wise "fine" mode
 			
 			// Ceiling
-			drawVLine_fine(x, 0, yStart-1, 0x00);
+			drawVLine_fine(x, 0, y1-1, 0x00);
+			
 			
 			// Wall
-			y = yStart + h;
-			drawVLine_fine(x, yStart, y, c);
+			#ifdef DRAW_EDGES
+				// Edge detection
+				if ((x > 0) && ((last_vertical != vertical) || (last_nblockx != nblockx) || (last_nblocky != nblocky))) {
+					// Changed orientation: Show edge!
+					// Edge should span the maximum of both heights
+					drawVLine_fine(
+						x,
+						((y1 < last_y1) ? y1 : last_y1),
+						((y2 > last_y2) ? y2 : last_y2),
+						0xff
+					);
+				} else {
+					drawVLine_fine(x, y1, y2, c);
+				}
+			#else
+				drawVLine_fine(x, y1, y2, c);
+			#endif
+			
+			
 			
 			// Floor
 			//drawVLine_fine(x, y, rows, 0x00);	// white
 			//drawVLine_fine(x, y, rows, ((y%2==0) ? 0x55 : 0xaa));	// 50% gray
-			drawVLine_fine(x, y+1, rows, (x%2==0) ? (1+16) : (4+64));	// 25% gray
+			drawVLine_fine(x, y2+1, rows, (x%2==0) ? (1+16) : (4+64));	// 25% gray
 			//drawVLine_fine(x, y, rows, ((y%2==0) ? 0x55 : 0xaa));	// stripes
+			
 			
 		#endif
 		
+		#ifdef DRAW_EDGES
+			last_y1 = y1;
+			last_y2 = y2;
+			last_nblockx = nblockx;
+			last_nblocky = nblocky;
+			last_vertical = vertical;
+		#else
+			// Suppress warnings for unused vars
+			(void)nblockx;
+			(void)nblocky;
+			(void)vertical;
+		#endif
 	}
 #endif
 
@@ -759,12 +824,11 @@ void drawScreen() {
 		
 		
 		// Actually draw the column
-		#ifdef TEXT_MODE
-			// Text mode requires more info (for edge detection)
-			drawColumn(x, dis1, fblock1, nblockx1, nblocky1, vertical);
-		#else
-			drawColumn(x, dis1, fblock1);
-		#endif
+		// Simple drawing
+		//drawColumn(x, dis1, fblock1);
+		
+		// Advanced drawing
+		drawColumn(x, dis1, fblock1, nblockx1, nblocky1, vertical);
 		
 		/*
 		// Debug display
