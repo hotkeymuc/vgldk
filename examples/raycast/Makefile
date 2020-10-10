@@ -1,8 +1,8 @@
 
 #NAME = raycast.naive
 #NAME = raycast.olc1
-NAME = raycast.olc2
-#NAME = raycast.mahnke
+#NAME = raycast.olc2
+NAME = raycast.mahnke
 
 
 # For targeting a specific model:
