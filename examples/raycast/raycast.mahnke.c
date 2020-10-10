@@ -4,20 +4,33 @@
 	
 	Raycaster modeled after "MAHNKE QBasic", but optimized.
 	
-	General limitations:
-		* The product of sinetable resolution, grid size, map size and resolution must be kept at a sweet spot or it leads to integer overflows.
-	
 	Keys:
 		* Cursor keys or WASD: Rotate/Move
+		* N/M: Strafe
+	
+	Limitations:
+		* This is just a demonstration. There is no "game" whatsoever.
+		* The product of sinetable size, grid size, map size and screen resolution must be kept at a sweet spot to prevent integer overflows.
+		* Use "OVER" and "UNDER" defines to play around with resolutions
+		* Clipping is non existent.
+	
+	Features (can be toggled at compile time):
+		* Multiple graphics modes:
+			* TEXT_MODE: Using simple ASCII characters to emulate lines
+			* GFX_MODE: Using graphical LCD and bit wise addressing (slow but nice)
+			* GFX_MODE+GFX_BLOCKY: Using "chunky 8 horizonal pixels at once" drawing for fast rendering on graphical screens
+		* Edge detection (esp. in text mode) to make clear where individual wall pieces join
+		* Fisheye correction: Keeping horizontal lines straight
+		* Configurable field of view
+		* (Texture mapping: Coordinates are calculated, but there are no textures yet)
+	
 	
 	2020-10-06 Bernhard "HotKey" Slawik
 */
 
-//#define TEXT_MODE
-//#define GFX_MODE
 
 #if VGLDK_SERIES == 6000
-	// GL6000SL defaults to GFX mod e(although it can also do text mode)
+	// GL6000SL defaults to GFX mode (although it can also do text mode)
 	#define GFX_MODE
 	
 	//#define GFX_BLOCKY	// Use simple/fast byte-wise mode (8th of the horiz. resolution, but patterns)
@@ -29,6 +42,16 @@
 		#define SCREEN_W LCD_W
 	#endif
 	#define SCREEN_H LCD_H
+	
+	
+	// Patterns for black/white graphics mode.
+	// Using an expression looks cool, but runs much slower.
+	// Also: 0x00 and 0xff are specially optimized
+	#define PATTERN_CEIL(x) 0x00
+	#define PATTERN_FLOOR(x) 0x00
+	//#define PATTERN_FLOOR(x) ((x%2==0) ? (1+16) : (4+64)));	// 25% gray
+	//#define PATTERN_FLOOR(x) ((x%2==0) ? 0x55 : 0xaa));	// 50% gray
+	
 #else
 	// Default is text mode
 	#define TEXT_MODE
@@ -37,7 +60,6 @@
 	#define SCREEN_H LCD_ROWS
 #endif
 
-#define DRAW_EDGES	// When drawing: Include vertical stripes between blocks/corners
 
 #define lcd_MINIMAL	// Use minimal text mode (disable scrolling)
 #include <vgldk.h>
@@ -47,12 +69,16 @@
 #define alert(s) { lcd_x = 0; lcd_y = 0; puts(s); getchar(); }
 //#define alert(s) ;
 
+//#define TEXT_MODE
+//#define GFX_MODE
+//#define GFX_BLOCKY	// Use simple/fast byte-wise graphical mode (8th of the horiz. resolution, but patterns)
+
 #define FISHEYE_CORRECTION	// Apply fisheye correction
+#define DRAW_FLOOR_CEIL	// Draw sky and floor
+#define DRAW_EDGES	// When drawing: Include vertical stripes between blocks/corners
 #define DRAW_DIST 16	// Maximum drawing distance (inner loop).
 #define OVER 2	// Oversample coordinates (increases overall spacial resolution)
-#define UNDER 4	// Undersample depth to keep values in range
-
-
+#define UNDER 4	// Undersample depth to keep values in range (keep this value as small as possible, but as big as neccessary. Also: power of two for performance)
 
 
 
@@ -141,8 +167,8 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#','%',' ','%','#'},
 	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#',' ',' ',' ','#'},
 	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#',' ',' ',' ','#'},
-	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#',' ',' ',' ','#'},
-	{'#',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','#',' ',' ',' ','#'},
+	{' ',' ',' ',' ',' ',' ',' ','#','#','#','#','#',' ',' ',' ','#'},
+	{' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ','?',' ',' ',' ','#'},
 	{'#','#','#','#','#','#','#','#','#','#','#','#','#','#','#','#'},
 };
 
@@ -318,12 +344,14 @@ const char levelmap[levelmap_w][levelmap_h] = {
 			ascii_buffer[ay2] = ac;
 		}
 		
+		#ifdef DRAW_FLOOR_CEIL
 		// Sky
 		if (ay1 > 0) {
 			for (ay = 0; ay < ay1; ay++) {
 				ascii_buffer[ay] = ' ';
 			}
 		}
+		#endif
 		
 		// Wall
 		if (ay1+1 < ay2) {
@@ -336,13 +364,14 @@ const char levelmap[levelmap_w][levelmap_h] = {
 				ascii_buffer[ay] = ' ';
 			}
 		}
+		#ifdef DRAW_FLOOR_CEIL
 		// Floor
 		if (ay2 < rows-1) {
 			for (ay = ay2+1; ay < rows; ay++) {
 				ascii_buffer[ay] = ':';
 			}
 		}
-		
+		#endif
 		
 		#ifdef DRAW_EDGES
 		// Calc edge
@@ -397,7 +426,7 @@ const char levelmap[levelmap_w][levelmap_h] = {
 	
 	#define FB_INC (LCD_W/8)	// How far to increment on the frame buffer to be on next line
 	
-	
+	#ifdef GFX_BLOCKY
 	void drawVLine_blocky(int x, int y1, int h, byte c) {
 		byte *p;
 		int y;
@@ -414,6 +443,8 @@ const char levelmap[levelmap_w][levelmap_h] = {
 			p += FB_INC;
 		}
 	}
+	
+	#else
 	
 	//void drawVLine_fine(int x, int y1, int h, byte c) {
 	void drawVLine_fine(int x, int y1, int y2, byte c) {
@@ -475,13 +506,11 @@ const char levelmap[levelmap_w][levelmap_h] = {
 		}
 		
 	}
+	#endif
 	
-	
-	
-	
+	// Draw one column of graphics
 	//void drawColumn(int x, int z, char b) {
 	void drawColumn(int x, int dis, char fblock, signed char nblockx, signed char nblocky, byte vertical) {
-		// Draw one column of graphics
 		
 		byte c;
 		unsigned int h;
@@ -505,68 +534,89 @@ const char levelmap[levelmap_w][levelmap_h] = {
 			}
 		#endif
 		
+		
 		if (dis < 1) {
 			h = 0;
 		} else {
 			
-			h = (wall_height_over * rows) / dis;
+			h = (wall_height_over * rows) / (dis+1);
 			//h = h / OVER;
-			//h = (wall_height * rows) / z;
 			
 			if (h > SCREEN_H) h = SCREEN_H;
-			//else if (h < 0) h = 0;
 			
 		}
 		// Draw column
 		y1 = SCREEN_H/2 - h/2;
 		y2 = SCREEN_H/2 + h/2;
 		
-		// Wall pattern
-		switch(fblock) {
-			case LEVEL_BLOCK_FREE:	c = 0x00; break;
-			case '?':	c = 1+8+64; break;
-			case '%':	c = 0x55; break;
-			case '#':	c = 0xff; break;
-			default:
-				c = 1+16;
-		}
-		
 		
 		#ifdef GFX_BLOCKY
 			// 8-bit at once "blocky" mode
+			
+			#ifdef DRAW_FLOOR_CEIL
 			// Ceiling
 			y = 0;
 			p = (byte *)(lcd_addr + x);	//(y * lcd_w/8 + x));
 			while(y < y1) {
-				*p = 0x00;	// white
+				//*p = 0x00;	// white
 				//*p = ((y%2==0) ? 0x55 : 0xaa);	// 50% gray
 				//*p = (y%2==0) ? (1+16) : (4+64);	// 25% gray
+				*p = PATTERN_CEIL(x);
 				p += FB_INC;
 				y++;
 			}
+			#endif
 			
 			// Wall
+			switch(fblock) {
+				case LEVEL_BLOCK_FREE:	c = 0x00; break;
+				case '?':	c = 1+8+64; break;
+				case '%':	c = 0x55; break;
+				case '#':	c = 0xff; break;
+				default:
+					c = 1+16;
+			}
 			drawVLine_blocky(x, y1, y2, c);
 			
+			#ifdef DRAW_FLOOR_CEIL
 			// Floor
 			y = y2;
 			p = (byte *)(lcd_addr + (y2 * lcd_w/8 + x));
 			while(y < SCREEN_H) {
 				//*(byte *)(lcd_addr + (y * lcd_w/8 + x)) = ((y%2==0) ? 0x55 : 0xaa);
 				//*p = ((y%2==0) ? 0x55 : 0xaa);	// 50% gray
-				*p = (y%2==0) ? (1+16) : (4+64);	// 25% gray
+				//*p = (y%2==0) ? (1+16) : (4+64);	// 25% gray
 				//*p = ((y%2==0) ? 0x55 : 0xaa);	// stripes
+				*p = PATTERN_FLOOR(y);
 				p += FB_INC;
 				y++;
 			}
+			#endif
+			
 		#else
 			// Bit-wise "fine" mode
 			
+			#ifdef DRAW_FLOOR_CEIL
 			// Ceiling
-			drawVLine_fine(x, 0, y1-1, 0x00);
-			
+			drawVLine_fine(x, 0, y1-1, PATTERN_CEIL(x));
+			#endif
 			
 			// Wall
+			
+			// Wall pattern
+			
+			switch(fblock) {
+				case LEVEL_BLOCK_FREE:	c = 0x00; break;
+				case '?':	c = ((x%2==0) ? (1+16) : (4+64)); break;	// 25% gray; break;
+				case '%':	c = ((x%2==0) ? 0x55 : 0xaa); break;	// 50% gray
+				case '#':	c = 0xff; break;
+				default:
+					//c = 1+16;
+					c = ((x%2==0) ? (1+8+64) : (2+16+128)); break;	// 33% gray; break;
+			}
+			// Shift pattern horizontal
+			//if ((x % 2) == 1) c = c << 1 + (c & 0x80) >> 7;
+			
 			#ifdef DRAW_EDGES
 				// Edge detection
 				if ((x > 0) && ((last_vertical != vertical) || (last_nblockx != nblockx) || (last_nblocky != nblocky))) {
@@ -576,7 +626,7 @@ const char levelmap[levelmap_w][levelmap_h] = {
 						x,
 						((y1 < last_y1) ? y1 : last_y1),
 						((y2 > last_y2) ? y2 : last_y2),
-						0xff
+						0xff - c
 					);
 				} else {
 					drawVLine_fine(x, y1, y2, c);
@@ -585,14 +635,14 @@ const char levelmap[levelmap_w][levelmap_h] = {
 				drawVLine_fine(x, y1, y2, c);
 			#endif
 			
-			
-			
+			#ifdef DRAW_FLOOR_CEIL
 			// Floor
 			//drawVLine_fine(x, y, rows, 0x00);	// white
-			//drawVLine_fine(x, y, rows, ((y%2==0) ? 0x55 : 0xaa));	// 50% gray
-			drawVLine_fine(x, y2+1, rows, (x%2==0) ? (1+16) : (4+64));	// 25% gray
-			//drawVLine_fine(x, y, rows, ((y%2==0) ? 0x55 : 0xaa));	// stripes
-			
+			//drawVLine_fine(x, y, rows, ((x%2==0) ? 0x55 : 0xaa));	// 50% gray
+			//drawVLine_fine(x, y2+1, rows, (x%2==0) ? (1+16) : (4+64));	// 25% gray
+			//drawVLine_fine(x, y, rows, ((x%2==0) ? 0x55 : 0xaa));	// stripes
+			drawVLine_fine(x, y2+1, rows, PATTERN_FLOOR(x));
+			#endif
 			
 		#endif
 		
