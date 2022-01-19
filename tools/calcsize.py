@@ -62,10 +62,11 @@ if __name__ == '__main__':#
 	#put('Free space: %d Bytes' % (l_full - l))
 	
 	# Check if file is an "aligned" binary (power of two)
-	l_log = math.log(l_full, 2)
-	if (l_full == math.pow(2, l_log)):
+	l_log = int(math.log(l_full, 2))
+	l_power = math.pow(2, l_log)
+	if (l_full == l_power):
 		if (l >= l_full):
-			put('WARNING: Binary image is full!')
+			put('WARNING: Binary image is full! (%d > %d)' % (l, l_full))
 			sys.exit(1)	# Throw error return code
 	else:
 		# Unaligned
