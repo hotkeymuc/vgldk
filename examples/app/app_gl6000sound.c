@@ -60,8 +60,6 @@ int main(int argc, char *argv[]) {
 	printf("Hello!\n");
 	//c = getchar();
 	
-	o = (byte *)0x4000;
-	
 	port_out(0x22, 0x00);
 	port_out(0x21, 0xe0);
 	port_out(0x23, 0x60);
@@ -80,42 +78,56 @@ int main(int argc, char *argv[]) {
 	
 	//for(i = 0; i < 4; i++) { check_port(0x21); }
 	
+	port_out(0x51, 8);
+	o = (byte *)0x4000;	//4320 - 12*4;	// Around 0x4320 it gets crazy!
 	
 	while(true) {
 		
-		
+		/*
 		//check_port(0x60);
 		//do {
+		for(i = 0; i < 10; i++) {
 			c = port_in(0x60);	// 0x0B / 0x0F
 			//if (c != 0x0b) printf_x2(c);
+		}
 		//} while (c & 0x04);	// == 0x00);
+		*/
 		
-		// Loop start
 		port_out(0x62, 0x00);
-		//port_out(0x10, 0x00);
 		
-		//for(i = 0; i < 4; i++) { check_port(0x21); }
+		
+		if ((word)o % 12 == 0) {
+			printf_x4((word)o);
+			c = getchar();
+			printf("\n");
+		}
 		
 		// INT
 		//check_port(0x10);
-		//c = port_in(0x10);	// 0x0B / 0xF9 / 0xFD
-		
-		if ((word)o % 0x20 == 0) printf_x4((word)o);
-		c = *o;
+		/*
+		for(i = 0; i < 10; i++) {
+			c = port_in(0x10);	// 0x0B / 0xF9 / 0xFD
+		}
+		*/
 		
 		//port_out(0x22, 0x00);
 		//port_out(0x21, 0xe0);
 		//port_out(0x23, 0x60);
 		
 		
+		c = *o;
+		o++;
 		port_out(0x10, c);
+		
+		
+		c = *o;
+		o++;
 		port_out(0x11, c);
 		
 		//port_out(0x61, 0xd0);
 		
 		//port_out(0x62, 0xff);
 		//port_out(0x10, 0x00);
-		o++;
 		
 		/*
 		putchar(' ');
