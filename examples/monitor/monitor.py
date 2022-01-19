@@ -305,7 +305,7 @@ class Monitor:
 		self.write('call %04x\n' % a)
 		#self.readline()
 	
-	def upload(self, filename, dest_addr, src_addr=0):
+	def upload(self, filename, dest_addr, src_addr=0, skip_trailing=True):
 		# Upload an app
 		self.put('Uploading app "%s"...' % filename)
 		#dest_addr = 0xc800	# LOC_DATA
@@ -314,6 +314,15 @@ class Monitor:
 		
 		with open(filename, 'rb') as h:
 			data = h.read()
+		
+		if skip_trailing:
+			len_old = len(data)
+			i = len_old
+			while(i > 0):
+				if data[i-1] not in [0xff, 0x00]: break
+				i -= 1
+			data = data[:i]
+			self.put('Stripped trailing FF/00: %d - %d = %d bytes' % (len_old, len_old-len(data), len(data)))
 		
 		# Extract portion
 		app_data = data[src_addr:]

@@ -15,22 +15,110 @@
 	OK	Determine max. RX baud: ca. 38400 baud
 	OK	Try RX at 19200 baud
 	
+	* GL6000SL support
+	
 	2020-08-10 Bernhard "HotKey" Slawik
 */
 
 
 //#define SOFTUART_BAUD 9600
 //#define SOFTUART_BAUD 19200
+
 // GL4000
 #define SOFTUART_PORT_DATA 0x10
 #define SOFTUART_PORT_LATCH 0x11
 #define SOFTUART_PORT_CONTROL 0x12
 
-#define SOFTUART_BITS_MASK 0xff	// Bitmask on parallel port
 #define SOFTUART_BITS_LOW 0x00	// Bits to set for serial "HIGH"
 #define SOFTUART_BITS_HIGH 0xff	// Bits to set for serial "LOW"
+#define SOFTUART_BITS_MASK 0xff	// Bitmask on parallel port
 
 #define SOFTUART_STROBE_MASK 0x04	// Bitmask (OR) on control port to strobe LOW (inverse for HIGH)
+
+
+/*
+// GL6000SL
+//#define SOFTUART_PORT_DATA 0x20
+//#define SOFTUART_PORT_LATCH 0x22
+//#define SOFTUART_PORT_CONTROL 0x23
+
+		_bbtx_set_LOW:					; Send LOW level / logical "0"
+			
+			ld	a, #0x20				; Disable latch?
+			out	(0x23), a
+			
+			ld	a, #0xff				; Select all bits to send?
+			out	(0x22), a
+			
+			ld	a, #0x00				; Set all data pins D0-D7 to LOW
+			out	(0x20), a
+			
+			ld	a, #0x60				; Send all data bits to the pins
+			out	(0x23), a
+			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
+			in	a, (0x21)
+			and	#0xbf					; STROBE LOW...
+			out	(0x21), a
+			
+			; Calibrated NOP slide for LOW
+			; 3 nops: 92us
+			; 6 nops: 98us
+			; 9 nops: 104us OK!
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
+			or	#0x40					; STROBE HIGH... (takes >50us to reach HIGH)
+			out	(0x21), a
+			
+		ret
+		
+		_bbtx_set_HIGH:					; Send HIGH level / logical "1"
+			
+			ld	a, #0x20				; Disable latch?
+			out	(0x23), a
+			
+			ld	a, #0xff				; Select all bits to send?
+			out	(0x22), a
+			
+			ld	a, #0xff				; Set all data pins D0-D7 to HIGH
+			out	(0x20), a
+			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
+			ld	a, #0x60				; Send all data bits to the pins
+			out	(0x23), a
+			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
+			in	a, (0x21)
+			and	#0xbf					; STROBE LOW...
+			out	(0x21), a
+			
+			; Calibrated NOP slide for HIGH
+			; 0 nops: 92us
+			; 3 nops: 98us
+			; 6 nops: 104us OK!
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+			
+			;@FIXME: I think this can be removed (but pad with NOPs!)
+			or	#0x40					; STROBE HIGH... (takes >50us to reach HIGH)
+			out	(0x21), a
+			
+		ret
+*/
+
 
 // Timing configuration
 #if SOFTUART_BAUD == 9600

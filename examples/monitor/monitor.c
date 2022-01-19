@@ -21,21 +21,21 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_HELP_LONG	// Include "long" help functionality (needs quite some space for the strings...)
 
 #define MONITOR_SERIAL	// Include serial functions
-#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart
-//#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use old ASM-based softserial
-//#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
+//#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart (currently only GL4000)
+#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use ASM-based softserial (custom for each architecture)
+#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
 #define SOFTUART_BAUD 9600
 
-#define MONITOR_FILES	// Include file system stuff
+//#define MONITOR_FILES	// Include file system stuff
 //#define MONITOR_FILES_FS_NULL	// Include FS driver for NULL filesystem
 //#define MONITOR_FILES_FS_INTERNAL	// Include FS driver for "internal" ROM data
-#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
+//#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
 
 // Commands to include (affects how big the binary gets)
 //#define MONITOR_CMD_BEEP
 //#define MONITOR_CMD_CLS
-//#define MONITOR_CMD_DUMP
-//#define MONITOR_CMD_ECHO
+#define MONITOR_CMD_DUMP
+#define MONITOR_CMD_ECHO
 //#define MONITOR_CMD_EXIT
 #define MONITOR_CMD_HELP	// Even without MONITOR_HELP_LONG, the HELP command can list all commands
 //#define MONITOR_CMD_INTERRUPTS
@@ -43,11 +43,11 @@ char cmd_arg[MAX_INPUT];
 #define MONITOR_CMD_PEEKPOKE	// Required for uploading via serial
 #define MONITOR_CMD_CALL
 //#define MONITOR_CMD_PAUSE
-//#define MONITOR_CMD_PORT
+#define MONITOR_CMD_PORT
 //#define MONITOR_CMD_PAUSE
 //#define MONITOR_CMD_VER	// ~54 bytes
-#define MONITOR_CMD_LOAD	// Requires MONITOR_FILES
-#define MONITOR_CMD_RUN	// Requires MONITOR_CMD_LOAD and MONITOR_CMD_CALL
+//#define MONITOR_CMD_LOAD	// Requires MONITOR_FILES
+//#define MONITOR_CMD_RUN	// Requires MONITOR_CMD_LOAD and MONITOR_CMD_CALL
 
 
 // Definitions
@@ -759,7 +759,7 @@ int cmd_ver(int argc, char *argv[]) {
 	*/
 	
 	#ifdef VGLDK_VARIABLE_STDIO
-	// Allow switching STDIO to serial (onl available when built with VGLDK_VARIABLE_STDIO)
+	// Allow switching STDIO to serial (only available when built with VGLDK_VARIABLE_STDIO)
 	int cmd_serial_io(int argc, char *argv[]) {
 		(void)argc;
 		(void)argv;
@@ -1159,7 +1159,7 @@ void main() __naked {
 	
 	#ifdef MONITOR_SERIAL
 	#ifdef MONITOR_SERIAL_AUTOSTART
-	if (serial_isReady()) {
+	//if (serial_isReady()) {
 		// If serial cable is connected: Ask for which I/O to use
 		
 		#ifdef VGLDK_VARIABLE_STDIO
@@ -1191,7 +1191,7 @@ void main() __naked {
 		*/
 		#endif
 		
-	}
+	//}
 	#endif
 	#endif
 	

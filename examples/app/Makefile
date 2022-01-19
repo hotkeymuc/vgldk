@@ -1,7 +1,8 @@
 
-NAME = app_hello
+#NAME = app_hello
 #NAME = app_tests
 #NAME = app_cserial
+NAME = app_gl6000sound
 
 # For targeting a specific model:
 #VGLDK_SERIES = 1000

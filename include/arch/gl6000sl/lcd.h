@@ -156,7 +156,7 @@ void drawString(byte x, byte y, char *s) {
 }
 
 //#define LCD_SCROLL_AMOUNT 1
-#define LCD_SCROLL_AMOUNT 8
+#define LCD_SCROLL_AMOUNT 8	// font_h
 void lcd_scroll(int dy) {
 	//byte x;	// Enough for one line
 	word x;	// For more than one line
@@ -193,7 +193,7 @@ void lcd_scroll(int dy) {
 		}
 		
 		dy -= LCD_SCROLL_AMOUNT;
-		lcd_y-= LCD_SCROLL_AMOUNT;
+		lcd_y -= (LCD_SCROLL_AMOUNT / font_h);	// or just ONE LINE
 	}
 }
 

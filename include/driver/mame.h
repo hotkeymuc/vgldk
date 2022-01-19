@@ -7,6 +7,10 @@ MAME Trap Access
 By using a modified version of MAME we can communicate with the host.
 This is especially useful when debugging serial communication.
 
+This file creates "get" and "put" functions to send and receive bytes through an unused port.
+the MAME core intercepts this call and pipes it through to stdout
+
+
 Use this patch for MAME (mame.git/src/mame/drivers/pc2000.cpp):
 	DECLARE_READ8_MEMBER( debug_r );
 	DECLARE_WRITE8_MEMBER( debug_w );
