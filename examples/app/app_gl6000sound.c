@@ -85,6 +85,7 @@ int main(int argc, char *argv[]) {
 	(void)argv;
 	
 	byte i;
+	byte v;
 	char c;
 	byte *o;
 	
@@ -132,13 +133,17 @@ int main(int argc, char *argv[]) {
 	*/
 	
 	
-	port_out(0x51, 8);
-	o = (byte *)0x4000;	//4320 - 12*4;	// Around 0x4320 it gets crazy!
+	port_out(0x62, 0x00);
 	
-	// 4034:	"Quao"
-	// 4038:	"whuhuhu"
-	// 4049:	"Alarm!"
-	// 4050:	Brown-out
+	
+	port_out(0x51, 8);
+	o = (byte *)0x4000 + 0x0040;	//4320 - 12*4;	// Around 0x4320 it gets crazy!
+	
+	// 400B:	"Blubb"
+	// 400A:	"tschwschwschw....."
+	// 402E:	"tschwschwschw....."
+	// 4032:	"tschwschwschw....."
+	// 4038:	"Quuuoouuu!" + Brown-out
 	
 	while(true) {
 		
@@ -155,23 +160,6 @@ int main(int argc, char *argv[]) {
 		
 		
 		
-		//@TODO: Real frames?
-		// spss011d.pdf, 6.1, page 180
-		//	Parameter	Energy	Repeat	Pitch 	K1	K2	K3	K4	K5	K6	K7	K8	K9	K10	K11	K12
-		//	# Bits		4		1		7		6	6	5	5	4	4	4	3	3	3	0	0
-		// 56 bits = 7 bytes?
-		
-		//if ((word)o >= 0x438a) {
-		//if ((word)o >= 0x4280) {
-		//if ((word)o >= 0x422c) {
-		
-		if ((word)o % 4 == 0) {
-			printf_x4((word)o);
-			c = getchar();
-			printf("\n");
-		}
-		
-		
 		// INT
 		//check_port(0x10);
 		/*
@@ -180,7 +168,8 @@ int main(int argc, char *argv[]) {
 		}
 		*/
 		
-		c = *o;	o++;
+		v = *o;	o++;
+		
 		
 		//port_out(0x22, 0x00);
 		//port_out(0x21, 0xe0);
@@ -191,17 +180,36 @@ int main(int argc, char *argv[]) {
 		
 		port_out(0x10, 0x00);
 		
-		port_out(0x11, c);
+		port_out(0x11, v);
 		
-		//c = *o;	o++;
 		port_out(0x10, 0xff);
 		
 		
-		//port_out(0x62, 0x00);
+		// Wait for 0x10 to turn from 0xFF to 0xFC / 0xFD?
+		
+		
+		//@TODO: Real frames?
+		// spss011d.pdf, 6.1, page 180
+		//	Parameter	Energy	Repeat	Pitch 	K1	K2	K3	K4	K5	K6	K7	K8	K9	K10	K11	K12
+		//	# Bits		4		1		7		6	6	5	5	4	4	4	3	3	3	0	0
+		// 56 bits = 7 bytes?
+		
+		//if ((word)o >= 0x438a) {
+		//if ((word)o >= 0x4280) {
+		//if ((word)o >= 0x422c) {
+		
+		//if ((word)o % 2 == 0) {
+			printf_x4((word)o); putchar(' '); printf_x2(v);
+			c = getchar();
+			printf("\n");
+		//}
 		//monitor_ports();
 		
-		//port_out(0x61, 0xd0);
 		
+		//port_out(0x62, 0x00);
+		
+		
+		//port_out(0x61, 0xd0);
 		//port_out(0x62, 0xff);
 		//port_out(0x10, 0x00);
 		
