@@ -135,9 +135,10 @@ int main(int argc, char *argv[]) {
 	port_out(0x51, 8);
 	o = (byte *)0x4000;	//4320 - 12*4;	// Around 0x4320 it gets crazy!
 	
-	// 422C: "click"
-	// 4280: "queeeeeeeeeeeeee......"
-	// 438A: "wowowowowo."
+	// 4034:	"Quao"
+	// 4038:	"whuhuhu"
+	// 4049:	"Alarm!"
+	// 4050:	Brown-out
 	
 	while(true) {
 		
@@ -164,7 +165,7 @@ int main(int argc, char *argv[]) {
 		//if ((word)o >= 0x4280) {
 		//if ((word)o >= 0x422c) {
 		
-		if ((word)o % 7 == 0) {
+		if ((word)o % 4 == 0) {
 			printf_x4((word)o);
 			c = getchar();
 			printf("\n");
