@@ -1,7 +1,12 @@
 /*
-	A simple "Hello World" for the VGLDK
+	GL6000SL Speech test
 	
-	2020-01-22 Bernhard "HotKey" Slawik
+	Not knowing how the interface works, I'll just push data out of some ports and hope for the best...
+	
+	Be careful: The Speech chip has an internal amplifier. When hitting the wrong resonance, you can almost short the power supply!
+	Believe me! The LCD flashed weirdly, the speaker made an "Oooof!"-sound and the USB power supply browned out!
+	
+	2022-01-19 Bernhard "HotKey" Slawik
 */
 
 
@@ -46,6 +51,32 @@ byte check_port(byte p) {
 	return v;
 }
 
+void monitor_ports() {
+	byte v_10;
+	byte v_60;
+	int v_10_old;
+	int v_60_old;
+	int i;
+	
+	v_10_old = -1;	//port_in(0x10);	// 0x0B / 0xF9 / 0xFD
+	v_60_old = -1;	//port_in(0x60);	// 0x0B / 0x0F
+	
+	for(i = 0; i < 400; i++) {
+		v_10 = port_in(0x10);	// 0x0B / 0xF9 / 0xFD
+		v_60 = port_in(0x60);	// 0x0B / 0x0F
+		
+		if (v_10 != v_10_old) {
+			printf("10="); printf_x2(v_10); putchar(' ');
+			v_10_old = v_10;
+		}
+		if (v_60 != v_60_old) {
+			printf("60="); printf_x2(v_60); putchar(' ');
+			v_60_old = v_60;
+		}
+	}
+	
+}
+
 //void main() __naked {
 //void main() {
 //int main() {
@@ -78,10 +109,38 @@ int main(int argc, char *argv[]) {
 	
 	//for(i = 0; i < 4; i++) { check_port(0x21); }
 	
+	/*
+	// This actually produces glitchy sounds (and eventually browns out LOUDLY)
 	port_out(0x51, 8);
 	o = (byte *)0x4000;	//4320 - 12*4;	// Around 0x4320 it gets crazy!
 	
 	while(true) {
+		port_out(0x62, 0x00);
+		
+		if ((word)o % 7 == 0) {
+			printf_x4((word)o);
+			c = getchar();
+			printf("\n");
+		}
+		
+		c = *o; o++;
+		port_out(0x10, c);
+		
+		c = *o; o++;
+		port_out(0x11, c);
+	}
+	*/
+	
+	
+	port_out(0x51, 8);
+	o = (byte *)0x4000;	//4320 - 12*4;	// Around 0x4320 it gets crazy!
+	
+	// 422C: "click"
+	// 4280: "queeeeeeeeeeeeee......"
+	// 438A: "wowowowowo."
+	
+	while(true) {
+		
 		
 		/*
 		//check_port(0x60);
@@ -93,14 +152,24 @@ int main(int argc, char *argv[]) {
 		//} while (c & 0x04);	// == 0x00);
 		*/
 		
-		port_out(0x62, 0x00);
 		
 		
-		if ((word)o % 12 == 0) {
+		//@TODO: Real frames?
+		// spss011d.pdf, 6.1, page 180
+		//	Parameter	Energy	Repeat	Pitch 	K1	K2	K3	K4	K5	K6	K7	K8	K9	K10	K11	K12
+		//	# Bits		4		1		7		6	6	5	5	4	4	4	3	3	3	0	0
+		// 56 bits = 7 bytes?
+		
+		//if ((word)o >= 0x438a) {
+		//if ((word)o >= 0x4280) {
+		//if ((word)o >= 0x422c) {
+		
+		if ((word)o % 7 == 0) {
 			printf_x4((word)o);
 			c = getchar();
 			printf("\n");
 		}
+		
 		
 		// INT
 		//check_port(0x10);
@@ -110,19 +179,25 @@ int main(int argc, char *argv[]) {
 		}
 		*/
 		
+		c = *o;	o++;
+		
 		//port_out(0x22, 0x00);
 		//port_out(0x21, 0xe0);
 		//port_out(0x23, 0x60);
 		
+		//printf_x2(c);//putchar(' ');
+		//c = getchar();
 		
-		c = *o;
-		o++;
-		port_out(0x10, c);
+		port_out(0x10, 0x00);
 		
-		
-		c = *o;
-		o++;
 		port_out(0x11, c);
+		
+		//c = *o;	o++;
+		port_out(0x10, 0xff);
+		
+		
+		//port_out(0x62, 0x00);
+		//monitor_ports();
 		
 		//port_out(0x61, 0xd0);
 		
