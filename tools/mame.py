@@ -57,11 +57,15 @@ def str_binhex(b):
 class MAME:
 	"Host implementation when using MAME"
 	
-	def __init__(self, command=MAME_COMMAND, rompath=MAME_ROMPATH, emusys=MAME_EMUSYS, cart=MAME_CART):
+	def __init__(self, command=MAME_COMMAND, rompath=MAME_ROMPATH, emusys=MAME_EMUSYS, cart=MAME_CART, speed=2.0, volume=24, buffer_size=3):
 		self.command = command
 		self.rompath = rompath
 		self.emusys = emusys
 		self.cart = cart
+		
+		self.buffer_size = buffer_size
+		self.speed = speed
+		self.volume = volume
 		
 		self.is_open = False
 		self.running = False
@@ -86,6 +90,12 @@ class MAME:
 		self.mame_close()
 		self.running = False
 	
+	def stop(self):
+		#put(str(dir(self.proc)))
+		#self.proc.terminate()
+		#self.proc.kill()
+		self.close()
+	
 	def mame_open(self):
 		self.is_open = False
 		
@@ -99,22 +109,25 @@ class MAME:
 		cmd += ' -nomax'
 		cmd += ' -nofilter'
 		cmd += ' -sleep'
-		cmd += ' -volume -24'
+		cmd += ' -volume -%d' % self.volume
+		#cmd += ' -skip_disclaimer'
 		cmd += ' -skip_gameinfo'
-		cmd += ' -speed 2.00'
+		cmd += ' -speed %.2f' % self.speed
 		
 		self.put(cmd)
 		#self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
 		### https://stackoverflow.com/questions/1606795/catching-stdout-in-realtime-from-subprocess
 		#self.proc = subprocess.Popen('stdbuf -o0 '+ cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
 		self.proc = subprocess.Popen(
-			'stdbuf -i3 -o3 '+ cmd,
+			'stdbuf -i%d -o%d %s' % (self.buffer_size, self.buffer_size, cmd),
 			#cmd,
 			stdin=subprocess.PIPE,
 			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
 			shell=True,
 			#close_fds=False,	# Use close_fds=False on unix, close_fds=True on linux
 			#bufsize=2
+			#bufsize=self.buffer_size	# 0=unbuffered, 1=line buffered, n=buffer ~n bytes
 			bufsize=0	# 0=unbuffered, 1=line buffered, n=buffer ~n bytes
 			)
 		
@@ -131,7 +144,7 @@ class MAME:
 		#put('Exit with returncode="%s"' % (str(p.returncode)))
 		return self.proc.returncode
 		"""
-		self.put('Return code so far: %s' % str(self.proc.returncode))
+		#self.put('Return code so far: %s' % str(self.proc.returncode))
 		self.is_open = True
 		
 		self.run()
@@ -154,7 +167,7 @@ class MAME:
 			if (r is None):
 				# Still running
 				
-				s = self.readline()
+				s = self.read()
 				
 				#self.handle_data(s)
 				if self.on_data is not None:
@@ -179,7 +192,9 @@ class MAME:
 		#put('Exit with returncode="%s"' % (str(p.returncode)))
 		#return self.proc.returncode
 	
-	def readline(self):
+	def read(self):
+		#s = self.proc.stdout.read(0)
+		#s = self.proc.stdout.read(1)
 		#s = self.proc.stdout.read(64)
 		s = self.proc.stdout.readline()
 		if (SHOW_TRAFFIC): self.put('<<< %s' % str_binhex(s))
@@ -192,6 +207,7 @@ class MAME:
 		try:
 			self.proc.stdin.write(s)	# s=bytes
 			#self.proc.stdin.write(bytes(s, 'ascii'))	# s=string
+			
 		except BrokenPipeError:
 			self.running = False
 	
