@@ -1,6 +1,7 @@
 /*
 	GL6000SL Speech test
 	
+	I am pretty sure that the sound chip is some sort of TI TMS51x0/52x0 speech chip
 	Not knowing how the interface works, I'll just push data out of some ports and hope for the best...
 	
 	Be careful: The Speech chip has an internal amplifier. When hitting the wrong resonance, you can almost short the power supply!
@@ -115,7 +116,7 @@ void tsp_put(byte v) {
 	//printf_x2(v);
 	//c = getchar();
 	
-	port_out(0x10, 0x00);
+	port_out(0x10, 0x00);	// Also 0x01
 	
 	// After OUT 0x10, 0x00:
 	//check_port(0x60);	// 0x0F
@@ -130,7 +131,6 @@ void tsp_put(byte v) {
 	//check_port(0x10);	// 0xF9
 	
 	
-	//port_out(0x11, (v * 0x55) % 0x100);	// Testing
 	
 	port_out(0x10, 0x04);	// Works: Put 0x00, then 0x04, then enter data!
 	
@@ -147,6 +147,7 @@ void tsp_put(byte v) {
 	//check_port(0x60);	// 0x0F
 	//check_port(0x62);	// 0xFF
 	
+	// TMS5220 ~RS and ~WS?
 	while(port_in(0x10) == 0xfd) { }	// Wait for wiggle-state :)
 	
 	port_out(0x11, v);	// Actually output data to the pins
@@ -276,7 +277,19 @@ int main(int argc, char *argv[]) {
 		
 		//if ((word)o % 2 == 0) {
 			printf_x4((word)o); putchar(' '); printf_x2(v);
-			c = getchar();
+			do {
+				c = getchar();
+				
+				if ((c == 'r') || (c == 'R')) {
+					// Output something
+					port_out(0x10, (tsp_frame++) % 16);
+					//port_out(0x60, tsp_frame++);
+					//port_out(0x11, tsp_frame++);
+				} else
+				break;
+				
+			} while(1);
+			
 			printf("\n");
 		
 			//check_port(0x10);
