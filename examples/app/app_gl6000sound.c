@@ -116,7 +116,7 @@ void tms_put(byte v) {
 	//printf_x2(v);
 	//c = getchar();
 	
-	port_out(0x10, 0x00);	// Also 0x01
+	port_out(0x10, 0x00);	// Also 0x01, 0x02, 0x08
 	
 	// After OUT 0x10, 0x00:
 	//check_port(0x60);	// 0x0F
@@ -132,29 +132,25 @@ void tms_put(byte v) {
 	
 	
 	port_out(0x10, 0x04);	// Works: Put 0x00, then 0x04, then enter data!
-	
-	//port_out(0x60, 0 + (tms_frame++) % 6);	// Testing
-	
 	// After OUT 0x10, 0x00:
-	//check_port(0x10);	// 0xF9
-	
+	//	check_port(0x10);	// 0xF9
 	// After OUT 0x10, 0x04:
-	//check_port(0x10);	// 0xFC (sound stopped?) -OR- 0xFD ... 0xFF ... 0xFD (sound running?)
-	//check_port(0x11);	// 0xFF
-	//check_port(0x21);	// 0xFF
-	//check_port(0x60);	// 0x0F
-	//check_port(0x62);	// 0xFF
+	//	check_port(0x10);	// 0xFC (sound stopped?) -OR- 0xFD ... 0xFF ... 0xFD (sound running?)
+	//	check_port(0x11);	// 0xFF
+	//	check_port(0x21);	// 0xFF
+	//	check_port(0x60);	// 0x0F
+	//	check_port(0x62);	// 0xFF
+	
 	
 	// TMS5220 ~RS and ~WS?
-	while(port_in(0x10) == 0xfd) { }	// Wait for wiggle
-	//while((port_in(0x10) & 0x01) == 0) { }	// Wait for ready
-	
+	while(port_in(0x10) == 0xfd) { }	// Wait for wiggle (working!)
 	port_out(0x11, v);	// Actually output data to the pins
 	
 	//check_port(0x10);	// 0xFC if sound stopped -OR- wiggling 0xFD ... 0xFF ... 0xFD
+	//while(port_in(0x10) == 0xff) { }
+	//port_out(0x10, 0xff);
 	
 }
-
 void tms_reset() {
 	// TMS: Command "Reset"
 	printf("TMS:Reset...");
@@ -185,7 +181,15 @@ int main(int argc, char *argv[]) {
 	char c;
 	byte *o;
 	
-	printf("Hello!\n");
+	printf("GL6000SL sound test\n");
+	printf("\n");
+	printf("!!! WARNING !!!\n");
+	printf("THE SOUND CHIP CAN SINK A LOT OF CURRENT!\n");
+	printf("THIS CAN DAMAGE THE DEVICE OR YOUR POWER SUPPLY!\n");
+	printf("LIMIT YOUR SUPPLY CURRENT, DO NOT USE BATTERIES!\n");
+	printf("CONTINUE AT YOUR OWN RISK!\n");
+	c = getchar();
+	printf("\n");
 	
 	// Boot:
 	port_out(0x22, 0x00);
@@ -223,12 +227,13 @@ int main(int argc, char *argv[]) {
 	
 	// End of init
 	
-	//printf("End of init.\n");
+	printf("End of init.\n");
 	
 	tms_reset();
 	
 	
 	printf("Ready.\n");
+	
 	//c = getchar();
 	
 	tms_speak();
@@ -245,10 +250,11 @@ int main(int argc, char *argv[]) {
 	//	# Bits		4		1		7		6	6	5	5	4	4	4	3	3	3	0	0
 	// 56 bits = 7 bytes?
 	
-	// Speech data can be found in ROM:0x6D141+ (out 0x51,0x1b, mem[0x5141...])
+	// Speech data can be found in ROM:0x6D100+ (out 0x51,0x1b, mem[0x5100...])
 	port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
-	o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	//o = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+	//o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+	o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
 	while(true) {
 		
@@ -277,7 +283,7 @@ int main(int argc, char *argv[]) {
 				continue;
 			}
 			
-			if ((v & 0x02) == 0) {
+			if ((v & 0x03) == 1) {
 				// Ready to receive data
 				break;
 			}
@@ -292,34 +298,23 @@ int main(int argc, char *argv[]) {
 		
 		printf_x2(v);
 		
-		//check_port(0x60);
-		//check_port(0x10);
-		//c = getchar();
-		
-		if ((tms_frame % 0x04) == 0) {
+		if ((tms_frame % 0x02) == 0) {
 			printf("Pause...");
-			c = getchar();
-			printf("\n");
+			
+			do {
+				c = getchar();
+				
+				if ((c == 'r') || (c == 'R')) {
+					// Output something
+					tms_reset();
+					tms_speak();
+				} else {
+					break;
+				}
+				
+			} while(1);
 		}
 		
-		
-		/*
-		do {
-			c = getchar();
-			
-			if ((c == 'r') || (c == 'R')) {
-				// Output something
-				//port_out(0x10, (tms_frame++) % 16);
-				//port_out(0x60, tms_frame++);
-				//port_out(0x11, tms_frame++);
-				tms_reset();
-				tms_speak();
-			} else
-			break;
-			
-		} while(1);
-		
-		*/
 		printf("\n");
 		
 		
