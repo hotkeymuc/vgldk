@@ -113,6 +113,23 @@ int tms_frame;
 void tms_put(byte v) {
 	byte c;
 	
+	
+	// Bit-reverse v? Datasheet says that D0 is the MSB!
+	/*
+	v =	  ((v & 0x80) >> 7)
+		| ((v & 0x40) >> 5)
+		| ((v & 0x20) >> 3)
+		| ((v & 0x10) >> 1)
+		| ((v & 0x08) << 1)
+		| ((v & 0x04) >> 3)
+		| ((v & 0x02) << 5)
+		| ((v & 0x01) << 7)
+	;
+	*/
+	v = (v & 0xF0) >> 4 | (v & 0x0F) << 4;
+	v = (v & 0xCC) >> 2 | (v & 0x33) << 2;
+	v = (v & 0xAA) >> 1 | (v & 0x55) << 1;
+	
 	//printf_x2(v);
 	//c = getchar();
 	
@@ -253,8 +270,8 @@ int main(int argc, char *argv[]) {
 	// Speech data can be found in ROM:0x6D100+ (out 0x51,0x1b, mem[0x5100...])
 	port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
 	//o = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-	//o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-	o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+	o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+	//o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
 	while(true) {
 		
