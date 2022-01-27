@@ -108,9 +108,9 @@ void monitor_ports() {
 }
 */
 
-int tsp_frame;
+int tms_frame;
 
-void tsp_put(byte v) {
+void tms_put(byte v) {
 	byte c;
 	
 	//printf_x2(v);
@@ -131,11 +131,9 @@ void tsp_put(byte v) {
 	//check_port(0x10);	// 0xF9
 	
 	
-	
 	port_out(0x10, 0x04);	// Works: Put 0x00, then 0x04, then enter data!
 	
-	//port_out(0x60, 0 + (tsp_frame++) % 6);	// Testing
-	
+	//port_out(0x60, 0 + (tms_frame++) % 6);	// Testing
 	
 	// After OUT 0x10, 0x00:
 	//check_port(0x10);	// 0xF9
@@ -148,15 +146,31 @@ void tsp_put(byte v) {
 	//check_port(0x62);	// 0xFF
 	
 	// TMS5220 ~RS and ~WS?
-	while(port_in(0x10) == 0xfd) { }	// Wait for wiggle-state :)
+	while(port_in(0x10) == 0xfd) { }	// Wait for wiggle
+	//while((port_in(0x10) & 0x01) == 0) { }	// Wait for ready
 	
 	port_out(0x11, v);	// Actually output data to the pins
 	
-	//check_port(0x11);	// 0xFC if sound stopped -OR- wiggling 0xFD ... 0xFF ... 0xFD
 	//check_port(0x10);	// 0xFC if sound stopped -OR- wiggling 0xFD ... 0xFF ... 0xFD
 	
-	//port_out(0x10, 0x04);
-	
+}
+
+void tms_reset() {
+	// TMS: Command "Reset"
+	printf("TMS:Reset...");
+	//check_port(0x10);	// 0xFC = 0b11111100
+	//check_port(0x60);	// 0x0F
+	tms_put(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
+	//check_port(0x60);	// 0x0F
+	//check_port(0x10);	// 0xFD = 0b11111101, 0xFF, = 0b11111111
+}
+
+void tms_speak() {
+	// TMS: Command "Speak External"
+	printf("TMS:Speak...");
+	//check_port(0x10);	// 0xFD = 0b11111101, 0xFF, = 0b11111111
+	tms_put(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
+	//check_port(0x10);	// 0xFC = 0b11111100
 }
 
 //void main() __naked {
@@ -172,7 +186,6 @@ int main(int argc, char *argv[]) {
 	byte *o;
 	
 	printf("Hello!\n");
-	//c = getchar();
 	
 	// Boot:
 	port_out(0x22, 0x00);
@@ -199,7 +212,7 @@ int main(int argc, char *argv[]) {
 	
 	port_out(0x62, 0x00);
 	port_out(0x10, 0x00);
-	check_port(0x10);	// 0xf9
+	check_port(0x10);	// 0xf9 = 0b11111001
 	port_out(0x10, 0x04);
 	
 	//for (i=0; i < 3; i++) {
@@ -210,48 +223,15 @@ int main(int argc, char *argv[]) {
 	
 	// End of init
 	
+	//printf("End of init.\n");
 	
-	/*
-	// This actually produces glitchy sounds (and eventually browns out LOUDLY)
-	port_out(0x51, 8);
-	o = (byte *)0x4000;	//4320 - 12*4;	// Around 0x4320 it gets crazy!
-	
-	while(true) {
-		port_out(0x62, 0x00);
-		
-		if ((word)o % 7 == 0) {
-			printf_x4((word)o);
-			c = getchar();
-			printf("\n");
-		}
-		
-		c = *o; o++;
-		port_out(0x10, c);
-		
-		c = *o; o++;
-		port_out(0x11, c);
-	}
-	*/
+	tms_reset();
 	
 	
-	/*
-	for(i = 0; i < 10; i++) {
-		printf("\nLoop: ");
-		tsp_put(0x0e);
-		tsp_put(0x02);
-		tsp_put(0x21);
-		tsp_put(0x67);
-		tsp_put(0x4B);
-		
-		tsp_put(0x11);
-		tsp_put(0x1B);
-		tsp_put(0x00);
-		tsp_put(0xfd);
-		tsp_put(0x21);
-		tsp_put(0x7d);	// Burp
-		tsp_put(0x21);
-	}
-	*/
+	printf("Ready.\n");
+	//c = getchar();
+	
+	tms_speak();
 	
 	/*
 	// Just speculating...
@@ -271,31 +251,77 @@ int main(int argc, char *argv[]) {
 	//o = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
 	
 	while(true) {
+		
+		printf_x4((word)o); putchar(':');
+		
+		
+		// Check TMS status
+		do {
+			v = port_in(0x10);
+			//printf_x2(v); c = getchar();
+			
+			if ((v & 0x03) == 2) {
+				// hang
+				printf("hang!"); c = getchar();
+				
+				tms_reset();
+				continue;
+			}
+			
+			if ((v & 0x03) == 0) {
+				// TMS is idle!
+				
+				printf("Idle!");	//c = getchar();
+				
+				tms_speak();
+				continue;
+			}
+			
+			if ((v & 0x02) == 0) {
+				// Ready to receive data
+				break;
+			}
+		} while(1);	// Wait until ready to receive data
+		
+		
+		// Feed new data
+		tms_frame++;
 		v = *o;
 		
-		tsp_put(v);
+		tms_put(v);
 		
-		//if ((word)o % 2 == 0) {
-			printf_x4((word)o); putchar(' '); printf_x2(v);
-			do {
-				c = getchar();
-				
-				if ((c == 'r') || (c == 'R')) {
-					// Output something
-					port_out(0x10, (tsp_frame++) % 16);
-					//port_out(0x60, tsp_frame++);
-					//port_out(0x11, tsp_frame++);
-				} else
-				break;
-				
-			} while(1);
-			
+		printf_x2(v);
+		
+		//check_port(0x60);
+		//check_port(0x10);
+		//c = getchar();
+		
+		if ((tms_frame % 0x04) == 0) {
+			printf("Pause...");
+			c = getchar();
 			printf("\n");
+		}
 		
-			//check_port(0x10);
 		
-		//}
-		//monitor_ports();
+		/*
+		do {
+			c = getchar();
+			
+			if ((c == 'r') || (c == 'R')) {
+				// Output something
+				//port_out(0x10, (tms_frame++) % 16);
+				//port_out(0x60, tms_frame++);
+				//port_out(0x11, tms_frame++);
+				tms_reset();
+				tms_speak();
+			} else
+			break;
+			
+		} while(1);
+		
+		*/
+		printf("\n");
+		
 		
 		o++;
 	}
