@@ -104,18 +104,19 @@ if __name__ == '__main__':
 	#filename = '../hello/out/hello.app.c800.bin'
 	filename = None
 	dest = DEST_DEFAULT
-	
+	keep_sio = False
+	reset = False
 	
 	parser = OptionParser(
 		description='Upload a binary file to a computer running monitor.c',
 		usage='Usage: %prog [options] filename'
 	)
-	parser.add_option('-p', '--port', dest='port', default=port,
-		action='store', type='string', help='Serial port to use (%s)' % port)
-	parser.add_option('-b', '--baud', dest='baud', default=baud,
-		action='store', type='int', help='Baud rate (%d)' % baud)
-	parser.add_option('-d', '--dest', dest='dest', default=dest,
-		action='store', type='int', help='Destination address (0x%04X)' % dest)
+	parser.add_option('-p', '--port', dest='port', default=port, action='store', type='string', help='Serial port to use (%s)' % port)
+	parser.add_option('-b', '--baud', dest='baud', default=baud, action='store', type='int', help='Baud rate (%d)' % baud)
+	parser.add_option('-d', '--dest', dest='dest', default=dest, action='store', type='int', help='Destination address (0x%04X)' % dest)
+	parser.add_option('-k', '--keep-sio', dest='keep_sio', default=keep_sio, action='store_true', help='Keep IO on serial when calling')
+	parser.add_option('-r', '--reset', dest='reset', default=reset, action='store_true', help='Reset after call')
+	
 	#parser.add_option('-f', '--file',
 	#	action='store', type='string', dest='filename', help='Binary file to send')
 	opt, args = parser.parse_args()
@@ -123,6 +124,9 @@ if __name__ == '__main__':
 	port = opt.port
 	baud = opt.baud
 	dest = opt.dest
+	keep_sio = opt.keep_sio
+	reset = opt.reset
+	
 	#filename = opt.filename
 	# Positional
 	if len(args) > 0:
@@ -152,11 +156,25 @@ if __name__ == '__main__':
 	# Call right away (having serial I/O as stdio)
 	#comp.call(dest)
 	
-	# Switch from serial I/O back to REAL I/O and call
-	comp.write('sio;call %04x\n' % dest)
+	# Switch from serial I/O back to REAL I/O and call (must be done in one line, because no more commands can be issued over serial after "sio")
+	#comp.write('sio;call %04x\n' % dest)
+	
+	# Either just call (keeping I/O on serial) or pre-pend a "sio" to switch back to display/keyboard
+	cmd = 'call %04x' % dest
+	
+	if not keep_sio:
+		cmd = 'sio;' + cmd	# Must be called in one line, because after "sio" nothing can be issued after it!
+	
+	if reset:
+		cmd += ';call 0000'
+	
+	cmd += '\n'
+	comp.write(cmd)
+	
 	
 	# Flush some residual output
-	for i in range(10):
+	for i in range(20):
+		time.sleep(0.05)
 		s = comp.readline()
 	
 	put('End.')
