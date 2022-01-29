@@ -10,6 +10,14 @@
 	OK	Determine max. RX baud: ca. 38400 baud
 	OK	Try RX at 19200 baud
 	
+	
+	
+	
+	===> This app is depricated! It has been integrated into the SDK
+	===> See includes/drivers/softuart.h
+	
+	
+	
 	2020-08-10 Bernhard "HotKey" Slawik
 */
 
