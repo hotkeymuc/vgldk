@@ -59,6 +59,71 @@
 #include <hex.h>
 
 
+//#define CHECK_FRAMES 1024
+#define CHECK_FRAMES 128
+#define CHECK_MAX_SAMPLES 8
+byte check_port(byte p) {
+	byte samples[CHECK_MAX_SAMPLES];
+	byte num_samples;
+	word i;
+	byte v;
+	byte v_old;
+	
+	num_samples = 0;
+	
+	v = port_in(p);
+	samples[num_samples++] = v;
+	v_old = v;
+	
+	for(i = 0; i < CHECK_FRAMES; i++) {
+		v = port_in(p);
+		if (v != v_old) {
+			// Value has changed
+			samples[num_samples++] = v;
+			v_old = v;
+			if (num_samples >= CHECK_MAX_SAMPLES) {
+				// Buffer is full!
+				break;
+			}
+		}
+	}
+	
+	// Output
+	printf("0x"); printf_x2(p);
+	//printf(" = ");
+	putchar('=');
+	for(i = 0; i < num_samples; i++) {
+		if (i > 0) putchar(',');
+		printf_x2(samples[i]);
+		
+	}
+	if (num_samples >= CHECK_MAX_SAMPLES) {
+		printf("...");
+	}
+	printf("\n");
+	
+	
+	// Return last read value
+	return v;
+}
+
+void delay(word n) {
+	word i;
+	for(i = 0; i < n; i++) {
+		__asm
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+			nop
+		__endasm;
+	}
+}
+
+/*
 byte check_port(byte p) {
 	//char c;
 	int i;
@@ -81,6 +146,7 @@ byte check_port(byte p) {
 	printf("\n");
 	return v;
 }
+*/
 
 
 int tms_frame;
@@ -102,12 +168,12 @@ void tms_put(byte v) {
 	
 	//printf_x2(v); c = getchar();
 	
+	//if ((port_in(0x10) & 0x04) == 0x00) {
 	
 	// Set ~WR inactive (high)?
 	port_out(0x10, 0x00);	// Working! Also for "anything other than 4", like 0x01, 0x02, 0x08
 	
 	// After OUT 0x10, 0x00:
-	//	check_port(0x60);	// 0x0F
 	//	check_port(0x10);	// 0xF9
 	
 	// After OUT 0x10, 0x04
@@ -115,11 +181,10 @@ void tms_put(byte v) {
 	
 	
 	// This check seems to prevent some brown-outs for me! Important?
-	while((port_in(0x10) & 0x07) == 0x05) { }
+	//while((port_in(0x10) & 0x07) == 0x05) { }
 	
 	// Set ~WR active (low)?
 	port_out(0x10, 0x04);	// Works: Put 0x00, then 0x04, then enter data!
-	
 	
 	// After OUT 0x10, 0x00:
 	//	check_port(0x10);	// 0xF9
@@ -133,8 +198,7 @@ void tms_put(byte v) {
 	
 	// TMS5220 Wait for ~READY to go low?
 	//while(port_in(0x10) == 0xfd) { }	// Wait for wiggle (working!)
-	while((port_in(0x10) & 0x07) == 0x05) { }
-	//while((port_in(0x10) & 0x03) == 1) { }	// not working
+	while((port_in(0x10) & 0x07) == 0x05) { }	// OK
 	
 	// Latch data?
 	port_out(0x11, v);	// Actually output data to the pins
@@ -194,6 +258,7 @@ int main(int argc, char *argv[]) {
 	(void)argv;
 	
 	byte i;
+	byte d;
 	byte v;
 	char c;
 	byte *o;
@@ -219,13 +284,15 @@ int main(int argc, char *argv[]) {
 	port_out(0x22, 0x00);
 	port_out(0x21, 0xe0);
 	
-	check_port(0x21);	// 0xff
+	//check_port(0x21);	// 0xff
+	delay(0x1000);
 	
 	port_out(0x23, 0x60);
 	port_out(0x23, 0x60);
 	port_out(0x21, 0xe0);
 	
-	check_port(0x21);	// 0xff
+	//check_port(0x21);	// 0xff
+	delay(0x0800);
 	
 	port_out(0x61, 0xd0);
 	port_out(0x10, 0x00);
@@ -237,35 +304,39 @@ int main(int argc, char *argv[]) {
 	port_out(0x43, 0x02);
 	port_out(0x23, 0x20);
 	
+	delay(0x0800);
 	//for (i=0; i < 3; i++) {
-		check_port(0x21);	// 0xff
-		check_port(0x60);	// 0x0b
+	//	check_port(0x21);	// 0xff
+	//	check_port(0x60);	// 0x0b
 	//}
 	
 	port_out(0x62, 0x00);
 	port_out(0x10, 0x00);
-	check_port(0x10);	// 0xf9 = 0b11111001
+	//check_port(0x10);	// 0xf9 = 0b11111001
+	delay(0x1000);
+	
 	port_out(0x10, 0x04);
 	
-	for (i=0; i < 3; i++) {
-		check_port(0x21);	// 0xff
-		check_port(0x60);	// 0x0F by now
-	}
+	//for (i=0; i < 3; i++) {
+	//	check_port(0x21);	// 0xff
+	//	check_port(0x60);	// 0x0F by now
+	//}
 	
 	
 	
 	// End of init
+	delay(0x2000);
 	
 	printf("End of init.\n");
 	
 	tms_reset();
 	
 	check_port(0x10);	// 0xf9 = 0b11111001
+	delay(0x2000);
 	
 	printf("Ready.\n");
 	//c = getchar();
 	
-	tms_speak_external();
 	
 	// Real frames?
 	// spss011d.pdf, 6.1, page 180
@@ -279,13 +350,16 @@ int main(int argc, char *argv[]) {
 	o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
 	//o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
+	tms_speak_external();
+	
+	byte mon21 = 1;
+	//check_port(0x10);
+	
 	while(true) {
-		
-		printf_x4((word)o); putchar(':');
 		
 		
 		// Check TMS status
-		do {
+		//do {
 			v = port_in(0x10);
 			//printf_x2(v); c = getchar();
 			
@@ -298,17 +372,36 @@ int main(int argc, char *argv[]) {
 				continue;
 			}
 			
-			if ((v & 0x03) == 0) {
+			if ((v & 0x07) == 4) {
+			//if ((v & 0x03) == 0) {
 				// TMS is idle!
 				printf("Idle!");	//c = getchar();
 				
 				// Wait for key
 				c = getchar();
-				if ((c == 'r') || (c == 'R'))
-					tms_reset();
+				switch(c) {
+					case 'r':
+					case 'R':
+						tms_reset();
+						break;
+					
+					case 'd':
+					case 'D':
+						mon21 = 1-mon21;
+						break;
+					case '0':
+						o = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+						break;
+					case '1':
+						o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+						break;
+					case '2':
+						o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+						break;
+					}
 				
-				check_port(0x62);
 				tms_speak_external();
+				//check_port(0x10);
 				continue;
 			}
 			/*
@@ -317,21 +410,24 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 			*/
-			break;
-		} while(1);	// Wait until ready to receive data
+			//break;
+		//} while(1);	// Wait until ready to receive data
 		
+		
+		tms_frame++;
+		d = *o;
+		
+		printf_x4((word)o); putchar(':');
+		printf_x2(d);
+		putchar(' ');
+		while(port_in(0x10) != 0xfd) { }
 		
 		// Feed new data
-		tms_frame++;
-		v = *o;
+		tms_put(d);
 		
-		tms_put(v);
-		
-		printf_x2(v);
-		putchar(' ');
 		
 		//check_port(0x60);
-		check_port(0x10);
+		//check_port(0x10);
 		
 		/*
 		if ((tms_frame % 0x02) == 0) {
@@ -352,7 +448,13 @@ int main(int argc, char *argv[]) {
 		}
 		*/
 		
-		//printf("\n");
+		if (mon21) {
+			check_port(0x10);
+			delay(0x100);
+		} else {
+			printf("\n");
+			delay(0x2000);
+		}
 		
 		
 		o++;
