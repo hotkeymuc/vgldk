@@ -39,13 +39,15 @@
 		R 0x60 == 0x0F
 		
 		--------------
-		R 0x10 = status?
-			* idle?	0xF9	1111 1001
-			* 0x01	0xF9	1111 1100
-			* 0x02	0xF9	1111 1100
-			* 0x04	0xFC	1111 1100
-			* stuffed?	0xFD	1111 1101
-			* ???	0xFF	1111 1101
+		Port 0x10 statuses:
+			* signal	0xF8	1111 1000	Short signal after OUT 0x10, 0x04 it goes "0xF9 0xF8 0xF9"
+			* ready	0xF9	1111 1001	State after OUT 0x10, 0x00
+			* -----	0xFA	1111 1010	---
+			* -----	0xFB	1111 1011	---
+			* finish	0xFC	1111 1100	State after finished playback. Buffer empty?
+			* play1	0xFD	1111 1101	State while playing, it wiggles "0xFD 0xFF 0xFF ..."
+			* err?	0xFE	1111 1110	"hang" state?
+			* play2	0xFF	1111 1111	State at cold-boot and while playing, it wiggles "0xFD 0xFF 0xFF ..."
 	
 	
 	2022-01-19 Bernhard "HotKey" Slawik
@@ -58,9 +60,10 @@
 #include <ports.h>
 #include <hex.h>
 
+//#define TMS_SHOW_DISCLAIMER	// show WARNING
 
 //#define CHECK_FRAMES 1024
-#define CHECK_FRAMES 128
+#define CHECK_FRAMES 512
 #define CHECK_MAX_SAMPLES 8
 byte check_port(byte p) {
 	byte samples[CHECK_MAX_SAMPLES];
@@ -123,36 +126,68 @@ void delay(word n) {
 	}
 }
 
-/*
-byte check_port(byte p) {
-	//char c;
-	int i;
-	byte v = 0x00;
-	byte v_old = 0x00;
-	
-	for(i = 0; i < 1024; i++) {
-		v = port_in(p);
-		if ((i == 0) || (v != v_old)) {
-			if (i == 0) {
-				printf("0x"); printf_x2(p); printf(" = ");
-			} else {
-				putchar(',');
-			}
-			printf_x2(v);	//printf("\n");
-			//c = getchar();
-			v_old = v;
-		}
-	}
-	printf("\n");
-	return v;
-}
-*/
-
-
 int tms_frame;
+byte *tms_play_offset;
+byte mon21;	// Monitor while playing?
+void user_input();	// Forward
+
+
+
+//@FIXME: I don't know any of these masks. This ist purely experimental!
+#define TMS_READY_TIMEOUT 0x1fff	// Timeout while waiting for "~READY", un-set for no timeout
+#define TMS_NREADY_MASK 0x02	// Which (input) bit is connected to TMS "~READY"? 2?
+#define TMS_NWRITE_MASK 0x04	// Which (output) bit is connected to TMS "~WR"?
+byte tms_get_ready() {
+	// Is ~READY LOW?
+	//return (port_in(0x10) & TMS_NREADY_MASK) == 0;
+	return (port_in(0x10) & 0x07) != 0x05;
+}
+
+byte tms_wait_ready() {
+	#ifdef TMS_READY_TIMEOUT
+	word t;
+	t = 0;
+	#endif
+	
+	do {
+		
+		#ifdef TMS_READY_TIMEOUT
+		t++;
+		if (t >= TMS_READY_TIMEOUT) {
+			printf("TIMEOUT! ");
+			check_port(0x10);
+			user_input();
+			return 0;
+		}
+		#endif
+	} while (tms_get_ready() == 0);
+	return 1;
+}
+void tms_set_write_on() {
+	// Start Write Request: Set ~WR LOW
+	//port_out(0x61, 0xd0);
+	//port_out(0x62, 0x00);
+	//port_out(0x10, 0x04);
+	port_out(0x10, 0x00);
+	
+	//port_out(0x10,  port_in(0x10) | TMS_NWRITE_MASK);
+	//port_out(0x10,  port_in(0x10) & (0xff-TMS_NWRITE_MASK));
+}
+void tms_set_write_off() {
+	// Stop Write Request: Set ~WR HIGH
+	//port_out(0x61, 0xd0);
+	//port_out(0x62, 0x00);
+	port_out(0x10, 0x04);
+	//port_out(0x10, 0x00);
+	
+	//port_out(0x10,  port_in(0x10) & (0xff-TMS_NWRITE_MASK));
+	//port_out(0x10,  port_in(0x10) | TMS_NWRITE_MASK);
+}
+void tms_set_data(byte v) {
+	port_out(0x11, v);	// Actually output data to the pins
+}
 
 void tms_put(byte v) {
-	byte c;
 	
 	//@TODO: The manual says (3.2 ~READY):
 	// * ~WS and ~RS should be high when not in use
@@ -165,28 +200,40 @@ void tms_put(byte v) {
 	
 	// Bit-reverse? Datasheet says that D0 is the MSB!
 	//v = (v & 0xF0) >> 4 | (v & 0x0F) << 4;	v = (v & 0xCC) >> 2 | (v & 0x33) << 2;	v = (v & 0xAA) >> 1 | (v & 0x55) << 1;
-	
 	//printf_x2(v); c = getchar();
 	
 	
-	port_out(0x11, v);	// Actually output data to the pins
+	// Make sure we don't interrupt an ongoing transaction
+	//tms_wait_ready();
+	
+	// Latch data onto bus
+	//tms_set_data(v);
+	
+	// Set ~WR active (LOW)
+	tms_set_write_on();
 	
 	
-	// Set ~WR inactive (high)?
-	port_out(0x10, 0x00);	// Working! Also for "anything other than 4", like 0x01, 0x02, 0x08
+	tms_set_write_off();	//@FIXME: It makes no sense!
 	
-	// After OUT 0x10, 0x00:
-	//	check_port(0x10);	// 0xF9
+	// Wait for ~READY to settle LOW again
+	tms_wait_ready();
+	//delay(1);
 	
-	// After OUT 0x10, 0x04
-	//	check_port(0x10);	// 0xFF, 0xFD, 0xFF, 0xFD, ...
+	tms_set_data(v);	//@FIXME: It makes no sense HERE!
 	
+	// Un-set ~WR (HIGH)
+	//tms_set_write_off();
+	
+	
+	/*
+	
+	port_out(0x10, 0x00);	// Works: Put 0x00, then 0x04, then enter data!
 	
 	// This check seems to prevent some brown-outs for me! Important?
-	while((port_in(0x10) & 0x07) == 0x05) { }
+	//while((port_in(0x10) & 0x07) == 0x05) { }
 	
-	// Set ~WR active (low)?
 	port_out(0x10, 0x04);	// Works: Put 0x00, then 0x04, then enter data!
+	
 	
 	// After OUT 0x10, 0x00:
 	//	check_port(0x10);	// 0xF9
@@ -199,19 +246,14 @@ void tms_put(byte v) {
 	
 	
 	// TMS5220 Wait for ~READY to go low?
-//	while((port_in(0x10) & 0x07) == 0x05) { }	// OK
+	while((port_in(0x10) & 0x07) == 0x05) { }	// OK
 	
 	// Latch data?
-//	port_out(0x11, v);	// Actually output data to the pins
-	
-	
-	//check_port(0x10);	// 0xFC if sound stopped -OR- wiggling 0xFD ... 0xFF ... 0xFD
-	//while(port_in(0x10) == 0xff) { }
-	
-	//c = port_in(0x10);
+	port_out(0x11, v);	// Actually output data to the pins
 	
 	// Set ~WR inactive (high) again?
 	//port_out(0x10, 0x00);
+	*/
 	
 }
 
@@ -227,8 +269,6 @@ void tms_flush() {
 void tms_reset() {
 	
 	printf("TMS:Reset...");
-	//check_port(0x10);	// 0xFC = 0b11111100
-	//check_port(0x60);	// 0x0F
 	
 	/*
 	// Manual: 100% guarantee for clean reset is to write nine bytes of "all ones" to the buffer, followed by a reset command
@@ -239,17 +279,98 @@ void tms_reset() {
 	
 	// TMS: Command "Reset"
 	tms_put(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
-	//check_port(0x60);	// 0x0F
-	//check_port(0x10);	// 0xFD = 0b11111101, 0xFF, = 0b11111111
 }
 
 void tms_speak_external() {
 	// TMS: Command "Speak External"
 	printf("TMS:Speak...");
-	//check_port(0x10);	// 0xFD = 0b11111101, 0xFF, = 0b11111111
 	tms_put(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
-	//check_port(0x10);	// 0xFC = 0b11111100
 }
+
+
+
+
+void user_input() {
+	char c;
+	
+	tms_frame = 1;	// Reset counter
+	
+	while(1) {
+		c = getchar();
+		
+		switch(c) {
+			
+			case 's':
+			case 'S':
+				tms_speak_external();
+				return;
+				break;
+			
+			case 'p':
+			case 'P':
+				check_port(0x10);
+				check_port(0x11);
+				check_port(0x60);
+				check_port(0x61);
+				break;
+			
+			case 'f':
+			case 'F':
+				// F** things up: This will glitch, play back a sample and reset
+				port_out(0x51, 0x08);
+				__asm
+					call #0x66f6
+				__endasm;
+				break;
+			
+			case 'q':
+			case 'Q':
+				// Soft reset
+				__asm
+					;rst0
+					call #0x0000
+				__endasm;
+				break;
+			
+			case 'r':
+			case 'R':
+				tms_flush();
+				delay(10);
+				tms_reset();
+				//return;
+				break;
+			
+			case 'd':
+			case 'D':
+				mon21 = 1-mon21;
+				return;
+				//break;
+			
+			case '0':
+				tms_speak_external();
+				tms_play_offset = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+				return;
+				//break;
+			
+			case '1':
+				tms_speak_external();
+				tms_play_offset = (byte *)0x513b+1;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+				return;
+				//break;
+			
+			case '2':
+				tms_speak_external();
+				tms_play_offset = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+				return;
+				//break;
+			
+			default:
+				return;
+				//break;
+		}
+	}
+}
+
 
 //void main() __naked {
 //void main() {
@@ -258,13 +379,13 @@ int main(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
 	
-	byte i;
+	//byte i;
 	byte d;
 	byte v;
 	char c;
-	byte *o;
 	
 	printf("GL6000SL sound test\n");
+	#ifdef TMS_SHOW_DISCLAIMER
 	printf("\n");
 	printf("!!! WARNING !!!\n");
 	printf("THE SOUND CHIP CAN SINK A LOT OF CURRENT!\n");
@@ -273,6 +394,7 @@ int main(int argc, char *argv[]) {
 	printf("CONTINUE AT YOUR OWN RISK!\n");
 	c = getchar();
 	printf("\n");
+	#endif
 	
 	
 	// I have *NO* idea about this init sequence.
@@ -314,7 +436,7 @@ int main(int argc, char *argv[]) {
 	port_out(0x62, 0x00);
 	port_out(0x10, 0x00);
 	//check_port(0x10);	// 0xf9 = 0b11111001
-	delay(0x1000);
+	delay(0x100);
 	
 	port_out(0x10, 0x04);
 	
@@ -330,10 +452,9 @@ int main(int argc, char *argv[]) {
 	
 	printf("End of init.\n");
 	
-	tms_reset();
-	
-	check_port(0x10);	// 0xf9 = 0b11111001
-	delay(0x2000);
+	//tms_reset();
+	//check_port(0x10);	// 0xf9 = 0b11111001
+	//delay(0x2000);
 	
 	printf("Ready.\n");
 	//c = getchar();
@@ -347,17 +468,21 @@ int main(int argc, char *argv[]) {
 	
 	// Speech data can be found in ROM:0x6D100+ (out 0x51,0x1b, mem[0x5100...])
 	port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
-	//o = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-	o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-	//o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+	//tms_play_offset = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+	tms_play_offset = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+	//tms_play_offset = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
 	tms_speak_external();
 	
-	byte mon21 = 1;
+	mon21 = 0;	// Monitor while playing?
 	//check_port(0x10);
 	
 	while(true) {
 		
+		if ((tms_frame % 0x10) == 0) {
+			printf("PAUSE");
+			user_input();
+		}
 		
 		// Check TMS status
 		//do {
@@ -373,38 +498,20 @@ int main(int argc, char *argv[]) {
 				continue;
 			}
 			
+			/*
 			if ((v & 0x07) == 4) {
 			//if ((v & 0x03) == 0) {
 				// TMS is idle!
 				printf("Idle!");	//c = getchar();
 				
-				// Wait for key
-				c = getchar();
-				switch(c) {
-					case 'r':
-					case 'R':
-						tms_reset();
-						break;
-					
-					case 'd':
-					case 'D':
-						mon21 = 1-mon21;
-						break;
-					case '0':
-						o = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-						break;
-					case '1':
-						o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-						break;
-					case '2':
-						o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
-						break;
-					}
+				user_input();
 				
 				tms_speak_external();
 				//check_port(0x10);
 				continue;
 			}
+			*/
+			
 			/*
 			if ((v & 0x03) == 1) {
 				// Ready to receive data
@@ -416,19 +523,16 @@ int main(int argc, char *argv[]) {
 		
 		
 		tms_frame++;
-		d = *o;
+		d = *tms_play_offset;
 		
-		printf_x4((word)o); putchar(':');
+		printf_x4((word)tms_play_offset); putchar(':');
 		printf_x2(d);
 		putchar(' ');
-		while(port_in(0x10) != 0xfd) { }
+		//while(port_in(0x10) != 0xfd) { }
 		
 		// Feed new data
 		tms_put(d);
 		
-		
-		//check_port(0x60);
-		//check_port(0x10);
 		
 		/*
 		if ((tms_frame % 0x02) == 0) {
@@ -458,10 +562,10 @@ int main(int argc, char *argv[]) {
 		}
 		
 		
-		o++;
+		tms_play_offset++;
 	}
 	
-	
+	/*
 	printf("Key to end\n");
 	c = getchar();
 	
@@ -469,4 +573,5 @@ int main(int argc, char *argv[]) {
 	//return;
 	//return c;
 	return 0x42;
+	*/
 }
