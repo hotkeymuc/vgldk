@@ -168,7 +168,9 @@ void tms_put(byte v) {
 	
 	//printf_x2(v); c = getchar();
 	
-	//if ((port_in(0x10) & 0x04) == 0x00) {
+	
+	port_out(0x11, v);	// Actually output data to the pins
+	
 	
 	// Set ~WR inactive (high)?
 	port_out(0x10, 0x00);	// Working! Also for "anything other than 4", like 0x01, 0x02, 0x08
@@ -181,7 +183,7 @@ void tms_put(byte v) {
 	
 	
 	// This check seems to prevent some brown-outs for me! Important?
-	//while((port_in(0x10) & 0x07) == 0x05) { }
+	while((port_in(0x10) & 0x07) == 0x05) { }
 	
 	// Set ~WR active (low)?
 	port_out(0x10, 0x04);	// Works: Put 0x00, then 0x04, then enter data!
@@ -197,11 +199,10 @@ void tms_put(byte v) {
 	
 	
 	// TMS5220 Wait for ~READY to go low?
-	//while(port_in(0x10) == 0xfd) { }	// Wait for wiggle (working!)
-	while((port_in(0x10) & 0x07) == 0x05) { }	// OK
+//	while((port_in(0x10) & 0x07) == 0x05) { }	// OK
 	
 	// Latch data?
-	port_out(0x11, v);	// Actually output data to the pins
+//	port_out(0x11, v);	// Actually output data to the pins
 	
 	
 	//check_port(0x10);	// 0xFC if sound stopped -OR- wiggling 0xFD ... 0xFF ... 0xFD
