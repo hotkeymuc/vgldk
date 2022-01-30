@@ -2,7 +2,12 @@
 #NAME = app_hello
 #NAME = app_tests
 #NAME = app_cserial
-NAME = app_gl6000sound
+#NAME = app_gl6000sound
+NAME = app_test_softuart
+
+# To see the result on serial terminal and recover quickly
+#SEND2MONITOR_KEEP_SIO = 1
+#SEND2MONITOR_RESET = 1
 
 # For targeting a specific model:
 #VGLDK_SERIES = 1000
