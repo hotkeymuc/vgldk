@@ -14,6 +14,10 @@
 	Believe me! The LCD can flash weirdly, the speaker can make "Oooof!"-sounds and the USB power supply can and will brown out!
 	
 	TODO:
+		!!! TIMING ISSUES
+			Though there is "some" sound - nothing is quite repeatable...
+			This needs more "wait-for-ready"-checks that I don't know where to find (port/bit)
+		
 		* By hooking up an oscilloscope, it is clear that ports 0x10 and 0x11 can be used to push data to the IC
 			! but I could not find ANY hint of the firmware ever accessing port 0x11!
 			* So far it seems: Send 0x00 to port 0x10, send 0x04 to port 0x10, wait for status on port 0x10 (!=0xFD), then send DATA to port 0x11 - seems to work
@@ -145,6 +149,16 @@ void tms_put(byte v) {
 	//port_out(0x10, 0x00);
 	
 }
+
+void tms_flush() {
+	// Manual: 100% guarantee for clean reset is to write nine bytes of "all ones" to the buffer, followed by a reset command
+	
+	// This will eventually read as "energy=0xF" and make the "speak external" stop
+	for(int i = 0; i < 9; i++) {
+		tms_put(0xff);
+	}
+}
+
 void tms_reset() {
 	
 	printf("TMS:Reset...");
@@ -157,7 +171,6 @@ void tms_reset() {
 		tms_put(0xff);
 	}
 	*/
-	
 	
 	// TMS: Command "Reset"
 	tms_put(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
@@ -206,6 +219,8 @@ int main(int argc, char *argv[]) {
 	port_out(0x22, 0x00);
 	port_out(0x21, 0xe0);
 	
+	check_port(0x21);	// 0xff
+	
 	port_out(0x23, 0x60);
 	port_out(0x23, 0x60);
 	port_out(0x21, 0xe0);
@@ -252,13 +267,7 @@ int main(int argc, char *argv[]) {
 	
 	tms_speak_external();
 	
-	/*
-	// Just speculating...
-	port_out(0x51, 0x08);
-	o = (byte *)0x4000 + 0x00c0;	// + 0x0040;	//4320 - 12*4;	// Around 0x4320 it gets crazy!
-	*/
-	
-	//@TODO: Real frames?
+	// Real frames?
 	// spss011d.pdf, 6.1, page 180
 	//	Parameter	Energy	Repeat	Pitch 	K1	K2	K3	K4	K5	K6	K7	K8	K9	K10	K11	K12
 	//	# Bits		4		1		7		6	6	5	5	4	4	4	3	3	3	0	0
@@ -285,6 +294,7 @@ int main(int argc, char *argv[]) {
 				printf("hang!"); c = getchar();
 				
 				tms_reset();
+				check_port(0x10);
 				continue;
 			}
 			
@@ -297,6 +307,7 @@ int main(int argc, char *argv[]) {
 				if ((c == 'r') || (c == 'R'))
 					tms_reset();
 				
+				check_port(0x62);
 				tms_speak_external();
 				continue;
 			}
