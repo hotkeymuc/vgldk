@@ -5,18 +5,16 @@
 	(Using the printer port to bit-bang valid UART serial)
 	
 	Tested and working on GL4000 with 9600 and 19200 baud
+	Tested and working on GL6000SL with 9600 and 19200 baud
 	
 	TODO:
 	OK	Re-create TX 9600 baud: L=23, 9569 baud
 	OK	Determine max. TX baud: L=1, 21739 baud
 	OK	Try TX at 19200 baud
-	
 	OK	Re-create RX 9600 baud
 	OK	Determine max. RX baud: ca. 38400 baud
 	OK	Try RX at 19200 baud
-	
-	* GL6000SL support
-		The port accesses are completely different, so the timing might differ as well
+	OK GL6000SL support
 	
 	
 	2020-08-10 Bernhard "HotKey" Slawik
@@ -40,7 +38,7 @@
 #endif
 
 
-//@TODO: Put this into the respective "arch/XXX/system.h" once this is clean across all platforms
+//@TODO: Put this into their respective "arch/XXX/system.h" once this is clean across all platforms
 #if SOFTUART_SERIES == 4000
 	// GL4000
 	#define SOFTUART_PORT_DATA 0x10
@@ -65,7 +63,7 @@
 		#define SOFTUART_DELAY_TX 3	// GL4000 at 19200 baud: L=3	=> 408us/8 => 19607 baud
 		#define SOFTUART_TX_DELAY_POST nop
 	#else
-		#error "SOFTUART_BAUD not defined/supported!"
+		#error "SOFTUART_BAUD not defined/supported on GL4000!"
 	#endif
 	
 	// Define port accesses
@@ -85,16 +83,15 @@
 	
 	/*
 	void softuart_set(byte data) {
-		
 		softuart_port_data = data;
 		softuart_port_latch = 0xff;
 		softuart_port_control |= 0x04;	// STROBE low
-		
 		/ *
 		__asm
-			// 5 NOPS for 0xff, 2 NOPS for 0x00
+			// 2 NOPS for 0x00, 5 NOPS for 0xff
 			nop
 			nop
+			
 			nop
 			nop
 			nop
@@ -115,7 +112,7 @@
 	
 #elif SOFTUART_SERIES == 6000
 	// GL6000SL
-	// Those port names are chosen by me for easier identification
+	// Those port names are chosen rather arbitrarily, as I can only guess...
 	#define SOFTUART_PORT_DATA 0x20
 	#define SOFTUART_PORT_STATUS 0x21
 	#define SOFTUART_PORT_LATCH 0x22
@@ -132,14 +129,11 @@
 		#define SOFTUART_TX_DELAY_POST nop
 	#elif SOFTUART_BAUD == 19200
 		// 19200 baud:
-		
-		#warning "Using 19200 baud on GL6000SL: TX timing is still off - Sending is not working!"
-		
 		#define SOFTUART_DELAY_RX 7	// GL6000SL at 19200 baud: 7 works
-		#define SOFTUART_DELAY_TX 2	// GL6000SL at 19200 baud: ?????	2-4 almost
-		#define SOFTUART_TX_DELAY_POST nop
+		#define SOFTUART_DELAY_TX 0	// GL6000SL at 19200 baud: 0 with 0-3 post-nops works;  1 with no post-nops ALMOST works, but is too slow on last MSB
+		#define SOFTUART_TX_DELAY_POST 
 	#else
-		#error "SOFTUART_BAUD not defined/supported!"
+		#error "SOFTUART_BAUD not defined/supported on GL6000SL!"
 	#endif
 	
 	// Define port accesses
@@ -152,6 +146,10 @@
 	#define softuart_set_high() {\
 		softuart_set(SOFTUART_BITS_HIGH)\
 		__asm\
+			; Usually writing 0x00 requires 3 extra NOPS, but empirically thats not needed any more?\
+			;nop\
+			;nop\
+			;nop\
 		__endasm;\
 	}
 	#define softuart_set_low() {\
@@ -270,7 +268,7 @@
 	}
 	*/
 #else
-	#error "No/unsupported VGLDK_SERIES/SOFTUART_SERIES for use with softuart.h!"
+	#error "No/unsupported VGLDK_SERIES/SOFTUART_SERIES!"
 #endif
 
 
@@ -292,13 +290,15 @@ void softuart_tx_delay() {
 		;	ld	l, #22	; => 816us/8 =>  9803 baud
 		;	ld	l, #23	; => 836us/8 =>  9569 baud (works as 9600 baud!)
 		;	ld	l, #25	; => 880us/8 =>  9090 baud
+	#if #SOFTUART_DELAY_TX > 0
 		ld	l, #SOFTUART_DELAY_TX
 		
 		_softuart_tx_delay_loop:
 			dec	l
 			jr	nz, _softuart_tx_delay_loop
+	#endif
 		
-		//nop
+		; Allow some custom NOP slides
 		SOFTUART_TX_DELAY_POST
 		
 		pop hl
@@ -310,10 +310,10 @@ void softuart_rx_delay() {
 	
 	byte i;
 	
-	// cserial.c on GL4000 at 9600 baud: 16-17
-	// cserial.c on GL4000 at 9600 baud with MARK at each bit: 9
-	// cserial.c on GL4000 at ~38400 baud: 1
-	// cserial.c on GL4000 at 19200 baud: 5
+	// GL4000 at 9600 baud: 16-17
+	// GL4000 at 9600 baud with MARK at each bit: 9
+	// GL4000 at 19200 baud: 5
+	// GL4000 at ~38400 baud: 1
 	for(i = 0; i < SOFTUART_DELAY_RX; i++) {
 		__asm
 			nop
@@ -402,6 +402,7 @@ int softuart_receiveByte() {
 		softuart_rx_delay();
 		
 		// Mark bit
+		//SOFTUART_MARK;
 		
 		if (!softuart_get_high()) {
 			// LOW/"1"
@@ -409,7 +410,7 @@ int softuart_receiveByte() {
 		} else {
 			// HIGH/"0"
 			// Caution: Keep this part of the "if" clause roughly the same number of CPU cycles!
-			//b &= 0xfe;
+			//b &= 0xfe;	// Not required as b is 0 from the beginning
 			__asm
 				nop
 				nop
@@ -422,9 +423,6 @@ int softuart_receiveByte() {
 	}
 	
 	// Stop bit should be happening right now!
-	
-	//softuart_rx_delay();
-	//softuart_rx_delayEdge();
 	
 	// Mark the end of data bits
 	SOFTUART_MARK;
