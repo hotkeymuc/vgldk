@@ -17,6 +17,13 @@
 	W 0x10 := 0x04
 	R 0x60 == 0x0F
 	
+	--------------
+	0x10
+		* idle	0xF9	1111 1001
+		* 0x01	0xF9	1111 1100
+		* 0x02	0xF9	1111 1100
+		* 0x04	0xFC	1111 1100
+		* stuffed	0xFD	1111 1101
 	
 	
 	2022-01-19 Bernhard "HotKey" Slawik
@@ -79,40 +86,20 @@ byte check_port(byte p) {
 	return v;
 }
 
-/*
-
-void monitor_ports() {
-	byte v_10;
-	byte v_60;
-	int v_10_old;
-	int v_60_old;
-	int i;
-	
-	v_10_old = -1;	//port_in(0x10);	// 0x0B / 0xF9 / 0xFD
-	v_60_old = -1;	//port_in(0x60);	// 0x0B / 0x0F
-	
-	for(i = 0; i < 400; i++) {
-		v_10 = port_in(0x10);	// 0x0B / 0xF9 / 0xFD
-		v_60 = port_in(0x60);	// 0x0B / 0x0F
-		
-		if (v_10 != v_10_old) {
-			printf("10="); printf_x2(v_10); putchar(' ');
-			v_10_old = v_10;
-		}
-		if (v_60 != v_60_old) {
-			printf("60="); printf_x2(v_60); putchar(' ');
-			v_60_old = v_60;
-		}
-	}
-	
-}
-*/
 
 int tms_frame;
 
 void tms_put(byte v) {
 	byte c;
 	
+	//@TODO: The manual says (3.2 ~READY):
+	// * ~WS and ~RS should be high when not in use
+	//
+	// * Set data to the bus (or shortly after next step)
+	// * Set ~WS low (keep ~RS high - only one can be low at once!)
+	// * Wait for READY to go low (it gets high 100ns after lowering either ~WS or ~RS)
+	// * Set ~WS high
+	// + remove data from bus
 	
 	// Bit-reverse v? Datasheet says that D0 is the MSB!
 	/*
@@ -133,22 +120,23 @@ void tms_put(byte v) {
 	//printf_x2(v);
 	//c = getchar();
 	
-	port_out(0x10, 0x00);	// Also 0x01, 0x02, 0x08
+	// Set ~WR inactive (high)?
+	port_out(0x10, 0x00);	// Working! Also: 0x01, 0x02, 0x08
 	
 	// After OUT 0x10, 0x00:
-	//check_port(0x60);	// 0x0F
-	//check_port(0x10);	// 0xF9
+	//	check_port(0x60);	// 0x0F
+	//	check_port(0x10);	// 0xF9
 	
 	//port_out(0x10, 0x04);
-	//check_port(0x10);	// After OUT 0x10, 0x04: 0xFF, 0xFD, 0xFF, 0xFD, ...
-	
-	//port_out(0x11, v);	// Actually output data to the pins
-	
-	//check_port(0x60);	// 0x0F
-	//check_port(0x10);	// 0xF9
+	//	check_port(0x10);	// After OUT 0x10, 0x04: 0xFF, 0xFD, 0xFF, 0xFD, ...
 	
 	
+	//while((port_in(0x10) & 0x03) != 1) { }
+	
+	
+	// Set ~WR active (low)?
 	port_out(0x10, 0x04);	// Works: Put 0x00, then 0x04, then enter data!
+	
 	// After OUT 0x10, 0x00:
 	//	check_port(0x10);	// 0xF9
 	// After OUT 0x10, 0x04:
@@ -159,20 +147,39 @@ void tms_put(byte v) {
 	//	check_port(0x62);	// 0xFF
 	
 	
-	// TMS5220 ~RS and ~WS?
+	
+	// TMS5220 Wait for ~READY to go low?
 	while(port_in(0x10) == 0xfd) { }	// Wait for wiggle (working!)
+	//while((port_in(0x60) & 0x02) == 0) { }
+	//while((port_in(0x10) & 0x03) != 1) { }
+	
+	// Latch data
 	port_out(0x11, v);	// Actually output data to the pins
+	
 	
 	//check_port(0x10);	// 0xFC if sound stopped -OR- wiggling 0xFD ... 0xFF ... 0xFD
 	//while(port_in(0x10) == 0xff) { }
-	//port_out(0x10, 0xff);
+	
+	//c = port_in(0x10);
+	
+	// Set ~WR inactive (high) again?
+	//port_out(0x10, 0x04);
 	
 }
 void tms_reset() {
-	// TMS: Command "Reset"
+	
 	printf("TMS:Reset...");
 	//check_port(0x10);	// 0xFC = 0b11111100
 	//check_port(0x60);	// 0x0F
+	
+	
+	// Manual: 100% guarantee for clean reset is to write nine bytes of "all ones" to the buffer, followed by a reset command
+	for(int i = 0; i < 9; i++) {
+		tms_put(0xff);
+	}
+	
+	
+	// TMS: Command "Reset"
 	tms_put(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
 	//check_port(0x60);	// 0x0F
 	//check_port(0x10);	// 0xFD = 0b11111101, 0xFF, = 0b11111111
@@ -270,8 +277,8 @@ int main(int argc, char *argv[]) {
 	// Speech data can be found in ROM:0x6D100+ (out 0x51,0x1b, mem[0x5100...])
 	port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
 	//o = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-	o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-	//o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+	//o = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+	o = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
 	while(true) {
 		
@@ -293,17 +300,18 @@ int main(int argc, char *argv[]) {
 			
 			if ((v & 0x03) == 0) {
 				// TMS is idle!
-				
 				printf("Idle!");	//c = getchar();
 				
 				tms_speak();
 				continue;
 			}
-			
+			/*
 			if ((v & 0x03) == 1) {
 				// Ready to receive data
 				break;
 			}
+			*/
+			break;
 		} while(1);	// Wait until ready to receive data
 		
 		
