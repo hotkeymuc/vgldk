@@ -63,26 +63,35 @@
 //#define TMS_SHOW_DISCLAIMER	// show WARNING
 
 //#define CHECK_FRAMES 1024
-#define CHECK_FRAMES 512
+#define CHECK_FRAMES 0x400
 #define CHECK_MAX_SAMPLES 8
 byte check_port(byte p) {
 	byte samples[CHECK_MAX_SAMPLES];
+	word deltas[CHECK_MAX_SAMPLES];
 	byte num_samples;
 	word i;
+	word t;
 	byte v;
 	byte v_old;
 	
 	num_samples = 0;
+	t = 0;
 	
+	// Initial measurement
 	v = port_in(p);
+	deltas[0] = t;
 	samples[num_samples++] = v;
 	v_old = v;
 	
 	for(i = 0; i < CHECK_FRAMES; i++) {
 		v = port_in(p);
+		t++;
+		
 		if (v != v_old) {
 			// Value has changed
+			deltas[num_samples] = t;
 			samples[num_samples++] = v;
+			t = 0;	// Reset "timer"
 			v_old = v;
 			if (num_samples >= CHECK_MAX_SAMPLES) {
 				// Buffer is full!
@@ -96,7 +105,14 @@ byte check_port(byte p) {
 	//printf(" = ");
 	putchar('=');
 	for(i = 0; i < num_samples; i++) {
-		if (i > 0) putchar(',');
+		if (i > 0) {
+			//putchar(',');
+			
+			// Timer
+			putchar('+');
+			printf_x4(deltas[i]);
+			putchar('=');
+		}
 		printf_x2(samples[i]);
 		
 	}
@@ -187,7 +203,7 @@ void tms_set_data(byte v) {
 	port_out(0x11, v);	// Actually output data to the pins
 }
 
-void tms_put(byte v) {
+void tms_put_internal(byte v) {
 	
 	//@TODO: The manual says (3.2 ~READY):
 	// * ~WS and ~RS should be high when not in use
@@ -209,17 +225,20 @@ void tms_put(byte v) {
 	// Latch data onto bus
 	//tms_set_data(v);
 	
+	
 	// Set ~WR active (LOW)
 	tms_set_write_on();
-	
+	tms_wait_ready();
+	tms_set_data(v);
 	
 	tms_set_write_off();	//@FIXME: It makes no sense!
 	
+	
 	// Wait for ~READY to settle LOW again
-	tms_wait_ready();
+	//tms_wait_ready();
 	//delay(1);
 	
-	tms_set_data(v);	//@FIXME: It makes no sense HERE!
+	//tms_set_data(v);	//@FIXME: It makes no sense HERE, but seems to do something. Hmmm...
 	
 	// Un-set ~WR (HIGH)
 	//tms_set_write_off();
@@ -257,12 +276,48 @@ void tms_put(byte v) {
 	
 }
 
+void tms_put(byte v) {
+	
+	// Looking into MAME's tms5110.cpp implementation, the ctrl port only takes 4 bits!
+	// So maybe we push both nibbles serially?
+	
+	// Maybe it is only 4 bits at a time?
+	// Bit-reverse? Datasheet says that D0 is the MSB!
+	byte v_reverse = (v & 0xF0) >> 4 | (v & 0x0F) << 4;	v = (v & 0xCC) >> 2 | (v & 0x33) << 2;	v = (v & 0xAA) >> 1 | (v & 0x55) << 1;
+	//printf_x2(v); c = getchar();
+	
+	
+	// This produces sound all the time (but not the correct one)
+	tms_put_internal(((v & 0xf) << 4));
+	tms_put_internal(((v >> 4) << 4));
+	
+	//tms_put_internal(((v & 0xf) ));
+	//tms_put_internal(((v >> 4) ));
+	
+	
+	// TMS ignores lowest bit?
+	//tms_put_internal(((v & 0xf) << 1) | 0x00);
+	//tms_put_internal(((v >> 4) << 1) | 0x81);
+	
+	// 3,0,1,2
+	//tms_put_internal( ((v&8)>>3) | ((v&1)<<1) | ((v&2)<<1) | ((v&3)<<1));
+	//tms_put_internal( ((v&128)>>7) | ((v&16)>>3) | ((v&32)>>3) | ((v&64)>>3));
+	
+	//tms_put_internal( ((v&16)>>1) | ((v&32)>>5) | ((v&64)>>5) | ((v&128)>>5));
+	//tms_put_internal( ((v&1 )<<3) | ((v&2 )>>1) | ((v&4 )>>1) | ((v&8  )>>1));
+	
+	/*
+	tms_put_internal((v & 0x0f) | (v_reverse & 0xf0));
+	tms_put_internal((v & 0xf0) | (v_reverse & 0x0f));
+	*/
+}
+
 void tms_flush() {
 	// Manual: 100% guarantee for clean reset is to write nine bytes of "all ones" to the buffer, followed by a reset command
 	
 	// This will eventually read as "energy=0xF" and make the "speak external" stop
 	for(int i = 0; i < 9; i++) {
-		tms_put(0xff);
+		tms_put_internal(0xff);
 	}
 }
 
@@ -278,13 +333,17 @@ void tms_reset() {
 	*/
 	
 	// TMS: Command "Reset"
-	tms_put(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
+	//tms_put(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
+	tms_put_internal(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
 }
 
 void tms_speak_external() {
 	// TMS: Command "Speak External"
 	printf("TMS:Speak...");
-	tms_put(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
+	//tms_put(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
+	tms_put_internal(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
+	
+	check_port(0x10);
 }
 
 
@@ -296,6 +355,8 @@ void user_input() {
 	tms_frame = 1;	// Reset counter
 	
 	while(1) {
+		printf_x4((word)tms_play_offset);
+		putchar('?');
 		c = getchar();
 		
 		switch(c) {
@@ -354,7 +415,7 @@ void user_input() {
 			
 			case '1':
 				tms_speak_external();
-				tms_play_offset = (byte *)0x513b+1;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+				tms_play_offset = (byte *)0x513b+2;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
 				return;
 				//break;
 			
@@ -379,7 +440,7 @@ int main(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
 	
-	//byte i;
+	word i;
 	byte d;
 	byte v;
 	char c;
@@ -473,61 +534,29 @@ int main(int argc, char *argv[]) {
 	//tms_play_offset = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
 	tms_speak_external();
+	delay(0x200);
 	
-	mon21 = 0;	// Monitor while playing?
+	mon21 = 1;	// Monitor port after writing data?
 	//check_port(0x10);
 	
 	while(true) {
 		
-		if ((tms_frame % 0x10) == 0) {
-			printf("PAUSE");
+		if ((tms_frame % 1) == 0) {
+			printf("P");
 			user_input();
 		}
 		
-		// Check TMS status
-		//do {
-			v = port_in(0x10);
-			//printf_x2(v); c = getchar();
-			
-			if ((v & 0x03) == 2) {
-				// hang
-				printf("hang!"); c = getchar();
-				
-				tms_reset();
-				check_port(0x10);
-				continue;
-			}
-			
-			/*
-			if ((v & 0x07) == 4) {
-			//if ((v & 0x03) == 0) {
-				// TMS is idle!
-				printf("Idle!");	//c = getchar();
-				
-				user_input();
-				
-				tms_speak_external();
-				//check_port(0x10);
-				continue;
-			}
-			*/
-			
-			/*
-			if ((v & 0x03) == 1) {
-				// Ready to receive data
-				break;
-			}
-			*/
-			//break;
-		//} while(1);	// Wait until ready to receive data
+		
 		
 		
 		tms_frame++;
 		d = *tms_play_offset;
 		
-		printf_x4((word)tms_play_offset); putchar(':');
-		printf_x2(d);
-		putchar(' ');
+		if (mon21) {
+			printf_x4((word)tms_play_offset); putchar(':');
+			printf_x2(d);
+			putchar(' ');
+		}
 		//while(port_in(0x10) != 0xfd) { }
 		
 		// Feed new data
@@ -555,10 +584,17 @@ int main(int argc, char *argv[]) {
 		
 		if (mon21) {
 			check_port(0x10);
-			delay(0x100);
+			//delay(0x100);
+			delay(0x400);
 		} else {
-			printf("\n");
-			delay(0x2000);
+			putchar('.');
+			//printf("\n");
+			//delay(0x800);
+			delay(0x1800);
+			//for(i = 0; i < 0x1000; i++) {
+			//	delay(0x1);
+			//	port_in(0x10);	// Poll?
+			//}
 		}
 		
 		
