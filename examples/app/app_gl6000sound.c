@@ -110,7 +110,10 @@ byte check_port(byte p) {
 			
 			// Timer
 			putchar('+');
-			printf_x4(deltas[i]);
+			
+			if (deltas[i] < 0x100) printf_x2(deltas[i]);
+			else printf_x4(deltas[i]);
+			
 			putchar('=');
 		}
 		printf_x2(samples[i]);
@@ -157,6 +160,7 @@ byte tms_get_ready() {
 	// Is ~READY LOW?
 	//return (port_in(0x10) & TMS_NREADY_MASK) == 0;
 	return (port_in(0x10) & 0x07) != 0x05;
+	//return (port_in(0x10) & 0x01) == 0x01;
 }
 
 byte tms_wait_ready() {
@@ -179,6 +183,22 @@ byte tms_wait_ready() {
 	} while (tms_get_ready() == 0);
 	return 1;
 }
+
+/*
+byte tms_get_playing() {
+	// 0xFC = stopped
+
+}
+*/
+
+void tms_wait_clock() {
+	// After sending a command, the lowest bit wiggles (0xF8/F9 and 0xFD/FF). Is it "clock pulses"?
+	byte v;
+	do {
+		v = port_in(0x10);
+	} while ((v & 0x02) == 0x00);	// Wait for a short high (e.g. 0xFD -> 0xFF)
+}
+
 void tms_set_write_on() {
 	// Start Write Request: Set ~WR LOW
 	//port_out(0x61, 0xd0);
@@ -219,29 +239,16 @@ void tms_put_internal(byte v) {
 	//printf_x2(v); c = getchar();
 	
 	
+	
+	tms_set_write_on();
+	
+	tms_set_write_off();
+	
 	// Make sure we don't interrupt an ongoing transaction
-	//tms_wait_ready();
+	tms_wait_ready();	// This is important
 	
 	// Latch data onto bus
-	//tms_set_data(v);
-	
-	
-	// Set ~WR active (LOW)
-	tms_set_write_on();
-	tms_wait_ready();
-	tms_set_data(v);
-	
-	tms_set_write_off();	//@FIXME: It makes no sense!
-	
-	
-	// Wait for ~READY to settle LOW again
-	//tms_wait_ready();
-	//delay(1);
-	
-	//tms_set_data(v);	//@FIXME: It makes no sense HERE, but seems to do something. Hmmm...
-	
-	// Un-set ~WR (HIGH)
-	//tms_set_write_off();
+	tms_set_data(v);	//@FIXME: It makes no sense HERE, but seems to do something. Hmmm...
 	
 	
 	/*
@@ -255,9 +262,9 @@ void tms_put_internal(byte v) {
 	
 	
 	// After OUT 0x10, 0x00:
-	//	check_port(0x10);	// 0xF9
+	//	check_port(0x10);	// 0xF9, 0xF8
 	// After OUT 0x10, 0x04:
-	//	check_port(0x10);	// 0xFC (sound stopped?) -OR- 0xFD ... 0xFF ... 0xFD (sound running?)
+	//	check_port(0x10);	// 0xFC (sound stopped) -OR- 0xFD ... 0xFF ... 0xFD (sound running?)
 	//	check_port(0x11);	// 0xFF
 	//	check_port(0x21);	// 0xFF
 	//	check_port(0x60);	// 0x0F
@@ -281,15 +288,28 @@ void tms_put(byte v) {
 	// Looking into MAME's tms5110.cpp implementation, the ctrl port only takes 4 bits!
 	// So maybe we push both nibbles serially?
 	
+	
+	tms_put_internal(v);
+	
+	//tms_wait_clock();
+	
+	
 	// Maybe it is only 4 bits at a time?
 	// Bit-reverse? Datasheet says that D0 is the MSB!
-	byte v_reverse = (v & 0xF0) >> 4 | (v & 0x0F) << 4;	v = (v & 0xCC) >> 2 | (v & 0x33) << 2;	v = (v & 0xAA) >> 1 | (v & 0x55) << 1;
+	//byte v_reverse = (v & 0xF0) >> 4 | (v & 0x0F) << 4;	v = (v & 0xCC) >> 2 | (v & 0x33) << 2;	v = (v & 0xAA) >> 1 | (v & 0x55) << 1;
 	//printf_x2(v); c = getchar();
 	
-	
+	/*
 	// This produces sound all the time (but not the correct one)
 	tms_put_internal(((v & 0xf) << 4));
+	
+	//tms_wait_clock();
+	
 	tms_put_internal(((v >> 4) << 4));
+	
+	//tms_wait_clock();
+	
+	*/
 	
 	//tms_put_internal(((v & 0xf) ));
 	//tms_put_internal(((v >> 4) ));
@@ -343,7 +363,8 @@ void tms_speak_external() {
 	//tms_put(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
 	tms_put_internal(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
 	
-	check_port(0x10);
+	//check_port(0x10);
+	//tms_wait_clock();
 }
 
 
@@ -355,16 +376,42 @@ void user_input() {
 	tms_frame = 1;	// Reset counter
 	
 	while(1) {
+		printf("\n");
 		printf_x4((word)tms_play_offset);
 		putchar('?');
 		c = getchar();
 		
 		switch(c) {
 			
+			case 'h':
+				// Help
+				printf("RS12PDQF\n");
+				break;
+			
+			case 0x18:	// UP
+				tms_play_offset-=0x10;
+				break;
+			case 0x19:	// DOWN
+				tms_play_offset+=0x10;
+				break;
+			case 0x1a:	// RIGHT
+				tms_play_offset++;
+				break;
+			case 0x1b:	// LEFT
+				tms_play_offset--;
+				break;
+			
+			case 10:
+			case 13:
+				// Play for a while
+				tms_frame = 16;
+				return;
+				break;
+			
 			case 's':
 			case 'S':
 				tms_speak_external();
-				return;
+				//return;
 				break;
 			
 			case 'p':
@@ -404,28 +451,30 @@ void user_input() {
 			case 'd':
 			case 'D':
 				mon21 = 1-mon21;
-				return;
-				//break;
+				if (mon21) printf("ON"); else printf("OFF");
+				//return;
+				break;
 			
 			case '0':
-				tms_speak_external();
+				//tms_speak_external();
 				tms_play_offset = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-				return;
-				//break;
+				//return;
+				break;
 			
 			case '1':
-				tms_speak_external();
-				tms_play_offset = (byte *)0x513b+2;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-				return;
-				//break;
+				//tms_speak_external();
+				tms_play_offset = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+				//return;
+				break;
 			
 			case '2':
-				tms_speak_external();
+				//tms_speak_external();
 				tms_play_offset = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
-				return;
-				//break;
+				//return;
+				break;
 			
 			default:
+				printf_x2((byte)c);
 				return;
 				//break;
 		}
@@ -534,22 +583,25 @@ int main(int argc, char *argv[]) {
 	//tms_play_offset = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
 	tms_speak_external();
-	delay(0x200);
+	//delay(0x200);
 	
-	mon21 = 1;	// Monitor port after writing data?
+	mon21 = 0;	//1;	// Monitor port after writing data?
+	tms_frame = 0;
 	//check_port(0x10);
 	
 	while(true) {
 		
-		if ((tms_frame % 1) == 0) {
-			printf("P");
+		//if ((tms_frame % tms_break_frames) == 0) {
+		if (tms_frame == 0) {
+			tms_frame = 1;
+			//printf("P");
 			user_input();
 		}
 		
 		
+		//tms_frame++;
+		tms_frame--;
 		
-		
-		tms_frame++;
 		d = *tms_play_offset;
 		
 		if (mon21) {
@@ -557,40 +609,49 @@ int main(int argc, char *argv[]) {
 			printf_x2(d);
 			putchar(' ');
 		}
-		//while(port_in(0x10) != 0xfd) { }
+		
+		
+		// Pre-check
+		v = port_in(0x10);
+		if (v == 0xf9) {
+			// Idle state?
+			tms_speak_external();
+			v = port_in(0x10);
+		}
+		if (v == 0xfc) {
+			// Sound ended?
+			tms_speak_external();
+			v = port_in(0x10);
+		}
+		
+		// Pre-wait: Wait for "tick"
+		if (v == 0xfd) while(port_in(0x10) != 0xff) { }
+		if (v == 0xf9) while(port_in(0x10) != 0xf8) { }
 		
 		// Feed new data
 		tms_put(d);
 		
+		/*
+		// Post-wait
+		v = port_in(0x10);
+		if (v == 0xfd) while(port_in(0x10) != 0xff) { }
+		if (v == 0xf9) while(port_in(0x10) != 0xf8) { }
+		*/
 		
 		/*
-		if ((tms_frame % 0x02) == 0) {
-			printf("Pause...");
-			
-			do {
-				c = getchar();
-				
-				if ((c == 'r') || (c == 'R')) {
-					// Output something
-					tms_reset();
-					tms_speak_external();
-				} else {
-					break;
-				}
-				
-			} while(1);
-		}
+		if (v == 0xfd) while(port_in(0x10) == 0xfd) { }
+		if (v == 0xf9) while(port_in(0x10) == 0xf9) { }
 		*/
 		
 		if (mon21) {
 			check_port(0x10);
 			//delay(0x100);
-			delay(0x400);
+			//delay(0x400);
 		} else {
 			putchar('.');
 			//printf("\n");
 			//delay(0x800);
-			delay(0x1800);
+			//delay(0x1800);
 			//for(i = 0; i < 0x1000; i++) {
 			//	delay(0x1);
 			//	port_in(0x10);	// Poll?
