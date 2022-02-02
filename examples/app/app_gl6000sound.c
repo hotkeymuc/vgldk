@@ -509,6 +509,25 @@ byte speech_get_data() {
 }
 
 
+void speech_play(word o, word l) {
+	speech_stop();
+	//speech_reset();
+	
+	speech_ofs_byte = o;
+	speech_ofs_bit = 0;
+	speech_data_next = speech_get_data();
+	
+	speech_playing = l;
+	
+	delay(0x100);
+	
+	speech_start();
+	delay(0x100);
+	speech_speak_external();
+
+}
+
+
 void speech_update() {
 	byte v;
 	v = port_in(0x10);
@@ -607,8 +626,12 @@ int main(int argc, char *argv[]) {
 	// Speech data can be found in ROM:0x6D100+ (out 0x51,0x1b, mem[0x5100...])
 	port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
 	//speech_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-	speech_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+	//speech_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
 	//speech_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+	speech_ofs_byte = 0x51274;	//, l=0x20 + 20	# 6D274 = Hello (???)
+	//speech_ofs_byte = 0x512F4;	//, l=0x40 + 20	# 6D2F4+- = Reverb / delete-sound
+	//speech_ofs_byte = 0x515E6;	//, l=0x30 + 40	# 6D5E6 = mewewew
+	
 	
 	//mon21 = 0;	//1;	// Monitor port after writing data?
 	//tms_frame = 0;
@@ -618,13 +641,10 @@ int main(int argc, char *argv[]) {
 	speech_playing = 0;
 	
 	
-	speech_reset();
 	delay(0x1000);
 	
-	speech_start();
-	delay(0x100);
-	speech_speak_external();
-	speech_playing = 0x04;
+	// Start playing right away
+	//speech_play(speech_ofs_byte, 0x30);
 	
 	
 	while(1) {
@@ -699,23 +719,27 @@ int main(int argc, char *argv[]) {
 			
 			case '0':
 				//tsp_speak_external();
-				speech_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-				speech_ofs_bit = 0;
-				speech_data_next = speech_get_data();
+				//speech_ofs_byte = 0x5000;	
+				//speech_ofs_bit = 0;
+				//speech_data_next = speech_get_data();
+				speech_play(0x5000, 0x80);	// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
 				break;
 			
 			case '1':
-				//tsp_speak_external();
-				speech_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-				speech_ofs_bit = 0;
-				speech_data_next = speech_get_data();
+				speech_play(0x513b, 0x4);	// MEM:0x513B now shows ROM:0x6D13B = Jingle
 				break;
 			
 			case '2':
-				//tsp_speak_external();
-				speech_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
-				speech_ofs_bit = 0;
-				speech_data_next = speech_get_data();
+				speech_play(0x5141, 0x60);	// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+				break;
+			case '3':
+				speech_play(0x51274, 0x80);	//, l=0x20 + 20	# 6D274 = Hello (???)
+				break;
+			case '4':
+				speech_play(0x512F4, 0x60);	//, l=0x40 + 20	# 6D2F4+- = Reverb / delete-sound
+				break;
+			case '5':
+				speech_play(0x515E6, 0x70);	//, l=0x30 + 40	# 6D5E6 = mewewew
 				break;
 			
 			
