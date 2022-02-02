@@ -179,9 +179,15 @@ void delay(word n) {
 
 
 
+// Speech stuff
+word speech_ofs_byte;
+byte speech_ofs_bit;
+
+byte speech_playing;
+byte speech_data_next;
+
+/*
 // TSP50C0x trials
-word tsp_ofs_byte;
-byte tsp_ofs_bit;
 
 // PB0 becomes a chip enable strobe. It is normally held high.
 // When it is taken low, data is read from or written to the PA0- PA7 pins
@@ -227,9 +233,9 @@ void tsp_check_pa() {
 }
 
 void tsp_write(byte d) {
-	byte v;
-	byte v_old;
-	word timeout;
+	//byte v;
+	//byte v_old;
+	//word timeout;
 	
 	// Send a byte (slave-mode) according to protocol
 	printf("{");
@@ -240,11 +246,10 @@ void tsp_write(byte d) {
 	
 	// 2) The master polls the output state of PA7 by pulsing STR (on PB0) low...
 	// ...and reading the state of PA7 while STR is low.
-	tsp_set_str_low();
-	tsp_set_str_high();
-	while((port_in(0x10) & 0x07) == 0x05) { }
+	//tsp_set_str_low();
+	//tsp_set_str_high();
+	//while((port_in(0x10) & 0x07) == 0x05) { }
 	
-	/*
 	v_old = 0x55;	// something invalid, so first change gets put to screen
 	timeout = 0x4000;
 	do {
@@ -271,7 +276,7 @@ void tsp_write(byte d) {
 	//} while ((v&0x01) == 0x00);
 	} while (((v&0x07) == 0x05) && (timeout > 0));
 	//} while (((v & 0x01) != 0x01) && (timeout > 0));
-	*/
+	
 	
 	// 4) When the master senses that PA7 has gone high, it sets the R/W signal low to indicate a write operation.
 	tsp_set_rw_write();
@@ -288,7 +293,7 @@ void tsp_write(byte d) {
 	
 	//tsp_set_str_low();
 	
-	/*
+	
 	// @FIXME: Verify PA7=0
 	printf("-");
 	//tsp_check_pa();
@@ -307,9 +312,8 @@ void tsp_write(byte d) {
 	//} while (((v & 0x02) == 0x02) && (timeout > 0));
 	//} while (((v&0x07) != 0x07) && (timeout > 0));
 	} while (((v&0x07) == 0x05) && (timeout > 0));
-	*/
 	
-	tsp_check_pa();
+	//tsp_check_pa();
 	
 	
 	// 7) The TSP50C0x/1x polls the PA7 output latch. When it sees it go low, it knows that data is being written to the port A input latch.
@@ -337,12 +341,10 @@ void tsp_flush() {
 void tsp_reset() {
 	printf("TSP:Reset...");
 	
-	/*
 	// Manual: 100% guarantee for clean reset is to write nine bytes of "all ones" to the buffer, followed by a reset command
 	for(int i = 0; i < 9; i++) {
 		tsp_write(0xff);
 	}
-	*/
 	
 	// TMS: Command "Reset"
 	tsp_write(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
@@ -352,9 +354,114 @@ void tsp_speak_external() {
 	printf("TSP:Speak...");
 	tsp_write(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
 }
+*/
 
 
+// VTech custom TSPish interface
+void speech_start() {
+	// Sets WRITE mode, starts "auto strobing"
+	port_out(0x10, 0x04);
+}
+void speech_stop() {
+	// clear WRITE, stop strobing
+	port_out(0x10, 0x00);
+}
+void speech_set_data(byte d) {
+	// Data can only be fed during signal
+	
+	// Data is contained in the highest 4 bits of port 0x11
+	port_out(0x11, d << 4);
+}
 
+void speech_wait() {
+	// Wait for just the right moment...
+	byte v;
+	word timeout;
+	
+	timeout = 0x1000;
+	do {
+		
+		timeout--;
+		if (timeout <= 0) {
+			printf("TIMEOUT");
+			return;	// false
+		}
+		
+		v = port_in(0x10);
+		
+	} while ((v & 0x02) == 0);
+	return;	// true
+}
+
+void speech_put(byte d) {
+	speech_wait();
+	speech_set_data(d);
+}
+void speech_reset() {
+	// TMS: Command "Reset"
+	speech_playing = 0;
+	
+	speech_stop();
+	speech_set_data(0xf);	// D0...D7: X111xxxx = "Reset" (e.g. 0x7 or 0xF)
+	speech_start();
+	
+	for(byte i = 0; i < 10; i++) {
+		speech_put(0xf);	// D0...D7: X111xxxx = "Reset" (e.g. 0x7 or 0xF)
+	}
+	speech_stop();
+}
+void speech_speak_external() {
+	// TMS: Command "Speak External"
+	//speech_set_data(0xe);	// D0...D7: X110xxxx = "Speak External" (e.g. 0x6 or 0xE)
+	speech_put(0xe);	// D0...D7: X110xxxx = "Speak External" (e.g. 0x6 or 0xE)
+}
+
+byte speech_get_data() {
+	// Get next bunch of bits (take care of 4, 7 or 8 bit)
+	byte d;
+	
+	// 8 bits
+	/*
+	d = *(byte *)(speech_ofs_byte);
+	speech_ofs_byte++;
+	*/
+	
+	/*
+	// 7 bits
+	word dw;
+	
+	dw = *(word*)(speech_ofs_byte);
+	d = (dw >> speech_ofs_bit) & 0x7f;
+	
+	speech_ofs_bit += 7;
+	if (speech_ofs_bit >= 8) {
+		speech_ofs_bit -= 8;
+		speech_ofs_byte++;
+	}
+	*/
+	
+	// 4 bits
+	d = *(byte*)(speech_ofs_byte);
+	d = (d >> speech_ofs_bit) & 0x0f;
+	
+	speech_ofs_bit += 4;
+	if (speech_ofs_bit >= 8) {
+		speech_ofs_bit -= 8;
+		speech_ofs_byte++;
+	}
+	
+	return d;
+}
+
+
+void speech_update() {
+	byte v;
+	v = port_in(0x10);
+	
+	//printf("0x"); printf_x2(0x10);
+	//printf("=");
+	printf_x2(v);
+}
 
 //void main() __naked {
 //void main() {
@@ -363,10 +470,10 @@ int main(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
 	
-	word i;
-	word dw;
-	byte d;
-	byte v;
+	//word i;
+	//word dw;
+	//byte d;
+	//byte v;
 	char c;
 	
 	printf("GL6000SL sound test\n");
@@ -421,7 +528,7 @@ int main(int argc, char *argv[]) {
 	//check_port(0x10);	// 0xf9 = 0b11111001
 	delay(0x100);
 	
-	port_out(0x10, 0x04);
+	//port_out(0x10, 0x04);	// Start speech?
 	
 	//for (i=0; i < 3; i++) {
 	//	check_port(0x21);	// 0xff
@@ -444,37 +551,66 @@ int main(int argc, char *argv[]) {
 	
 	// Speech data can be found in ROM:0x6D100+ (out 0x51,0x1b, mem[0x5100...])
 	port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
-	//tsp_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-	tsp_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-	//tsp_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+	//speech_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+	speech_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+	//speech_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
 	//mon21 = 0;	//1;	// Monitor port after writing data?
 	//tms_frame = 0;
-	tsp_ofs_bit = 0;
+	speech_ofs_bit = 0;
 	
-	tsp_check_pa();
+	speech_data_next = speech_get_data();
+	speech_playing = 0;
 	
-	tsp_speak_external();
 	
-	//tsp_check_pa();
+	speech_start();
+	speech_speak_external();
+	speech_playing = 0x09;
+	
 	
 	while(1) {
+		
+		while (speech_playing > 0) {
+			speech_put(speech_data_next);
+			speech_data_next = speech_get_data();
+			
+			//putchar('.');
+			speech_update();
+			
+			speech_playing--;
+		}
+		
+		speech_update();
+		
 		printf("\n");
-		printf_x4(tsp_ofs_byte);
+		printf_x4(speech_ofs_byte);
 		putchar('?');
 		c = getchar();
 		
 		switch(c) {
+			case 13:
+			case 10:
+				speech_playing = 0x09;
+				break;
+			case 'P':
+			case 'p':
+				speech_start();
+				speech_speak_external();
+				speech_playing = 0x08;
+				break;
 			
 			case 'S':
 			case 's':
-				tsp_speak_external();
-				//tsp_check_pa();
+				speech_stop();
 				break;
+			
 			case 'R':
 			case 'r':
-				tsp_reset();
-				tsp_check_pa();
+				//speech_start();
+				//speech_stop();
+				speech_reset();
+				//tsp_reset();
+				//tsp_check_pa();
 				break;
 			
 			case 'q':
@@ -503,51 +639,36 @@ int main(int argc, char *argv[]) {
 			
 			case '0':
 				//tsp_speak_external();
-				tsp_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-				tsp_ofs_bit = 0;
+				speech_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+				speech_ofs_bit = 0;
+				speech_data_next = speech_get_data();
 				break;
 			
 			case '1':
 				//tsp_speak_external();
-				tsp_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-				tsp_ofs_bit = 0;
+				speech_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+				speech_ofs_bit = 0;
+				speech_data_next = speech_get_data();
 				break;
 			
 			case '2':
 				//tsp_speak_external();
-				tsp_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
-				tsp_ofs_bit = 0;
+				speech_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+				speech_ofs_bit = 0;
+				speech_data_next = speech_get_data();
 				break;
 			
 			
 			case ' ':	// Cont
 			case '.':	// Cont
+				speech_playing = 0x01;
+				break;
+				
 			default:
-				// Play...
-				
-				// 8 bits
-				/*
-				d = *(byte *)(tsp_ofs_byte);
-				tsp_ofs_byte++;
-				*/
-				
-				// 7 bits
-				dw = *(word*)(tsp_ofs_byte);
-				
-				d = (dw >> tsp_ofs_bit) & 0x7f;
-				
-				
-				tsp_ofs_bit += 7;
-				if (tsp_ofs_bit >= 8) {
-					tsp_ofs_bit -= 8;
-					tsp_ofs_byte++;
-				}
-				
-				
-				printf_x2(d);
-				tsp_write(d);
-				
-				
+				// ?
+				printf_x2(c); putchar('?');
+				//speech_data_next = speech_get_data();
+				//speech_put(speech_data_next);
 				break;
 		}
 	}
