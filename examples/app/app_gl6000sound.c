@@ -486,6 +486,16 @@ int main(int argc, char *argv[]) {
 				__endasm;
 				break;
 			
+			case 'f':
+			case 'F':
+				// Call intro
+				port_out(0x51, 0x09);
+				__asm
+					;rst0
+					call #0x66f6
+				__endasm;
+				break;
+			
 			case 'h':
 				// Help
 				break;
