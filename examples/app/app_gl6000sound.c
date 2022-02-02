@@ -176,337 +176,184 @@ void delay(word n) {
 	}
 }
 
-int tms_frame;
-byte *tms_play_offset;
-byte mon21;	// Monitor while playing?
-void user_input();	// Forward
 
 
 
-//@FIXME: I don't know any of these masks. This ist purely experimental!
-#define TMS_READY_TIMEOUT 0x1fff	// Timeout while waiting for "~READY", un-set for no timeout
-#define TMS_NREADY_MASK 0x02	// Which (input) bit is connected to TMS "~READY"? 2?
-#define TMS_NWRITE_MASK 0x04	// Which (output) bit is connected to TMS "~WR"?
-byte tms_get_ready() {
-	// Is ~READY LOW?
-	//return (port_in(0x10) & TMS_NREADY_MASK) == 0;
-	return (port_in(0x10) & 0x07) != 0x05;
-	//return (port_in(0x10) & 0x01) == 0x01;
-}
+// TSP50C0x trials
+word tsp_ofs_byte;
+byte tsp_ofs_bit;
 
-byte tms_wait_ready() {
-	#ifdef TMS_READY_TIMEOUT
-	word t;
-	t = 0;
-	#endif
-	
-	do {
-		
-		#ifdef TMS_READY_TIMEOUT
-		t++;
-		if (t >= TMS_READY_TIMEOUT) {
-			printf("TIMEOUT! ");
-			check_port(0x10);
-			user_input();
-			return 0;
-		}
-		#endif
-	} while (tms_get_ready() == 0);
-	return 1;
-}
-
-/*
-byte tms_get_playing() {
-	// 0xFC = stopped
-
-}
-*/
-
-void tms_wait_tick() {
-	// After sending a command, the lowest bit wiggles (0xF8/F9 and 0xFD/FF). Is it "clock pulses"?
-	byte v;
-	// Pre-wait: Wait for "tick"
-	v = port_in(0x10);
-	if (v == 0xfd) while(port_in(0x10) != 0xff) { }
-	if (v == 0xf9) while(port_in(0x10) != 0xf8) { }
-}
-
-void tms_set_write_on() {
-	// Start Write Request: Set ~WR LOW
-	//port_out(0x61, 0xd0);
-	//port_out(0x62, 0x00);
-	//port_out(0x10, 0x04);
+// PB0 becomes a chip enable strobe. It is normally held high.
+// When it is taken low, data is read from or written to the PA0- PA7 pins
+// depending on the value of PB1.
+void tsp_set_str_low() {
 	port_out(0x10, 0x00);
-	
-	//port_out(0x10,  port_in(0x10) | TMS_NWRITE_MASK);
-	//port_out(0x10,  port_in(0x10) & (0xff-TMS_NWRITE_MASK));
+	//port_out(0x10, 0x04);
 }
-void tms_set_write_off() {
-	// Stop Write Request: Set ~WR HIGH
-	//port_out(0x61, 0xd0);
-	//port_out(0x62, 0x00);
+void tsp_set_str_high() {
 	port_out(0x10, 0x04);
 	//port_out(0x10, 0x00);
-	
-	//port_out(0x10,  port_in(0x10) & (0xff-TMS_NWRITE_MASK));
-	//port_out(0x10,  port_in(0x10) | TMS_NWRITE_MASK);
-}
-void tms_set_data(byte v) {
-	port_out(0x11, v);	// Actually output data to the pins
 }
 
-void tms_put_internal(byte v) {
-	
-	//@TODO: The manual says (3.2 ~READY):
-	// * ~WS and ~RS should be high when not in use
-	//
-	// * Set data to the bus (or shortly after next step)
-	// * Set ~WS low (keep ~RS high - only one can be low at once!)
-	// * Wait for READY to go low (it gets high 100ns after lowering either ~WS or ~RS)
-	// * Set ~WS high
-	// + remove data from bus
-	
-	// Bit-reverse? Datasheet says that D0 is the MSB!
-	//v = (v & 0xF0) >> 4 | (v & 0x0F) << 4;	v = (v & 0xCC) >> 2 | (v & 0x33) << 2;	v = (v & 0xAA) >> 1 | (v & 0x55) << 1;
-	//printf_x2(v); c = getchar();
-	
-	
-	
-	tms_set_write_on();
-	
-	tms_set_write_off();
-	
-	// Make sure we don't interrupt an ongoing transaction
-	tms_wait_ready();	// This seems important
-	
-	// Latch data onto bus
-	tms_set_data(v);
-	
-	
-	/*
-	
-	port_out(0x10, 0x00);	// Works: Put 0x00, then 0x04, then enter data!
-	
-	// This check seems to prevent some brown-outs for me! Important?
-	//while((port_in(0x10) & 0x07) == 0x05) { }
-	
-	port_out(0x10, 0x04);	// Works: Put 0x00, then 0x04, then enter data!
-	
-	
-	// After OUT 0x10, 0x00:
-	//	check_port(0x10);	// 0xF9, 0xF8
-	// After OUT 0x10, 0x04:
-	//	check_port(0x10);	// 0xFC (sound stopped) -OR- 0xFD ... 0xFF ... 0xFD (sound running?)
-	//	check_port(0x11);	// 0xFF
-	//	check_port(0x21);	// 0xFF
-	//	check_port(0x60);	// 0x0F
-	//	check_port(0x62);	// 0xFF
-	*/
+#define tsp_set_rw_read tsp_set_rw_high
+void tsp_set_rw_high() {
+	//port_out(0x10, 0xfb);	// str HIGH and RW HIGH?
+	//port_out(0x61, 0xdf);	// ???
+	//port_out(0x62, 0xff);	// ???
+}
+#define tsp_set_rw_write tsp_set_rw_low
+void tsp_set_rw_low() {
+	//port_out(0x61, 0xd0);	// ???
+	//port_out(0x62, 0x00);	// ???
 }
 
-void tms_put(byte v) {
-	
-	// Looking into MAME's tms5110.cpp implementation, the ctrl port only takes 4 bits!
-	// So maybe we push both nibbles serially?
-	
-	
-	tms_put_internal(v);
-	
-	//tms_wait_clock();
-	
-	
-	// Maybe it is only 4 bits at a time?
-	// Bit-reverse? Datasheet says that D0 is the MSB!
-	//byte v_reverse = (v & 0xF0) >> 4 | (v & 0x0F) << 4;	v = (v & 0xCC) >> 2 | (v & 0x33) << 2;	v = (v & 0xAA) >> 1 | (v & 0x55) << 1;
-	//printf_x2(v); c = getchar();
-	
-	/*
-	// This produces sound all the time (but not the correct one)
-	tms_put_internal(((v & 0xf) << 4));
-	
-	//tms_wait_clock();
-	
-	tms_put_internal(((v >> 4) << 4));
-	
-	//tms_wait_clock();
-	
-	*/
-	
-	//tms_put_internal(((v & 0xf) ));
-	//tms_put_internal(((v >> 4) ));
-	
-	
-	// TMS ignores lowest bit?
-	//tms_put_internal(((v & 0xf) << 1) | 0x00);
-	//tms_put_internal(((v >> 4) << 1) | 0x81);
-	
-	// 3,0,1,2
-	//tms_put_internal( ((v&8)>>3) | ((v&1)<<1) | ((v&2)<<1) | ((v&3)<<1));
-	//tms_put_internal( ((v&128)>>7) | ((v&16)>>3) | ((v&32)>>3) | ((v&64)>>3));
-	
-	//tms_put_internal( ((v&16)>>1) | ((v&32)>>5) | ((v&64)>>5) | ((v&128)>>5));
-	//tms_put_internal( ((v&1 )<<3) | ((v&2 )>>1) | ((v&4 )>>1) | ((v&8  )>>1));
-	
-	/*
-	tms_put_internal((v & 0x0f) | (v_reverse & 0xf0));
-	tms_put_internal((v & 0xf0) | (v_reverse & 0x0f));
-	*/
+byte tsp_get_pa() {
+	byte v;
+	v = port_in(0x10);
+	//v = port_in(0x11);
+	//v = port_in(0x60);
+	return v;
+}
+void tsp_set_pa(byte v) {
+	port_out(0x11, v);
 }
 
-void tms_flush() {
+void tsp_check_pa() {
+	check_port(0x10);
+	//check_port(0x11);
+	//check_port(0x60);
+	//check_port(0x61);
+	//check_port(0x62);
+}
+
+void tsp_write(byte d) {
+	byte v;
+	byte v_old;
+	word timeout;
+	
+	// Send a byte (slave-mode) according to protocol
+	printf("{");
+	
+	// 1) The master microprocessor sets R/W high to indicate a read operation.
+	tsp_set_rw_read();
+	
+	
+	// 2) The master polls the output state of PA7 by pulsing STR (on PB0) low...
+	// ...and reading the state of PA7 while STR is low.
+	tsp_set_str_low();
+	tsp_set_str_high();
+	while((port_in(0x10) & 0x07) == 0x05) { }
+	
+	/*
+	v_old = 0x55;	// something invalid, so first change gets put to screen
+	timeout = 0x4000;
+	do {
+		// 2) The master polls the output state of PA7 by pulsing STR (on PB0) low...
+		tsp_set_str_low();
+		
+		// ...and reading the state of PA7 while STR is low.
+		v = tsp_get_pa();
+		
+		tsp_set_str_high();
+		
+		
+		if (v != v_old) {
+			printf_x2(v);
+			v_old = v;
+		}
+		timeout--;
+		
+		// 3) Eventually, the TSP50C0x/1x completes processing any previous data or instructions from the master.
+		// When it does, it writes a one to the PA7 output latch.
+		
+		// Wait until PA7=1	(0x10 0xFC --> 0xFD)
+	//} while (timeout > 0);
+	//} while ((v&0x01) == 0x00);
+	} while (((v&0x07) == 0x05) && (timeout > 0));
+	//} while (((v & 0x01) != 0x01) && (timeout > 0));
+	*/
+	
+	// 4) When the master senses that PA7 has gone high, it sets the R/W signal low to indicate a write operation.
+	tsp_set_rw_write();
+	
+	//5) The master presents valid data to port PA0- PA6.
+	tsp_set_pa(d);
+	//tsp_set_pa( (d & 0x7f) );	// Only 7 bit!
+	//tsp_set_pa(((d & 0x7f) << 1) | 0x00);	// Only 7 bit!
+	//tsp_set_pa( (d & 0x7f) | 0x80 );	// Only 7 bit!
+	
+	
+	//6) The master pulses STR (on PB0) low, which causes the data on port PA0- PA6 pins to be latched to the port A input latch.
+	// The TSP50C0x/1x hardware causes the PA7 output latch to be cleared to zero, indicating that the TSP50C0x/1x has accepted the data.
+	
+	//tsp_set_str_low();
+	
+	/*
+	// @FIXME: Verify PA7=0
+	printf("-");
+	//tsp_check_pa();
+	//v = tsp_get_pa();
+	//printf_x2(v);
+	v_old = 0x55;	// something invalid
+	timeout = 0x1000;
+	do {
+		v = tsp_get_pa();
+		if (v != v_old) {
+			printf_x2(v);
+			v_old = v;
+		}
+		timeout--;
+		// Wait until PA7=0	// 0xFF to 0xFD? or 0xFC?
+	//} while (((v & 0x02) == 0x02) && (timeout > 0));
+	//} while (((v&0x07) != 0x07) && (timeout > 0));
+	} while (((v&0x07) == 0x05) && (timeout > 0));
+	*/
+	
+	tsp_check_pa();
+	
+	
+	// 7) The TSP50C0x/1x polls the PA7 output latch. When it sees it go low, it knows that data is being written to the port A input latch.
+	
+	
+	// 8) The TSP50C0x/1x polls the PB0 (STR) input line. When PB0 goes high, the write is complete, and the data in PA0 is valid.
+	
+	//tsp_set_str_high();
+	
+	
+	// 9) When it is ready to accept another command, the TSP50C0x/1x writes a one to the PA7 output latch, thus starting another cycle.
+	printf("}");
+}
+
+
+void tsp_flush() {
 	// Manual: 100% guarantee for clean reset is to write nine bytes of "all ones" to the buffer, followed by a reset command
 	
 	// This will eventually read as "energy=0xF" and make the "speak external" stop
 	for(int i = 0; i < 9; i++) {
-		tms_put_internal(0xff);
+		tsp_write(0xff);
 	}
 }
 
-void tms_reset() {
-	
-	printf("TMS:Reset...");
+void tsp_reset() {
+	printf("TSP:Reset...");
 	
 	/*
 	// Manual: 100% guarantee for clean reset is to write nine bytes of "all ones" to the buffer, followed by a reset command
 	for(int i = 0; i < 9; i++) {
-		tms_put(0xff);
+		tsp_write(0xff);
 	}
 	*/
 	
 	// TMS: Command "Reset"
-	//tms_put(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
-	tms_put_internal(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
+	tsp_write(0xff);	// D0...D7: X111XXXX = "Reset" (e.g. 0xFF or 0x7E)
 }
 
-void tms_speak_external() {
-	// TMS: Command "Speak External"
-	printf("TMS:Speak...");
-	//tms_put(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
-	tms_put_internal(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
-	
-	//check_port(0x10);
-	//tms_wait_clock();
+void tsp_speak_external() {
+	printf("TSP:Speak...");
+	tsp_write(0xE7);	// D0...D7: X110XXXX = "Speak External" (e.g. 0xE7 or 0x66)
 }
 
 
-
-
-void user_input() {
-	char c;
-	
-	tms_frame = 1;	// Reset counter
-	
-	while(1) {
-		printf("\n");
-		printf_x4((word)tms_play_offset);
-		putchar('?');
-		c = getchar();
-		
-		switch(c) {
-			
-			case 'h':
-				// Help
-				printf("RS12PDQF\n");
-				break;
-			
-			case ' ':	// Cont
-			case '.':	// Cont
-				return;
-			
-			
-			case 0x18:	// UP
-				tms_play_offset-=0x10;
-				break;
-			case 0x19:	// DOWN
-				tms_play_offset+=0x10;
-				break;
-			case 0x1a:	// RIGHT
-				tms_play_offset++;
-				break;
-			case 0x1b:	// LEFT
-				tms_play_offset--;
-				break;
-			
-			case 10:
-			case 13:
-				// Play for a while
-				//tms_frame = 16;
-				tms_frame = 8;
-				return;
-				break;
-			
-			case 's':
-			case 'S':
-				tms_speak_external();
-				//return;
-				break;
-			
-			case 'p':
-			case 'P':
-				check_port(0x10);
-				check_port(0x11);
-				check_port(0x60);
-				check_port(0x61);
-				break;
-			
-			case 'f':
-			case 'F':
-				// F** things up: This will glitch, play back a sample and reset
-				port_out(0x51, 0x08);
-				__asm
-					call #0x66f6
-				__endasm;
-				break;
-			
-			case 'q':
-			case 'Q':
-				// Soft reset
-				__asm
-					;rst0
-					call #0x0000
-				__endasm;
-				break;
-			
-			case 'r':
-			case 'R':
-				tms_flush();
-				delay(10);
-				tms_reset();
-				//return;
-				break;
-			
-			case 'd':
-			case 'D':
-				mon21 = 1-mon21;
-				if (mon21) printf("ON"); else printf("OFF");
-				//return;
-				break;
-			
-			case '0':
-				//tms_speak_external();
-				tms_play_offset = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-				//return;
-				break;
-			
-			case '1':
-				//tms_speak_external();
-				tms_play_offset = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-				//return;
-				break;
-			
-			case '2':
-				//tms_speak_external();
-				tms_play_offset = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
-				//return;
-				break;
-			
-			default:
-				printf_x2((byte)c);
-				return;
-				//break;
-		}
-	}
-}
 
 
 //void main() __naked {
@@ -517,6 +364,7 @@ int main(int argc, char *argv[]) {
 	(void)argv;
 	
 	word i;
+	word dw;
 	byte d;
 	byte v;
 	char c;
@@ -537,8 +385,6 @@ int main(int argc, char *argv[]) {
 	// I have *NO* idea about this init sequence.
 	// I just know: If I leave it in, there is more success.....
 	
-	// Also: To play a sound from firmware:
-	// OUT 51 08; CALL 66F6
 	
 	// Boot:
 	port_out(0x22, 0x00);
@@ -587,14 +433,7 @@ int main(int argc, char *argv[]) {
 	// End of init
 	delay(0x2000);
 	
-	printf("End of init.\n");
-	
-	//tms_reset();
-	//check_port(0x10);	// 0xf9 = 0b11111001
-	//delay(0x2000);
-	
 	printf("Ready.\n");
-	//c = getchar();
 	
 	
 	// Real frames?
@@ -605,90 +444,102 @@ int main(int argc, char *argv[]) {
 	
 	// Speech data can be found in ROM:0x6D100+ (out 0x51,0x1b, mem[0x5100...])
 	port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
-	//tms_play_offset = (byte *)0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-	tms_play_offset = (byte *)0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-	//tms_play_offset = (byte *)0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+	//tsp_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+	tsp_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+	//tsp_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	
-	tms_speak_external();
-	//delay(0x200);
+	//mon21 = 0;	//1;	// Monitor port after writing data?
+	//tms_frame = 0;
+	tsp_ofs_bit = 0;
 	
-	mon21 = 0;	//1;	// Monitor port after writing data?
-	tms_frame = 0;
-	//check_port(0x10);
+	tsp_check_pa();
 	
-	while(true) {
+	tsp_speak_external();
+	
+	//tsp_check_pa();
+	
+	while(1) {
+		printf("\n");
+		printf_x4(tsp_ofs_byte);
+		putchar('?');
+		c = getchar();
 		
-		//if ((tms_frame % tms_break_frames) == 0) {
-		if (tms_frame == 0) {
-			tms_frame = 1;
-			//printf("P");
-			user_input();
+		switch(c) {
+			
+			case 'S':
+			case 's':
+				tsp_speak_external();
+				//tsp_check_pa();
+				break;
+			case 'R':
+			case 'r':
+				tsp_reset();
+				tsp_check_pa();
+				break;
+			
+			case 'q':
+			case 'Q':
+				// Soft reset
+				__asm
+					;rst0
+					call #0x0000
+				__endasm;
+				break;
+			
+			case 'h':
+				// Help
+				break;
+			
+			
+			case '0':
+				//tsp_speak_external();
+				tsp_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+				tsp_ofs_bit = 0;
+				break;
+			
+			case '1':
+				//tsp_speak_external();
+				tsp_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
+				tsp_ofs_bit = 0;
+				break;
+			
+			case '2':
+				//tsp_speak_external();
+				tsp_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+				tsp_ofs_bit = 0;
+				break;
+			
+			
+			case ' ':	// Cont
+			case '.':	// Cont
+			default:
+				// Play...
+				
+				// 8 bits
+				/*
+				d = *(byte *)(tsp_ofs_byte);
+				tsp_ofs_byte++;
+				*/
+				
+				// 7 bits
+				dw = *(word*)(tsp_ofs_byte);
+				
+				d = (dw >> tsp_ofs_bit) & 0x7f;
+				
+				
+				tsp_ofs_bit += 7;
+				if (tsp_ofs_bit >= 8) {
+					tsp_ofs_bit -= 8;
+					tsp_ofs_byte++;
+				}
+				
+				
+				printf_x2(d);
+				tsp_write(d);
+				
+				
+				break;
 		}
-		
-		
-		//tms_frame++;
-		tms_frame--;
-		
-		d = *tms_play_offset;
-		
-		if (mon21) {
-			printf_x4((word)tms_play_offset); putchar(':');
-			printf_x2(d);
-			putchar(' ');
-		}
-		
-		
-		// Pre-check
-		v = port_in(0x10);
-		if (v == 0xf9) {
-			// Idle state?
-			tms_speak_external();
-			v = port_in(0x10);
-		}
-		if (v == 0xfc) {
-			// Sound ended?
-			tms_speak_external();
-			v = port_in(0x10);
-		}
-		
-		/*
-		// Pre-wait: Wait for "tick"
-		v = port_in(0x10);
-		if (v == 0xfd) while(port_in(0x10) != 0xff) { }
-		if (v == 0xf9) while(port_in(0x10) != 0xf8) { }
-		*/
-		tms_wait_tick();
-		
-		// Feed new data
-		tms_put(d);
-		//check_port(0x60);
-		
-		if (mon21) {
-			check_port(0x10);
-			//delay(0x100);
-			//delay(0x400);
-		} else {
-			putchar('.');
-			//printf("\n");
-			//delay(0x800);
-			//delay(0x1800);
-			//for(i = 0; i < 0x1000; i++) {
-			//	delay(0x1);
-			//	port_in(0x10);	// Poll?
-			//}
-		}
-		
-		
-		tms_play_offset++;
 	}
 	
-	/*
-	printf("Key to end\n");
-	c = getchar();
-	
-	//while(1) { }
-	//return;
-	//return c;
-	return 0x42;
-	*/
 }
