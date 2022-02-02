@@ -14,6 +14,37 @@
 	Believe me! The LCD can flash weirdly, the speaker can make "Oooof!"-sounds and the USB power supply can and will brown out!
 	
 	TODO:
+		* Try TSP50C0x Slave-Mode:
+			""
+6.7 Slave Mode
+Setting bit 6 of the mode register high places the TSP50C0x/1x in the slave
+mode. This specialized mode is intended for applications in which the
+TSP50C0x/1x device needs to be controlled by a master microprocessor.
+
+When in slave mode, the functionality of the following ports is modified:
+PB0 becomes a chip enable strobe. It is normally held high. When it is taken
+low, data is read from or written to the PA0- PA7 pins depending on the value of PB1.
+
+PB1 becomes a read/write select input. If PB1 is low, data is written to the
+TSP50C0x/1x when PB0 goes low. If PB1 is high, data may be read from the
+TSP50C0x/1x when PB0 goes low.
+
+Port A becomes a general bidirectional port controlled by PB0 and PB1. Pin
+PA7 is used as a busy signal. If bit 7 in the output latch is set high by the
+software, PA7 of the output latch is reset to a low state when PB0 goes low to
+write data to the TSP50C0x/1x.
+
+Because the PA7 output latch is used as a busy flag, leaving only PA0- PA6
+for data, normally only seven bits of data may be exchanged between the
+master and the slave in any one read operation from the TSP50C0x/1x. In write
+operations to the TSP50C0x/1x, all 8 pins of port A can be used to transfer data.
+
+During read operations from the slave TSP50C0x/1x, the master is
+responsible for maintaining its outputs connected to the TSP50C0x/1x port A
+in a high-impedance state. Otherwise, bus contention results.
+			""
+		
+		
 		!!! TIMING ISSUES
 			Though there is "some" sound - nothing is quite repeatable...
 			This needs more "wait-for-ready"-checks that I don't know where to find (port/bit)
@@ -191,12 +222,13 @@ byte tms_get_playing() {
 }
 */
 
-void tms_wait_clock() {
+void tms_wait_tick() {
 	// After sending a command, the lowest bit wiggles (0xF8/F9 and 0xFD/FF). Is it "clock pulses"?
 	byte v;
-	do {
-		v = port_in(0x10);
-	} while ((v & 0x02) == 0x00);	// Wait for a short high (e.g. 0xFD -> 0xFF)
+	// Pre-wait: Wait for "tick"
+	v = port_in(0x10);
+	if (v == 0xfd) while(port_in(0x10) != 0xff) { }
+	if (v == 0xf9) while(port_in(0x10) != 0xf8) { }
 }
 
 void tms_set_write_on() {
@@ -245,10 +277,10 @@ void tms_put_internal(byte v) {
 	tms_set_write_off();
 	
 	// Make sure we don't interrupt an ongoing transaction
-	tms_wait_ready();	// This is important
+	tms_wait_ready();	// This seems important
 	
 	// Latch data onto bus
-	tms_set_data(v);	//@FIXME: It makes no sense HERE, but seems to do something. Hmmm...
+	tms_set_data(v);
 	
 	
 	/*
@@ -269,18 +301,7 @@ void tms_put_internal(byte v) {
 	//	check_port(0x21);	// 0xFF
 	//	check_port(0x60);	// 0x0F
 	//	check_port(0x62);	// 0xFF
-	
-	
-	// TMS5220 Wait for ~READY to go low?
-	while((port_in(0x10) & 0x07) == 0x05) { }	// OK
-	
-	// Latch data?
-	port_out(0x11, v);	// Actually output data to the pins
-	
-	// Set ~WR inactive (high) again?
-	//port_out(0x10, 0x00);
 	*/
-	
 }
 
 void tms_put(byte v) {
@@ -388,6 +409,11 @@ void user_input() {
 				printf("RS12PDQF\n");
 				break;
 			
+			case ' ':	// Cont
+			case '.':	// Cont
+				return;
+			
+			
 			case 0x18:	// UP
 				tms_play_offset-=0x10;
 				break;
@@ -404,7 +430,8 @@ void user_input() {
 			case 10:
 			case 13:
 				// Play for a while
-				tms_frame = 16;
+				//tms_frame = 16;
+				tms_frame = 8;
 				return;
 				break;
 			
@@ -624,24 +651,17 @@ int main(int argc, char *argv[]) {
 			v = port_in(0x10);
 		}
 		
-		// Pre-wait: Wait for "tick"
-		if (v == 0xfd) while(port_in(0x10) != 0xff) { }
-		if (v == 0xf9) while(port_in(0x10) != 0xf8) { }
-		
-		// Feed new data
-		tms_put(d);
-		
 		/*
-		// Post-wait
+		// Pre-wait: Wait for "tick"
 		v = port_in(0x10);
 		if (v == 0xfd) while(port_in(0x10) != 0xff) { }
 		if (v == 0xf9) while(port_in(0x10) != 0xf8) { }
 		*/
+		tms_wait_tick();
 		
-		/*
-		if (v == 0xfd) while(port_in(0x10) == 0xfd) { }
-		if (v == 0xf9) while(port_in(0x10) == 0xf9) { }
-		*/
+		// Feed new data
+		tms_put(d);
+		//check_port(0x60);
 		
 		if (mon21) {
 			check_port(0x10);
