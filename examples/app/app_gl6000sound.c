@@ -13,7 +13,9 @@
 	Be careful: The Speech chip has an internal amplifier. When hitting the wrong resonance, you can almost short the power supply!
 	Believe me! The LCD can flash weirdly, the speaker can make "Oooof!"-sounds and the USB power supply can and will brown out!
 	
+	
 	TODO:
+	
 		* Try TSP50C0x Slave-Mode:
 			""
 6.7 Slave Mode
@@ -44,21 +46,73 @@ responsible for maintaining its outputs connected to the TSP50C0x/1x port A
 in a high-impedance state. Otherwise, bus contention results.
 			""
 		
+
+	* Hardware Pins:
+		TSP50C0X/1X Manual:
+		|	Color 	   Function	   Pin | Pin 	Function 	Color	|
+		|	----- 	   --------	   ---   --- 	-------- 	-----	|
+		|	      	           	  ____   ____  	         	      	|
+		|	yellow	        PA3	-| 1* \_/ 16 |-	PA4      	green 	|
+		|	orange	        PA2	-| 2      15 |-	PA5      	blue  	|
+		|	red   	        PA1	-| 3      14 |-	PA6      	purple	|
+		|	brown 	        PA0	-| 4      13 |-	PA7      	gray  	|
+		|	BLACK 	    Vss/GND	-| 5      12 |-	Vdd/5V   	RED   	|
+		|	BLUE  	      ~INIT	-| 6      11 |-	DA1      	white2	|
+		|	---   	       OSC1	-| 7      10 |-	PB1/DA2  	black2	|
+		|	---   	       OSC2	-| 8       9 |-	PB0?     	BROWN 	|
+		|	      	           	  -----------  	         	      	|
+
+	* Tested:
+		Pin	color 	function
+		---	----- 	--------
+		1	yellow	DATA7 / OUT 11 80
+		2	orange	DATA6 / OUT 11 40
+		3	red   	DATA5 / OUT 11 20
+		4	brown 	DATA4 / OUT 11 10
+		(5	BLACK 	(GND)
+		(6	BLUE  	(~RESET: HIGH, LOW on RESET with slow rise)
+		(7	---   	?OSC?)
+		(8	---   	?OSC2?)
+		(9	BROWN 	(HIGH always)
+		(10	black2	(HIGH always)
+	!	11	white2	!!! HIGH in my tests	==> When music: there is heavy activity! (HIGH with bundles of bursts of LOWs)
+						=> Buffer state?
+		(12	red   	(+5V)
+	!	13	gray  	!!! LOW; Goes HIGH when starting to speak with "OUT 11 D6; OUT 10 04"; Goes LOW when resetting speak, with HIGH bursts starting between two short HIGH bursts of #16 (both go LOW at the same time in the end) (IN 10 = 0xFD 11111101)
+						=> BUSY/"PA7", because for a write-transactions, it should go HIGH between STROBES (see manual), which this does!
+	!	14	purple	!!! HIGH in my tests	===> When music: There are some LOW signals (rather long and slow).
+						=> Interrupt? READY? Queue full?
+	!	15	blue  	!!! After OUT 10 00: LOW  (IN 10 = 0xF9 11111001); After OUT 10 04: Goes HIGH FIRST (IN 10 = 0xFC 11111100)
+						=> WRITE/read
+	!	16	green 	!!! After OUT 10 00: HIGH (IN 10 = 0xF9 11111001); After OUT 10 04: Goes LOW 43us AFTER #15 GOT HIGH (IN 10 = 0xFD 11111101), after 115us it strobes HIGH for 4us, sometimes two bursts (and #13 goes HIGH between them!)
+						=> STROBE?
 		
-		!!! TIMING ISSUES
-			Though there is "some" sound - nothing is quite repeatable...
-			This needs more "wait-for-ready"-checks that I don't know where to find (port/bit)
+		My Version:
+			|    My Color     Function       Pin | Pin     Function     My Color |
+			|    --------     --------       ---   ---     --------     -------- |
+			|                               ____   ____                          |
+			|    yellow    P11#7   PA3    -| 1* \_/ 16 |-  STROBE?      green    |
+			|    orange    P11#6   PA2    -| 2      15 |-  RW?          blue     |
+			|    red       P11#5   PA1    -| 3      14 |-  READY?INT    purple   |
+			|    brown     P11#4   PA0    -| 4      13 |-  BUSY/PA7?    gray     |
+			|    BLACK         Vss/GND    -| 5      12 |-  Vdd/5V       RED      |
+			|    BLUE            ~INIT    -| 6      11 |-  QUEUE?       white2   |
+			|    ---              OSC1    -| 7      10 |-  ?HIGH?       black2   |
+			|    ---              OSC2    -| 8       9 |-  ?HIGH?       BROWN    |
+			|                               -----------                          |
 		
-		* By hooking up an oscilloscope, it is clear that ports 0x10 and 0x11 can be used to push data to the IC
-			! but I could not find ANY hint of the firmware ever accessing port 0x11!
-			* So far it seems: Send 0x00 to port 0x10, send 0x04 to port 0x10, wait for status on port 0x10 (!=0xFD), then send DATA to port 0x11 - seems to work
-		* The firmware fondles around with ports 0x10, 0x21, 0x22, 0x23, 0x29, 0x60, 0x61 and 0x62
-		* There seems to be a very strict timing on when to talk to the chip and when not
-		* Data sheet on sending a byte: Set ~WR low, wait for ~READY to go low, then send data and set ~WR high again
-		* The firmware MAY be using the interrupt of the TMS chip in order to fill it, that's why MAME shows no port accesses to port 0x11?
+		==> Data is 4bit only, packed into the MSBs (PA4-PA7) of port 0x11 (that's why the command bits are all happening in the upper nibble)
+		
+		==> When doing "OUT 10 00; OUT 10 04" there is "communication" going on on pins #13 and #15 for several 100ms!
+			* Initial bursts, then some "busy waiting" state?
+			* Does the VTech have some sort of "auto strobe" feature?
+		
+		* Call intro:
+			OUT 51 09; CALL 66F6
+		
 		
 	
-	Port log:
+	* Port log:
 		R 0x10 == 0xF9
 		R 0x11 == 0xFF
 		R 0x60 == 0x0B
@@ -373,7 +427,7 @@ void speech_set_data(byte d) {
 	port_out(0x11, d << 4);
 }
 
-void speech_wait() {
+void speech_wait_busy() {
 	// Wait for just the right moment...
 	byte v;
 	word timeout;
@@ -394,7 +448,7 @@ void speech_wait() {
 }
 
 void speech_put(byte d) {
-	speech_wait();
+	speech_wait_busy();
 	speech_set_data(d);
 }
 void speech_reset() {
@@ -442,7 +496,8 @@ byte speech_get_data() {
 	
 	// 4 bits
 	d = *(byte*)(speech_ofs_byte);
-	d = (d >> speech_ofs_bit) & 0x0f;
+	d = (d >> speech_ofs_bit) & 0x0f;	// Low nibble first
+	//d = (d >> (4-speech_ofs_bit)) & 0x0f;	// High nibble first
 	
 	speech_ofs_bit += 4;
 	if (speech_ofs_bit >= 8) {
@@ -563,9 +618,13 @@ int main(int argc, char *argv[]) {
 	speech_playing = 0;
 	
 	
+	speech_reset();
+	delay(0x1000);
+	
 	speech_start();
+	delay(0x100);
 	speech_speak_external();
-	speech_playing = 0x09;
+	speech_playing = 0x04;
 	
 	
 	while(1) {
@@ -592,6 +651,7 @@ int main(int argc, char *argv[]) {
 			case 10:
 				speech_playing = 0x09;
 				break;
+			
 			case 'P':
 			case 'p':
 				speech_start();
