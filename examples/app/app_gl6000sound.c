@@ -481,12 +481,28 @@ byte speech_put(byte d) {
 	//speech_wait_busy();
 	byte v;
 	word timeout;
-	timeout = 0x2000;
 	
 	speech_port_data = d << 4;
 	
-	/*
+	timeout = 0x100;
 	// Wait for queue to be empty?
+	do {
+		timeout--;
+		if (timeout <= 0) {
+			printf("TimeOut0");
+			break;
+			//return v;
+		}
+		v = speech_port_control;
+	} while ((v & 0x02) == 2);
+	
+	
+	
+	//speech_port_control = 0x0f;
+	/*
+	
+	// Wait for latch?
+	timeout = 0x2000;
 	do {
 		timeout--;
 		if (timeout <= 0) {
@@ -494,12 +510,11 @@ byte speech_put(byte d) {
 			return v;
 		}
 		v = speech_port_control;
-	} while ((v & 0x01) == 0);
+	} while ((v & 0x02) > 0);
 	*/
 	
 	
-	
-	
+	/*
 	// Wait for line to be clear
 	do {
 		timeout--;
@@ -509,11 +524,12 @@ byte speech_put(byte d) {
 		}
 		v = speech_port_control;
 	} while ((v & 0x02) == 2);
-	
+	*/
 	
 	// Latch data for next strobe
 	// Data pins are in high nibble of the data port 0x11
 	//speech_set_data(d);
+	//speech_port_data = d << 4;
 	//speech_port_data = (d << 4) | 0x0f;
 	//speech_start();
 	
@@ -841,13 +857,16 @@ int main(int argc, char *argv[]) {
 	//port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
 	bank_port_51 = 0x1b;
 	
-	speech_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
+	//speech_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
 	//speech_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
 	//speech_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	//speech_ofs_byte = 0x5274;	//, l=0x20 + 20	# 6D274 = Hello (???)
 	//speech_ofs_byte = 0x52F4;	//, l=0x40 + 20	# 6D2F4+- = Reverb / delete-sound
 	//speech_ofs_byte = 0x55E6;	//, l=0x30 + 40	# 6D5E6 = mewewew
+	speech_ofs_byte = 0x55b2;	//0x6d5b2 = Meep!
 	
+	// Found on Bus and ROM: 0x6D637 - 6D73E: Beauauauauauau
+	speech_ofs_byte = 0x5637;	//, 264);	//, 6d637 = Beauauauau
 	
 	//mon21 = 0;	//1;	// Monitor port after writing data?
 	//tms_frame = 0;
@@ -995,6 +1014,15 @@ int main(int argc, char *argv[]) {
 				break;
 			case '5':
 				speech_play(0x55E6+o, 0x70);	//, l=0x30 + 40	# 6D5E6 = mewewew
+				break;
+			
+			case '6':
+				// Actual 1:1 raw BUS data found!
+				speech_play(0x55b2, (0x5637-0x55b2));	// 0x6d5b2 = Meep!
+				break;
+			case '7':
+				// Actual 1:1 raw BUS data found!
+				speech_play(0x5637, 264);	//, 6d637 = Beauauauau
 				break;
 			
 			
