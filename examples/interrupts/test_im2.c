@@ -1,4 +1,9 @@
 /*
+	Testing IM2
+	
+	IM2 = bus specifies the low byte of the address to look for a jump address... phew!
+	So: There is a list of pointers in memory. The periphery gives the low byte, register I holds the high byte.
+	
 	Even though we can not overwrite the internal interrupt table in ROM, we can make use of "IM 2"
 	See: http://www.z80.info/1653.htm
 	
@@ -9,12 +14,11 @@
 	2022-02-07 Bernhard "HotKey" Slawik
 */
 
-
-// When using VGLDK_VARIABLE_STDIO vgldk.h will define the entry point automatically and obtain the host p_putchar/p_getchar
 #include <vgldk.h>
 #include <stdiomin.h>
 #include <hex.h>
 
+// Interrupt service routines
 
 //extern word int_count;
 word dummy_int_count;

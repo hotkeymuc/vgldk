@@ -1,17 +1,28 @@
 /*
-	Trying to capture interrupts in IM0 mode
+	Trying to capture interrupts in IM0 mode.
+	IM0 = The periphery puts an INSTRUCTION onto the bus.
+	This instruction is usually "RSTx", which is a single-byte jump to 0x00 - 0x38 (in steps of 8)
+	
+	
+	
+	!!!!!!!!!!!!!!!!!!!!
+	!! This is not possible in cart / app mode, since RST-instructions DO NOT pay respect to I register.
+	!! So the interrupts always jump to the zero page at 0x0000 - 0x0038, which we do not control  :-(
+	!!!!!!!!!!!!!!!!!!!!
+	
 	
 	2022-02-15 Bernhard "HotKey" Slawik
 */
 
 
-// When using VGLDK_VARIABLE_STDIO vgldk.h will define the entry point automatically and obtain the host p_putchar/p_getchar
 #include <vgldk.h>
 #include <stdiomin.h>
 
 //#define HEX_USE_DUMP
 #include <hex.h>
 
+
+// Interrupt service routines
 
 //extern word int_count;
 word dummy_int_count;
@@ -100,6 +111,9 @@ void main() __naked {
 	
 	printf("Interrupt IM0 Test\n");
 	
+	printf("This is prett futile, since  RSTx instructions (as used by VTech) only support jumps to the zero page (0x0000-0x0040), which is ROM and not under our control.\n");
+	//getchar();
+	
 	
 	// Let's try IM0 with a table located at 0xd000
 	#define INTTBL 0xd000
@@ -134,17 +148,27 @@ void main() __naked {
 	getchar();
 	#else
 	printf("Press key to enable IM0");
-	getchar();
+	//getchar();
 	#endif
 	
 	
 	// Set up and enable interrupts
+	
+	
 	__asm
 		di
+		nop
+		nop
 		im 0
-		ld a, #0xd0	; High byte of our interrupt table INTTBL
+		
+		; !!!!!!!!!!!!!!!!
+		ld a, #0xd0	; High byte of our interrupt table INTTBL. This has NO EFFECT on the RSTx instructions!
 		ld i,a
+		; !!!!!!!!!!!!!!!!
+		
 		ei
+		nop
+		nop
 	__endasm;
 	
 	
