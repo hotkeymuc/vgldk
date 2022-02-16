@@ -5,10 +5,10 @@
 VTech Genius Leader 2000p/400x Soft Serial
 ==========================================
 
-Bit-banged serial functions for V-Tech Genius LEADER 4000 series.
+Bit-banged bespoke serial functions for V-Tech Genius LEADER 4000 series.
 
-===> There is also a pure C implementation at examples/app/app_cserial.c
-===> ...which can achieve 19200 baud!
+===> There is also a C-based multi-architecture implementation called "softuart"!
+===> or see "examples/app/app_cserial.c" which can achieve 19200 baud!
 
 The parallel port has 9 output pins (1=STROBE and 2..9=D0..D7), but only ONE input pin (11=BUSY).
 The stock "link cable" uses D0..D7 to select a bit and BUSY/STROBE to receive data bit by bit from the PC.

@@ -24,10 +24,10 @@
 #include <vgldk.h>
 #include <stdiomin.h>
 
-//void main() __naked {
+//void main() __naked {	// Regular carts don't have args
 //void main() {
 //int main() {
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {	// Apps can take arguments
 	char c;
 	
 	printf("Hello World!\n");
@@ -46,5 +46,5 @@ int main(int argc, char *argv[]) {
 	//while(1) { }
 	//return;
 	//return c;
-	return 0x43;
+	return 0x42;	// Apps can return a value
 }
