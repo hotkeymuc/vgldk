@@ -454,18 +454,16 @@ void speech_play(word o, word l) {
 	speech_ofs_byte = o;
 	speech_ofs_bit = 0;
 	speech_data_next = speech_get_data();
+	speech_playing = l*2;	// 4 bit! We need to play tiwce as long to use up all bytes
 	
-	//speech_playing = l;
-	
-	delay(0x800);
+	//delay(0x800);
 	
 	speech_start();
 	
-	//delay(0x100);
-	
-	// My recorded data already starts with "E"
+	// My recorded data already starts with "E", so this is only needed if I play my own data
 //	speech_speak_external();
 	
+	/*
 	//delay(0x100);
 	
 	l *= 2;	// 4 bit! We need to play tiwce as long to use up all bytes
@@ -486,45 +484,27 @@ void speech_play(word o, word l) {
 		
 		speech_data_next = speech_get_data();
 		
-		//speech_update();
-		
-		/*
-		for(byte i = 0; i < 0x01; i++) {
-			speech_wait_busy();
-			speech_update();
-		}
-		*/
-		
 		l--;
 	}
 	
 	for(byte i = 0; i < 9; i++) {
 		speech_put(0xf);	// D0...D7: X111xxxx = "Reset" (e.g. 0x7 or 0xF)
 	}
+	*/
 	
 	delay(0x4000);
+	speech_playing = 1;
+	delay(0x1000);
 	
 	speech_stop();
 	
-	speech_playing = 0;
-}
-
-
-void speech_update() {
-	byte v;
-	//v = port_in(0x10);
-	v = speech_port_control;
 	
-	//printf("0x"); printf_x2(0x10);
-	//printf("=");
-	printf_x2(v);
 }
 
 
 
-//extern word int_count;
-word int_count;
-void int_isp() __naked {
+word dummy_int_count;
+void dummy_isp() __naked {
 	__asm
 	
 	; Slow prolog
@@ -537,9 +517,9 @@ void int_isp() __naked {
 	
 	
 	; Increment int_count
-	ld hl, (_int_count)
+	ld hl, (_dummy_int_count)
 	inc hl
-	ld (_int_count), hl
+	ld (_dummy_int_count), hl
 	
 	
 	; Slow epilog
@@ -553,40 +533,41 @@ void int_isp() __naked {
 	;ex af, af'	;'
 	;ei
 	
+	ei
 	reti
 	__endasm;
 }
 
 
-word timer_int_count;
+word timer_count;
 void timer_isp() __naked {
 	__asm
 	
 	; Slow prolog
-	push af
-	push hl
+	;push af
+	;push hl
 	
 	;; Quick prolog
-	;ex af, af'	;'
-	;exx
+	ex af, af'	;'
+	exx
 	
 	
-	; Increment int_count2
-	ld hl, (_timer_int_count)
+	; Increment timer_count
+	ld hl, (_timer_count)
 	inc hl
-	ld (_timer_int_count), hl
+	ld (_timer_count), hl
 	
 	
 	; Slow epilog
+	;;ei
+	;pop hl
+	;pop af
 	;ei
-	pop hl
-	pop af
-	ei
 	
 	;; Quick epilog
-	;exx
-	;ex af, af'	;'
-	;ei
+	exx
+	ex af, af'	;'
+	ei
 	
 	reti
 	__endasm;
@@ -604,11 +585,26 @@ void speech_isp() __naked {
 	;ex af, af'	;'
 	;exx
 	
-	
 	; Increment int_count2
 	ld hl, (_speech_int_count)
 	inc hl
 	ld (_speech_int_count), hl
+	
+	__endasm;
+	
+	
+	speech_port_data = speech_data_next << 4;
+	
+	speech_playing--;
+	if (speech_playing > 0) {
+		//speech_put(speech_data_next);
+		speech_data_next = speech_get_data();
+	} else {
+		speech_stop();
+		printf("STOP");
+	}
+	
+	__asm
 	
 	
 	; Slow epilog
@@ -717,15 +713,16 @@ int main(int argc, char *argv[]) {
 	itp = (word *)((word)itp + 1);
 	// Fill up with dummy int handler
 	for(i = 0; i < 0x100; i++) {
-		*itp = (word)&int_isp;
+		*itp = (word)&dummy_isp;
 		itp++;
 	}
+	dummy_int_count = 0;
+	
 	// Special interrupt handlers
-	int_count = 0;
 	
 	// 0xf7 = timer interrupt, ~128 Hz
 	*(word *)(INTTBL + 0xf7) = (word)&timer_isp;
-	timer_int_count = 0;
+	timer_count = 0;
 	
 	// 0xe7 = speech interrupt, called for new data
 	*(word *)(INTTBL + 0xe7) = (word)&speech_isp;
@@ -777,20 +774,8 @@ int main(int argc, char *argv[]) {
 	byte running = 1;
 	while(running) {
 		
-		while (speech_playing > 0) {
-			speech_put(speech_data_next);
-			speech_data_next = speech_get_data();
-			
-			putchar('.');
-			//speech_update();
-			
-			speech_playing--;
-		}
-		
-		//speech_update();
-		
 		printf("ints=");
-		printf_x4(int_count);
+		printf_x4(dummy_int_count);
 		printf(",");
 		//printf_x4(timer_int_count);
 		printf_x4(speech_int_count);
