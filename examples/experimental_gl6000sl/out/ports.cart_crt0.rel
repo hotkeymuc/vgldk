@@ -1,0 +1,31 @@
+XL2
+H C areas 4 global symbols
+M crt0
+S _main Ref0000
+S _vgldk_init Ref0000
+S .__.ABS. Def0000
+A _CODE size 0 flags 0 addr 0
+A _HEADER size 0 flags 8 addr 0
+A _HEADER0 size A flags 8 addr 8000
+A _HOME size 0 flags 0 addr 0
+A _INITIALIZER size 0 flags 0 addr 0
+A _GSINIT size 0 flags 0 addr 0
+S gsinit Def0000
+A _GSFINAL size 0 flags 0 addr 0
+A _DATA size 0 flags 0 addr 0
+A _INITIALIZED size 0 flags 0 addr 0
+A _BSEG size 0 flags 0 addr 0
+A _BSS size 0 flags 0 addr 0
+A _HEAP size 0 flags 0 addr 0
+T 00 80
+R 00 00 02 00
+T 00 80 55 AA 59 45 C3 07 80
+R 00 00 02 00 00 07 02 00
+T 07 80
+R 00 00 02 00
+T 07 80 C3 00 00
+R 00 00 02 00 02 03 01 00
+T 00 00
+R 00 00 05 00
+T 00 00
+R 00 00 05 00
