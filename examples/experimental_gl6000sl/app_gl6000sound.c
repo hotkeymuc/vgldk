@@ -153,8 +153,6 @@ __sfr __at 0x11 speech_port_data;
 
 __sfr __at 0x51 bank_port_51;
 
-
-
 //const byte spAFFIRMATIVE[180] = {0xA5,0x4F,0x7A,0xD3,0x3C,0x5A,0x8F,0xAE,0xC8,0xA9,0x70,0xED,0xBD,0xBA,0x2A,0x3B,0xC3,0xD9,0x8F,0x00,0x6C,0x4A,0x21,0x40,0xD3,0xCA,0x08,0x18,0xC2,0x04,0x01,0xC3,0x86,0x11,0x60,0xDA,0x4C,0x05,0x54,0x53,0xDA,0x9C,0x58,0x16,0xED,0xC8,0xEB,0x88,0xE2,0x4C,0xEC,0xC1,0x36,0x23,0xC8,0x65,0xD1,0x17,0xBA,0xB4,0x20,0xE5,0xE4,0x6A,0x8A,0x53,0xA2,0xAC,0x0B,0x73,0x38,0xC9,0xC8,0xB2,0x68,0xCE,0x92,0x24,0x33,0x5B,0x45,0xB1,0xA9,0x11,0xB6,0x6A,0x75,0x4D,0x96,0x98,0xC7,0xAA,0xD6,0x37,0x91,0xEC,0x12,0xAF,0xC8,0xD1,0xB1,0x88,0x97,0x25,0x76,0xC0,0x96,0x22,0x01,0xF8,0x2E,0x2C,0x01,0x53,0x99,0xAD,0xA1,0x7A,0x13,0xF5,0x7A,0xBD,0xE6,0xAE,0x43,0xD4,0x7D,0xCF,0xBA,0xBA,0x0E,0x51,0xF7,0xDD,0xED,0x6A,0xB6,0x94,0xDC,0xF7,0xB4,0xB7,0x5A,0x57,0x09,0xDF,0x9D,0xBE,0x62,0xDC,0xD4,0x75,0xB7,0xFB,0xAA,0x55,0x33,0xE7,0x3E,0xE2,0x2B,0xDC,0x5D,0x35,0xFC,0x98,0xAF,0x79,0x0F,0x0F,0x56,0x6D,0xBE,0xE1,0xA6,0xAA,0x42,0xCE,0xFF,0x03};
 
 // Captured with Arduino VTechGL6000SLSoundBusInspector.ino
@@ -200,49 +198,17 @@ void speech_stop() {
 	//port_out(0x10, 0x00);
 	speech_port_control = 0x00;
 }
-/*
-void speech_set_data(byte d) {
-	// Data can only be fed during signal
-	
-	// Data is contained in the highest 4 bits of port 0x11
-	port_out(0x11, d << 4);
-	//port_out(0x11, (d << 4) | (0x0f));	// Don't know what happens to the lower bits...
-}
-*/
-//#define speech_set_data(d) port_out(0x11, d << 4)
-//#define speech_set_data(dd) speech_port_data = (dd << 4)
 
-/*
-void speech_wait_busy() {
-	// Wait for just the right moment...
-	byte v;
-	word timeout;
-	
-	timeout = 0x800;
-	do {
-		
-		timeout--;
-		if (timeout <= 0) {
-			printf("TimeOut");
-			return;	// false
-		}
-		
-		v = port_in(0x10);
-		
-	} while ((v & 0x02) == 0);	// 0x02 == BUSY flag?
-	return;	// true
-}
-*/
 
 byte speech_put(byte d) {
 	//speech_wait_busy();
 	byte v;
 	word timeout;
 	
+	
 	speech_port_data = d << 4;
 	
 	timeout = 0x100;
-	// Wait for queue to be empty?
 	do {
 		timeout--;
 		if (timeout <= 0) {
@@ -251,68 +217,10 @@ byte speech_put(byte d) {
 			//return v;
 		}
 		v = speech_port_control;
+	//} while ((v & 0x07) != 5);
 	} while ((v & 0x02) == 2);
 	
 	
-	
-	//speech_port_control = 0x0f;
-	/*
-	
-	// Wait for latch?
-	timeout = 0x2000;
-	do {
-		timeout--;
-		if (timeout <= 0) {
-			printf("TimeOut1");
-			return v;
-		}
-		v = speech_port_control;
-	} while ((v & 0x02) > 0);
-	*/
-	
-	
-	/*
-	// Wait for line to be clear
-	do {
-		timeout--;
-		if (timeout <= 0) {
-			printf("TimeOut2");
-			return v;
-		}
-		v = speech_port_control;
-	} while ((v & 0x02) == 2);
-	*/
-	
-	// Latch data for next strobe
-	// Data pins are in high nibble of the data port 0x11
-	//speech_set_data(d);
-	//speech_port_data = d << 4;
-	//speech_port_data = (d << 4) | 0x0f;
-	//speech_start();
-	
-
-	
-	//speech_stop();
-	
-	
-	/*
-	do {
-		timeout--;
-		if (timeout <= 0) {
-			printf("TimeOut3");
-			return v;
-		}
-		v = speech_port_control;
-	} while ((v & 0x02) == 0);	
-	do {
-		timeout--;
-		if (timeout <= 0) {
-			printf("TimeOut4");
-			return v;
-		}
-		v = speech_port_control;
-	} while ((v & 0x02) > 0);
-	*/
 	
 	/*
 	// Wait for right moment
@@ -325,28 +233,7 @@ byte speech_put(byte d) {
 		}
 		//v = port_in(0x10);
 		v = speech_port_control;
-	} while ((v & 0x02) == 0);	// 0x02 == BUSY flag: while ((v & 0x02) == 0)
-	//} while ((v & 0x06) == 4);	// 0x02 == BUSY flag?
-	//} while (((v & 0x02) == 0) || ((v & 0x04) == 0));	// 0x02 == BUSY flag? 0x04 == QUEUE FULL?
-	//} while ((v & 0x07) == 5);	// 0x02 == BUSY flag? 0x04 == QUEUE FULL?
-	*/
-	
-	//speech_set_data(d);
-	//v = speech_port_data;
-	
-	/*
-	do {
-		
-		timeout--;
-		if (timeout <= 0) {
-			printf("TimeOut");
-			return;	// false
-		}
-		
-		v = speech_port_control;
-		//v = port_in(0x10);
-		
-	} while ((v & 0x02) == 0);	// 0x02 == BUSY flag?
+	} while ((v & 0x07) == 5);	// 0x02 == BUSY flag? 0x04 == QUEUE FULL?
 	*/
 	
 	return 0x00;	// OK
@@ -440,69 +327,59 @@ byte speech_get_data() {
 
 
 void speech_play(word o, word l) {
-	byte r;
+	//byte r;
 	
 	printf("Playing "); printf_x4(o); printf("...");
+	
+	#define SOUND7A 0xf97a
+	#define SOUND7E 0xf97e
+	#define SOUND_DATA_POS 0xf981
+	#define SOUND_DATA_END 0xf983
+	*(word *)SOUND_DATA_POS = o;
+	*(word *)SOUND_DATA_END = o+l;
+	*(byte *)SOUND7A = 1;
+	*(word *)SOUND7E = 0xffff;	// ?
 	
 	//speech_stop();
 	//delay(0x100);
 	
 	speech_reset();
 	
-	//delay(0x800);
+	delay(0x800);
 	
 	speech_ofs_byte = o;
+	/*
 	speech_ofs_bit = 0;
 	speech_data_next = speech_get_data();
 	speech_playing = l*2;	// 4 bit! We need to play tiwce as long to use up all bytes
 	
 	//delay(0x800);
+	*/
 	
 	speech_start();
 	
-	// My recorded data already starts with "E", so this is only needed if I play my own data
-//	speech_speak_external();
+	delay(0x200);
+	
+	delay(0x100 * l);
 	
 	/*
-	//delay(0x100);
-	
-	l *= 2;	// 4 bit! We need to play tiwce as long to use up all bytes
-	
-	while(l > 0) {
-		
-		r = speech_put(speech_data_next);
-		
-		//putchar('.');
-		//printf_x2(speech_data_next);
-		//putchar(hexDigit(speech_data_next & 0x0f));
-		
-		if (r != 0x00) {
-			// something went wrong!
-			printf("E="); printf_x2(r); printf("!\n");
-			break;
-		}
-		
-		speech_data_next = speech_get_data();
-		
-		l--;
-	}
-	
-	for(byte i = 0; i < 9; i++) {
-		speech_put(0xf);	// D0...D7: X111xxxx = "Reset" (e.g. 0x7 or 0xF)
-	}
-	*/
-	
-	delay(0x4000);
 	speech_playing = 1;
 	delay(0x1000);
+	*/
 	
+	// Stop
+	*(byte *)SOUND7A = 0;	// Set to 0 to stop playback
+	*(word *)SOUND7E = 0x0000;	// Set LO or HI to 0x00 to stop playback
+	
+	
+	delay(0x1000);
 	speech_stop();
 	
 	
 }
 
 
-
+/*
 word dummy_int_count;
 void dummy_isp() __naked {
 	__asm
@@ -537,8 +414,9 @@ void dummy_isp() __naked {
 	reti
 	__endasm;
 }
+*/
 
-
+/*
 word timer_count;
 void timer_isp() __naked {
 	__asm
@@ -572,7 +450,9 @@ void timer_isp() __naked {
 	reti
 	__endasm;
 }
+*/
 
+/*
 word speech_int_count;
 void speech_isp() __naked {
 	__asm
@@ -621,6 +501,8 @@ void speech_isp() __naked {
 	reti
 	__endasm;
 }
+*/
+
 
 //void main() __naked {
 //void main() {
@@ -629,10 +511,7 @@ int main(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
 	
-	word i;
-	//word dw;
-	//byte d;
-	//byte v;
+	//word i;
 	char c;
 	
 	printf("GL6000SL sound test\n");
@@ -648,61 +527,14 @@ int main(int argc, char *argv[]) {
 	#endif
 	
 	
-	// I have *NO* idea about this init sequence.
-	// I just know: If I leave it in, there is more success.....
-	
-	/*
-	// Boot:
-	port_out(0x22, 0x00);
-	port_out(0x21, 0xe0);
-	
-	//check_port(0x21);	// 0xff
-	delay(0x1000);
-	
-	port_out(0x23, 0x60);
-	port_out(0x23, 0x60);
-	port_out(0x21, 0xe0);
-	
-	//check_port(0x21);	// 0xff
-	delay(0x0800);
-	
-	port_out(0x61, 0xd0);
-	port_out(0x10, 0x00);
-	
-	//check_port(0x21);	// 0xff
-	port_out(0x21, 0xff);
-	
-	port_out(0x29, 0x01);
-	port_out(0x43, 0x02);
-	port_out(0x23, 0x20);
-	
-	delay(0x0800);
-	//for (i=0; i < 3; i++) {
-	//	check_port(0x21);	// 0xff
-	//	check_port(0x60);	// 0x0b
-	//}
-	
-	port_out(0x62, 0x00);
-	port_out(0x10, 0x00);
-	//check_port(0x10);	// 0xf9 = 0b11111001
-	delay(0x100);
-	
-	//port_out(0x10, 0x04);	// Start speech?
-	
-	//for (i=0; i < 3; i++) {
-	//	check_port(0x21);	// 0xff
-	//	check_port(0x60);	// 0x0F by now
-	//}
-	
-	
-	
 	// End of init
 	delay(0x2000);
-	*/
+	
 	printf("Ready.\n");
 	
 	// The speech chip may/seems to take advantage of INTs...
 	
+	/*
 	// Let's try IM2
 	#define INTTBL 0xd000
 	
@@ -736,7 +568,7 @@ int main(int argc, char *argv[]) {
 		ld i,a
 		ei
 	__endasm;
-	
+	*/
 	
 	// Real frames?
 	// spss011d.pdf, 6.1, page 180
@@ -748,98 +580,117 @@ int main(int argc, char *argv[]) {
 	//port_out(0x51, 0x1B);	// OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
 	bank_port_51 = 0x1b;
 	
-	//speech_ofs_byte = 0x5000;		// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-	//speech_ofs_byte = 0x513b;		// MEM:0x513B now shows ROM:0x6D13B = Jingle
-	//speech_ofs_byte = 0x5141;		// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
 	//speech_ofs_byte = 0x5274;	//, l=0x20 + 20	# 6D274 = Hello (???)
 	//speech_ofs_byte = 0x52F4;	//, l=0x40 + 20	# 6D2F4+- = Reverb / delete-sound
 	//speech_ofs_byte = 0x55E6;	//, l=0x30 + 40	# 6D5E6 = mewewew
-	speech_ofs_byte = 0x55b2;	//0x6d5b2 = Meep!
+	speech_ofs_byte = 0x5131;	// Short "bing"
 	
 	// Found on Bus and ROM: 0x6D637 - 6D73E: Beauauauauauau
-	speech_ofs_byte = 0x5637;	//, 264);	//, 6d637 = Beauauauau
+	//speech_ofs_byte = 0x5637;	//, 264);	//, 6d637 = Beauauauau
 	
-	//mon21 = 0;	//1;	// Monitor port after writing data?
-	//tms_frame = 0;
 	speech_ofs_bit = 0;
-	speech_data_next = speech_get_data();
+	//speech_data_next = speech_get_data();
 	speech_playing = 0;
 	
-	int o = 0;	// play offset
 	
-	//delay(0x1000);
-	// Start playing right away
-	//speech_play(speech_ofs_byte, 0x30);
 	
 	byte running = 1;
 	while(running) {
 		
+		/*
 		printf("ints=");
 		printf_x4(dummy_int_count);
 		printf(",");
 		//printf_x4(timer_int_count);
 		printf_x4(speech_int_count);
 		printf("\n");
+		*/
 		
 		//printf_x4(speech_ofs_byte);
 		putchar('?');
 		c = getchar();
 		
 		switch(c) {
+			case 0x1b:	// LEFT
+				speech_ofs_byte--;
+				break;
+			case 0x1a:	// RIGHT
+				speech_ofs_byte++;
+				break;
+			case 8:
+				break;
 			case 13:
 			case 10:
-				speech_playing = 0x09;
+				speech_play(speech_ofs_byte, 80);
 				break;
 			
-			case 'P':
-			case 'p':
-				speech_start();
-				speech_speak_external();
-				speech_playing = 0x08;
+			case 'A':
+			case 'a':
+				speech_play(0x51c5, 0xf0);
 				break;
-			
-			case 'T':
-			case 't':
-				speech_put(0xff);
+			case 'B':
+			case 'b':
+				speech_play(0x5123, 0x10);	// tone?
 				break;
-			case 'Z':
-			case 'z':
-				speech_put(0x00);
-				break;
-			case 'U':
-			case 'u':
-				speech_put(0xff);
-				speech_put(0xff);
-				//delay(0x200);
-				speech_put(0xff);
-				speech_put(0xff);
-				break;
-			case 'I':
-			case 'i':
-				speech_put(0xff);
-				speech_put(0x00);
-				speech_put(0xff);
-				speech_put(0x00);
-				break;
-			
-			case 'S':
-			case 's':
-				speech_start();
+			case 'C':
+			case 'c':
+				speech_play(0x55d0, 0x10);	// wuwooooooo?
 				break;
 			case 'D':
 			case 'd':
-				speech_stop();
+				speech_play(0x51EF, 0x10);
+				break;
+			case 'E':
+			case 'e':
+				speech_play(0x5207, 0x10);	// MEEP-MEEEEEEEP! Buzzer
+				break;
+			case 'F':
+			case 'f':
+				speech_play(0x526d, 0x10);	// Crash-oompf
+				break;
+			
+			case '0':
+				//speech_play(0x51BB, 0x10);
+				//speech_play(0x51C5, 0x10);
+				//speech_play(0x51EF, 0x10);
+				//speech_play(0x523D, 0x10);
+				//speech_play(0x52A5, 0x10);
+				//speech_play(0x52EE, 0x10);
+				speech_play(0x5308, 0x10);
+				break;
+			
+			case '1':
+				speech_play(0x5131, 40);	//, 6d131 = Bing (invalid key)
+				break;
+			case '2':
+				//speech_play(0x5157, 0xf0);	// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
+				speech_play(0x517B, 0xf0);
+				break;
+			case '3':
+				speech_play(0x5278, 0x38);	// 6D278 = Hello (???)
+				break;
+			case '4':
+				speech_play(0x52F7, 60);	//, l=0x40 + 20	# 6D2F7 = Reverb / delete-sound
+				break;
+			case '5':
+				speech_play(0x55E5, 0x70);	//, l=0x30 + 40	# 6D5E6 = gyeeee!
+				break;
+			
+			case '6':
+				// Actual 1:1 raw BUS data found!
+				speech_play(0x5632, 150);	//264);	//, 6d637 = Beauauauau
+				break;
+			
+			case '7':
+				// Actual 1:1 raw BUS data found!
+				speech_play(0x55b2, (0x5637-0x55b2));	// 0x6d5b2 = Meep!
 				break;
 			
 			case 'R':
 			case 'r':
-				//speech_start();
-				//speech_stop();
+				// Speech reset
 				speech_reset();
-				//tsp_reset();
-				//tsp_check_pa();
 				break;
-			
 			case 'q':
 			case 'Q':
 				// Soft reset
@@ -858,7 +709,7 @@ int main(int argc, char *argv[]) {
 				__endasm;
 				running = 0;
 				break;
-			
+			/*
 			case 'f':
 			case 'F':
 				// Call intro
@@ -869,68 +720,15 @@ int main(int argc, char *argv[]) {
 					call #0x66f6
 				__endasm;
 				break;
-			
+			*/
 			case 'h':
 				// Help
 				break;
 			
 			
-			case 0x1b:	// LEFT
-				o --;
-				break;
-			case 0x1a:	// RIGHT
-				o ++;
-				break;
-			case '0':
-				//tsp_speak_external();
-				//speech_ofs_byte = 0x5000;	
-				//speech_ofs_bit = 0;
-				//speech_data_next = speech_get_data();
-				//speech_play(0x5000, 0x80);	// MEM:0x5000 now shows ROM:0x6D000 = sounds and stuff
-				//speech_play((word)(&spAFFIRMATIVE), sizeof(spAFFIRMATIVE));
-				//speech_play((word)(&recMEEP), sizeof(recMEEP));
-				break;
-			
-			case '1':
-				//speech_play(0x513a+o, 0x10);	// MEM:0x513B now shows ROM:0x6D13B = Jingle
-				//speech_play(0x5153+o, 0x10);	// 5153 = key stroke sound or just random?
-				//speech_play(0x5121+o, 0x10);	// 5121 = key stroke sound?
-				//speech_play((word)(&recBOING), sizeof(recBOING));
-				break;
-			
-			case '2':
-				speech_play(0x5141+o, 0x60);	// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
-				break;
-			case '3':
-				speech_play(0x5274+o, 0x60);	//, l=0x20 + 20	# 6D274 = Hello (???)
-				break;
-			case '4':
-				speech_play(0x52F4+o, 48);	//, l=0x40 + 20	# 6D2F4+- = Reverb / delete-sound
-				break;
-			case '5':
-				speech_play(0x55E6+o, 0x70);	//, l=0x30 + 40	# 6D5E6 = mewewew
-				break;
-			
-			case '6':
-				// Actual 1:1 raw BUS data found!
-				speech_play(0x55b2, (0x5637-0x55b2));	// 0x6d5b2 = Meep!
-				break;
-			case '7':
-				// Actual 1:1 raw BUS data found!
-				speech_play(0x5637, 264);	//, 6d637 = Beauauauau
-				break;
-			
-			
-			case ' ':	// Cont
-			case '.':	// Cont
-				speech_playing = 0x01;
-				break;
-				
 			default:
 				// ?
 				printf_x2(c); putchar('?');
-				//speech_data_next = speech_get_data();
-				//speech_put(speech_data_next);
 				break;
 		}
 	}
