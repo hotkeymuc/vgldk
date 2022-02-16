@@ -4,6 +4,10 @@
 	Even though the GL6000SL does not "talk", it surely does not use a standard 1-bit buzzer.
 	Just by the sound of it (it has no IC markings), I am pretty sure that the sound chip is some sort of TI TMS51x0/52x0 compatible speech chip.
 	
+	Data is pushed to port 0x11 through a NMI routine, which we cannot modify as cart/app, because it is spec'ed to be at 0x0066 (ROM).
+	But we can at least feed the NMI routine some data it deems useful.
+	
+	----
 	After "listening" through the whole GL6000SL ROM file using an emulated LPC-10 speech decoder (e.g. Arduino/Adafruit Talkie)
 	I have actually found some LPC-10 encoded sound data at ROM address 0x6D000!
 	This means, the sound chip does not use its own mask ROM, but rather gets fed data from the CPU.
@@ -624,31 +628,6 @@ int main(int argc, char *argv[]) {
 				speech_play(speech_ofs_byte, 80);
 				break;
 			
-			case 'A':
-			case 'a':
-				speech_play(0x51c5, 0xf0);
-				break;
-			case 'B':
-			case 'b':
-				speech_play(0x5123, 0x10);	// tone?
-				break;
-			case 'C':
-			case 'c':
-				speech_play(0x55d0, 0x10);	// wuwooooooo?
-				break;
-			case 'D':
-			case 'd':
-				speech_play(0x51EF, 0x10);
-				break;
-			case 'E':
-			case 'e':
-				speech_play(0x5207, 0x10);	// MEEP-MEEEEEEEP! Buzzer
-				break;
-			case 'F':
-			case 'f':
-				speech_play(0x526d, 0x10);	// Crash-oompf
-				break;
-			
 			case '0':
 				//speech_play(0x51BB, 0x10);
 				//speech_play(0x51C5, 0x10);
@@ -656,35 +635,72 @@ int main(int argc, char *argv[]) {
 				//speech_play(0x523D, 0x10);
 				//speech_play(0x52A5, 0x10);
 				//speech_play(0x52EE, 0x10);
-				speech_play(0x5308, 0x10);
-				break;
-			
-			case '1':
-				speech_play(0x5131, 40);	//, 6d131 = Bing (invalid key)
-				break;
-			case '2':
-				//speech_play(0x5157, 0xf0);	// MEM:0x5141 now shows ROM:0x6D141 = BOING-sound
-				speech_play(0x517B, 0xf0);
-				break;
-			case '3':
+				//speech_play(0x5308, 0x10);
+				//speech_play(0x51EF, 0x10);
+				//speech_play(0x5207, 0x10);	// MEEP-MEEEEEEEP! Buzzer
+				//speech_play(0x526d, 0x10);	// Crash-oompf
 				speech_play(0x5278, 0x38);	// 6D278 = Hello (???)
 				break;
+			
+			
+			case '1':
+				speech_play(0x5131+0, 11);	//, 6d131 = Bing (invalid key)
+				break;
+			case '2':
+				speech_play(0x513b, 146);	// Upwards Arpeggio
+				break;
+			case '3':
+				speech_play(0x51cd, 112);	// Beysh
+				break;
 			case '4':
-				speech_play(0x52F7, 60);	//, l=0x40 + 20	# 6D2F7 = Reverb / delete-sound
+				speech_play(0x523d, 183);	// Going up
 				break;
 			case '5':
-				speech_play(0x55E5, 0x70);	//, l=0x30 + 40	# 6D5E6 = gyeeee!
+				speech_play(0x52F7, 58);	// Reverb
 				break;
-			
 			case '6':
-				// Actual 1:1 raw BUS data found!
-				speech_play(0x5632, 150);	//264);	//, 6d637 = Beauauauau
+				speech_play(0x5330, 65);	// Switch
 				break;
-			
 			case '7':
-				// Actual 1:1 raw BUS data found!
-				speech_play(0x55b2, (0x5637-0x55b2));	// 0x6d5b2 = Meep!
+				speech_play(0x5370, 58);	// Bang/Step
 				break;
+			case '8':
+				speech_play(0x53A9, 117);	// Bite
+				break;
+			case '9':
+				speech_play(0x541d, 35+29);	// Hack/switch
+				break;
+			case 'A':
+			case 'a':
+				speech_play(0x55e5, 81);	// gyeeee
+				break;
+			case 'B':
+			case 'b':
+				speech_play(0x5635, 228);	// Boioioioioi
+				break;
+			case 'C':
+			case 'c':
+				speech_play(0x58a9, 149);	// Tone (lower)
+				break;
+			case 'D':
+			case 'd':
+				speech_play(0x5941, 121);	// Tone (higher)
+				break;
+			case 'E':
+			case 'e':
+				speech_play(0x59ba, 169);	// Tone (highest)
+				break;
+			case 'F':
+			case 'f':
+				speech_play(0x5a62, 148);	// Bow-Boooow / Buzz
+				break;
+			case 'G':
+			case 'g':
+				speech_play(0x5af7, 515);	// Fanfare
+				break;
+			// End of assets
+			
+			
 			
 			case 'R':
 			case 'r':

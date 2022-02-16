@@ -98,12 +98,12 @@ TMS_K[9]	= int8_t_array([0xCD,0xDF,0xF1,0x04,0x16,0x20,0x3B,0x4D])
 
 ### Chirp wave form
 # Original talkie chirp
-#CHIRP_SIZE = 41
-#CHIRP = int8_t_array([0x00,0x2a,0xd4,0x32,0xb2,0x12,0x25,0x14,0x02,0xe1,0xc5,0x02,0x5f,0x5a,0x05,0x0f,0x26,0xfc,0xa5,0xa5,0xd6,0xdd,0xdc,0xfc,0x25,0x2b,0x22,0x21,0x0f,0xff,0xf8,0xee,0xed,0xef,0xf7,0xf6,0xfa,0x00,0x03,0x02,0x01])
+CHIRP_SIZE = 41
+CHIRP = int8_t_array([0x00,0x2a,0xd4,0x32,0xb2,0x12,0x25,0x14,0x02,0xe1,0xc5,0x02,0x5f,0x5a,0x05,0x0f,0x26,0xfc,0xa5,0xa5,0xd6,0xdd,0xdc,0xfc,0x25,0x2b,0x22,0x21,0x0f,0xff,0xf8,0xee,0xed,0xef,0xf7,0xf6,0xfa,0x00,0x03,0x02,0x01])
 
 # Saw chirp
-CHIRP_SIZE = 41*2
-CHIRP = int8_t_array([((i * 4) % 0x100) for i in range(CHIRP_SIZE)])
+#CHIRP_SIZE = 41*2
+#CHIRP = int8_t_array([((i * 4) % 0x100) for i in range(CHIRP_SIZE)])
 
 """
 r = ''
@@ -481,6 +481,9 @@ def say(filename=None, data=None, ofs=None, l=None):
 			time.sleep(len(data) / SAMPLE_RATE)
 		frame += 1
 	
+	while len(data) < SAMPLE_RATE:
+		data.append(0x80)
+	buffer_pyaudio(data)
 	time.sleep(1)	# Post-delay
 	
 	#Play all at once, once it is finished:
@@ -560,7 +563,7 @@ if __name__ == '__main__':
 	#say_file('files/VTech_GeniusLeaderNotebook_guitar_etc.bin')
 	#say_file('files/VTech_GeniusLeaderNotebook.bin', 0x7c74e)
 	
-	TIME_STRETCH = 2
+	TIME_STRETCH = 1
 	# Findings: 0x6D000-0x6E000	!!!!!!!!!!!!
 	# Hint: The last frame is usually "0x00" or "0x0F"
 	#filename = 'files/VTech_GeniusLeader_ROM_GL6000SL_27-5894-01.bin'
@@ -569,19 +572,32 @@ if __name__ == '__main__':
 	
 	#say_file(filename, ofs=0x6D124, l=0x08 + 60)
 	
-	#say_file(filename, ofs=0x6D131, l=0x0a + 0)	# Bing
+	## Good ones:
+	#say_file(filename, ofs=0x6D131+1, l=10)	# Bing (confirmed!)
+	#say_file(filename, ofs=0x6D13b, l=146)	# Upwards-Arpeggio Jingle
+	#say_file(filename, ofs=0x6D1cd, l=112)	# Beuysh
+	#say_file(filename, ofs=0x6D23d, l=183)	# Goiing up!
+	#say_file(filename, ofs=0x6D2f7, l=58)	# Reverb
+	#say_file(filename, ofs=0x6D330, l=65)	# Switch
+	#say_file(filename, ofs=0x6D370, l=58)	# Bang/Step
+	#say_file(filename, ofs=0x6D3A9, l=117)	# Bite
+	#say_file(filename, ofs=0x6D41d, l=35+29)	# Hack
+	## ...data...
+	#say_file(filename, ofs=0x6D5e5, l=81)	# goyeeeeee
+	say_file(filename, ofs=0x6D635, l=228)	# Boioiooi
+	## ...data...
+	#say_file(filename, ofs=0x6D8a9, l=153)	# Tone (lower)
+	#say_file(filename, ofs=0x6D941, l=121)	# Tone (higher)
+	#say_file(filename, ofs=0x6D9ba, l=169)	# Tone (highest)
+	#say_file(filename, ofs=0x6Da62, l=148)	# Bow-Booooow/Buzz
+	#say_file(filename, ofs=0x6Daf7, l=515)	# Fanfare
+	## ...data...
+	## End of Sound assets
 	
-	#say_file(filename, ofs=0x6D13b-1, l=0x60 + 60)	# 6d13c=Jingle
 	
-	#say_file(filename, ofs=0x6D141, l=0x20 + 80)	# 0x6D141 = Boing
-	
-	#say_file(filename, ofs=0x6D157-2, l=0x120 + 80)	# Instrument-Sound?
-	
-	#say_file(filename, ofs=0x6D2BC, l=0x20 + 20)
-	
+	# Experiments
 	#say_file(filename, ofs=0x6D274, l=0x20 + 20)	# Hello?
-	say_file(filename, ofs=0x6D2f4, l=0x30)	# ~6d2f4+- = Reverb / delete
-	#say_file(filename, ofs=0x6D5e6, l=0x30 + 40)	# 	! 0x6D5e6 = mewewew
+	#say_file(filename, ofs=0x6D17B, l=40)
 	
 	
 	#voice.say_file('encode/OUT/MASGER/AIN0.sfm')
