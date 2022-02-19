@@ -159,6 +159,9 @@ int eval(int argc, char *argv[]);	// Forward declaration to input parser, needed
 
 
 #ifdef MONITOR_CMD_BEEP
+
+#include "sound.h"
+
 int cmd_beep(int argc, char *argv[]) {
 	
 	if (argc <= 1) {

@@ -182,6 +182,11 @@ Intro sound port accesses at 0x2x?:
 #include "keyboard.h"
 
 
+// Sound
+//#include "speech.h"
+//#include "sound.h"
+
+
 // Publish function NAMES for STDIO
 #define VGLDK_STDOUT_PUTCHAR lcd_putchar
 #define VGLDK_STDIN_GETCHAR keyboard_getchar
