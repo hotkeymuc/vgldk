@@ -14,22 +14,17 @@ This is still heavily work in progress, but usable. For some working proof-of-co
 		VTech Genius LEADER 2000 PLUS [DE]
 		VTech Genius LEADER 2000 Compact [DE]
 		VTech PreComputer THINK BOOK [UK]
-		YENO Mister X2
+		YENO Mister X2 [DE]
 	gl4000
-		VTech PreComputer POWER PAD [UK]
-		VTech Genius LEADER 4000 Quadro [DE]
 		VTech Genius LEADER 4000 Quadro [DE]
 		VTech Genius LEADER 4004 Quadro L [DE]
+		VTech PreComputer POWER PAD [UK]
 	gl6000sl
 		VTech Genius LEADER 6000 SL [DE]
-		VTech PreComputer Prestige
-	
-	planned:
-	gl7000
-		VTech PC ENDEAVOUR [UK]
 		VTech Genius LEADER 7007 SL [DE]
-		VTech Genius LEADER 8008 CX [DE]
-		(CompuSavant? [FR])
+		VTech PC PRESTIGE [US]
+
+Newer models ("CX" series, circa 1999 onward) use a completely different system architecture, namely a CompactRISC CR16B CPU. Refer to the [VCXDK](https://www.github.com/hotkeymuc/vcxdk) for those models.
 
 ## Files
 * examples: Some demonstrative use cases and experiments
@@ -59,5 +54,7 @@ This is still heavily work in progress, but usable. For some working proof-of-co
 * [Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking)
 * [Discussion on the Z88DK forum](https://www.z88dk.org/forum/viewtopic.php?id=10055)
 * [VTech hardware development](https://www.thingiverse.com/thing:3108809)
+* [VCXDK for newer models](https://www.github.com/hotkeymuc/vcxdk)
+
 
 2020-09-07 Bernhard "HotKey" Slawik
