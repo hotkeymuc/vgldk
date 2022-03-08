@@ -23,6 +23,7 @@ This is still heavily work in progress, but usable. For some working proof-of-co
 		VTech Genius LEADER 6000 SL [DE]
 		VTech Genius LEADER 7007 SL [DE]
 		VTech PC PRESTIGE [US]
+		(YENO COMPUSAVANT [FR])
 
 Newer models ("CX" series, circa 1999 onward) use a completely different system architecture, namely a CompactRISC CR16B CPU. Refer to the [VCXDK](https://www.github.com/hotkeymuc/vcxdk) for those models.
 
@@ -54,7 +55,7 @@ Newer models ("CX" series, circa 1999 onward) use a completely different system 
 * [Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking)
 * [Discussion on the Z88DK forum](https://www.z88dk.org/forum/viewtopic.php?id=10055)
 * [VTech hardware development](https://www.thingiverse.com/thing:3108809)
+* [Alexandre Botzung dissecting the YENO COMPUSAVANT](https://alexandre.botzung.fr/fr/analyse-du-yeno-compusavant)
 * [VCXDK for newer models](https://www.github.com/hotkeymuc/vcxdk)
-
 
 2020-09-07 Bernhard "HotKey" Slawik
