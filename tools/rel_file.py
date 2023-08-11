@@ -24,7 +24,7 @@ def put(txt):
 
 AREA_NAME_CODE = '_CODE'
 AREA_NAME_DATA = '_DATA'
-AREA_NAME_EXT = 'ext'	# Name for symbols wihtout an explicit area
+AREA_NAME_EXT = 'global'	# Name for symbols wihtout an explicit area
 
 class Usage:
 	"One usage of a symbol within a .rel file"
@@ -276,7 +276,7 @@ def process_rel_file(filename_rel, filename_bin_linked=None):
 						a = a2
 						break
 				else:
-					put('Line %d: Unhandled relocation due to unknown area rel_index: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X' % (line_num, rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr))
+					put('Line %d: Unhandled relocation due to unknown area rel_index: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X' % (line_num, rel_ofs_abs, rel_ofs_abs, rel_type, rel_index, org_addr, linked_addr))
 					put('Skipping!')
 					break
 				
@@ -287,17 +287,17 @@ def process_rel_file(filename_rel, filename_bin_linked=None):
 					
 					sym, sym_ofs = a.symbol_by_address(org_addr)
 					
-					put('Relocation in line %d: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X (%s: Symbol "%s")' % (line_num, rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr, str(a), sym.name if sym is not None else '???'))
+					put('Line %d / offset %d / 0x%04X: Normal Relocation (rel_type=%02X), rel_index=%d: org_addr=%04X, linked_addr=%04X (Area %s: Symbol "%s")' % (line_num, rel_ofs_abs, rel_ofs_abs, rel_type, rel_index, org_addr, linked_addr, a.name, sym.name if sym is not None else '???'))
 					sym.linked_addr = linked_addr - sym_ofs	# Update linked address
 					u = Usage(bin_ofs=rel_ofs_abs, sym_ofs=sym_ofs)
 				
 				elif (rel_type == 0x02):
-					# Calling an external symbol by its INDEX (e.g. auto-generated subs like "___sdcc_call_hl" or external undefined externals)
+					# Calling an external/global symbol by its INDEX (e.g. auto-generated subs like "___sdcc_call_hl" or external undefined externals)
 					a = areas[AREA_NAME_EXT]
 					sym = a.symbol_by_index(rel_index) # Symbol by INDEX! (Because its address is unknown/0x0000)
 					sym_ofs = org_addr
 					
-					put('Relocation (EXT) in line %d: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X (%s: Symbol "%s")' % (line_num, rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr, str(a), sym.name if sym is not None else '???'))
+					put('Line %d / offset %d / 0x%04X: Global Relocation (rel_type=%02X), rel_index=%d: org_addr=%04X, linked_addr=%04X (Area %s: Symbol "%s")' % (line_num, rel_ofs_abs, rel_ofs_abs, rel_type, rel_index, org_addr, linked_addr, a.name, sym.name if sym is not None else '???'))
 					
 					sym.linked_addr = linked_addr - sym_ofs	# Update linked address
 					u = Usage(bin_ofs=rel_ofs_abs, sym_ofs=sym_ofs)
@@ -307,7 +307,7 @@ def process_rel_file(filename_rel, filename_bin_linked=None):
 					sym, sym_ofs = a.symbol_by_address(org_addr)
 					
 					sym, sym_ofs = a.symbol_by_address(org_addr)
-					put('Relocation (lo addr) in line %d: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X (%s: Symbol "%s")' % (line_num, rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr, str(a), sym.name if sym is not None else '???'))
+					put('Line %d / offset %d / 0x%04X: LO addr (rel_type=%02X), rel_index=%d: org_addr=%04X, linked_addr=%04X (Area %s: Symbol "%s")' % (line_num, rel_ofs_abs, rel_ofs_abs, rel_type, rel_index, org_addr, linked_addr, a.name, sym.name if sym is not None else '???'))
 					
 					sym.linked_addr = linked_addr - sym_ofs	# Update linked address
 					u = Usage(bin_ofs=rel_ofs_abs, sym_ofs=sym_ofs)	#@TODO: Usage of the LO BYTE of the ADDRESS of this symbol
@@ -316,7 +316,7 @@ def process_rel_file(filename_rel, filename_bin_linked=None):
 					sym, sym_ofs = a.symbol_by_address(org_addr)
 					
 					sym, sym_ofs = a.symbol_by_address(org_addr)
-					put('Relocation (hi addr) in line %d: rel_type=%02X, rel_index=%d at offset=%d / 0x%04X: org_addr=%04X, linked_addr=%04X (%s: Symbol "%s")' % (line_num, rel_type, rel_index, rel_ofs_abs, rel_ofs_abs, org_addr, linked_addr, str(a), sym.name if sym is not None else '???'))
+					put('Line %d / offset %d / 0x%04X: HI addr (rel_type=%02X), rel_index=%d: org_addr=%04X, linked_addr=%04X (Area %s: Symbol "%s")' % (line_num, rel_ofs_abs, rel_ofs_abs, rel_type, rel_index, org_addr, linked_addr, a.name, sym.name if sym is not None else '???'))
 					
 					sym.linked_addr = linked_addr - sym_ofs	# Update linked address
 					u = Usage(bin_ofs=rel_ofs_abs, sym_ofs=sym_ofs)	#@TODO: Usage of the HI BYTE of the ADDRESS of this symbol
