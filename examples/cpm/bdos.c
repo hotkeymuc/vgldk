@@ -9,616 +9,17 @@
 	
 */
 
-// First bytes of _CODE area should be the BDOS entry
-
-void bdos() __naked {
-	__asm
-		jp _bdos_entry
-		.asciz '<- bdos_entry jump'
-	__endasm;
-}
-
-#include "fcb.h"
-
+#include "fcb.h"	// For files
 #include "bdos.h"
+#include "bios.h"	// For basic I/O
 
 
-// @TODO: De-couple from BIOS at compile time
-//#include <stdio.h>	// for puts() putchar() gets() getchar()
-//#include <stdiomin.h>	// for puts() putchar() gets() getchar()
-#include "bios.h"
+// First bytes of the _CODE area should be the BDOS entry function.
+// The jump at CRT0 0x0005 should point here.
+// Its address marks the end of the transient memory area (e.g. ZORK checks 0x0005 for that).
 
-
-// Make puts / gets etc. talk directly to BIOS
-void bdos_putchar(char c) {
-	bios_conout(c);
-}
-byte bdos_getchar() {
-	return bios_conin();
-}
-
-void bdos_puts(const char *str) {
-	while(*str) bios_conout(*str++);
-}
-void bdos_gets(char *pc) {
-	char *pcs;
-	char c;
-	pcs = pc;
-	
-	while(1) {
-		c = bios_conin();
-		if ( (c == 8) || (c == 127) ) {
-			// Backspace/DEL
-			if (pc > pcs) {
-				pc--;
-				//if (lcd_x > 0) {
-				//	lcd_x--;
-				//	vgl_lcd_set_cursor();
-				//}
-			}
-			continue;
-		}
-		
-		bios_conout(c);
-		
-		if ((c == '\n') || (c == '\r') || (c == 0)) {
-			// End of string
-			
-			// Terminate string
-			*pc = 0;
-			return;
-		}
-		
-		// Add char
-		*pc++ = c;
-	}
-}
-
-// Helpers
-void bdos_printf(char *pc) {
-	char c;
-	c = *pc;
-	while(c != 0) {
-		bios_conout(c);
-		pc++;
-	}
-}
-
-void bdos_printf_d(char *pc, byte d) {
-	byte i;
-	
-	bdos_printf(pc);
-	i = 100;
-	while(i > 0) {
-		bios_conout('0' + ((d / i) % 10));
-		i /= 10;
-	}
-	//bios_conout('\n');
-}
-
-
-byte bdos_strlen(const char *c) {
-	byte l;
-	l = 0;
-	while (*c++ != 0)  {
-		l++;
-	}
-	return l;
-}
-void bdos_memset(byte *addr, byte b, word count) {
-	while(count > 0) {
-		*addr++ = b;
-		count--;
-	}
-}
-
-// Host communication
-#ifdef BDOS_USE_HOST
-	//void host_send(const byte *data, byte ldata);
-	//int host_receive(byte *data);
-	
-	#ifdef BDOS_USE_HOST_SOFTSERIAL
-		#include "host_softserial.h"
-	#endif
-	
-	#ifdef BDOS_USE_HOST_MAME
-		#include "host_mame.h"
-	#endif
-	
-#endif
-
-
-
-#ifdef BDOS_USE_HOST
-	void host_sendfcb(byte num, struct FCB *fcb) {
-		byte data[1+1+2+36];
-		byte *pdata;
-		byte *pfcb;
-		byte i;
-		
-		// Show on screen
-		//printf_d("F", num); printf(fcb2name(fcb));
-		
-		
-		// Dump to serial
-		pdata = data;
-		
-		*pdata++ = 'F';
-		*pdata++ = num;
-		
-		*pdata++ = (word)fcb >> 8;
-		*pdata++ = (word)fcb & 0xff;
-		
-		pfcb = (char *)fcb;
-		for (i = 0; i < 36; i++) {
-			*pdata++ = *pfcb++;
-		}
-		
-		host_send(data, 1+1+2+36);
-		
-		//@TODO: Handle answer from companion
-	}
-	
-	
-	byte host_receivefcb(struct FCB *fcb) {
-		byte data[1 + 36 + 16];
-		byte l;
-		byte r;
-		
-		// Receive result only (make FCB alterations manually)
-		//r = host_receivebyte();
-		
-		// Receive result and FCB
-		do {
-			l = host_receive(data);
-		} while(l == 0);
-		
-		// Get result
-		r = data[0];
-		
-		if (r == 0xff) {
-			//@TODO: Error codes!?
-			//printf("FCB FUN ERR!\n");
-		} else {
-			// Copy the received FCB over
-			memcpy((byte *)&data[1], (byte *)fcb, 36);
-		}
-		
-		return r;
-	}
-	
-	word host_receivedma() {
-		byte data[255];
-		int l;
-		byte *p;
-		word ltotal;
-		
-		p = bios_dma;
-		ltotal = 0;
-		l = 1;
-		while(l > 0) {
-			l = host_receive(data);
-			if (l > 0) {
-				memcpy(data, p, l);
-				p += l;
-			}
-		}
-		
-		ltotal = p - bios_dma;
-		return ltotal;
-	}
-	
-	byte host_receivebyte() {
-		byte data[MAX_DATA];
-		int l;
-		
-		l = 0;
-		while(l == 0) {
-			l = host_receive(data);
-		}
-		
-		return data[0];
-	}
-	
-	
-	//#ifdef BDOS_TRACE_CALLS
-	volatile byte bdos_s;
-	volatile byte bdos_p;
-	void host_sendstack() {
-		byte data[MAX_DATA];
-		byte *pdata;
-		byte *pstack;
-		byte stack_count;
-		
-		/*
-		//word bdos_sp;
-		
-		// Get stack pointer
-		__asm
-			; Write SP to bdos_param_s
-			push af
-			push hl
-			
-			ld hl, #0x04	; Skip the items we just pushed ourselves
-			add hl, sp
-			
-			; Write to a global
-			ld a, h
-			ld (_bdos_s), a
-			ld a, l
-			ld (_bdos_p), a
-			
-			pop hl
-			pop af
-		__endasm;
-		*/
-		
-		// Dump to serial
-		pdata = &data[0];
-		
-		*pdata++ = 'D';	// D for Debug
-		
-		// Add registers
-		#ifdef BDOS_SAVE_ALL_REGISTERS
-			*pdata++ = bdos_param_a;
-			*pdata++ = bdos_param_b;
-		#else
-			*pdata++ = 0;
-			*pdata++ = 0;
-		#endif
-		
-		*pdata++ = bdos_param_c;
-		*pdata++ = bdos_param_d;
-		*pdata++ = bdos_param_e;
-		
-		#ifdef BDOS_SAVE_ALL_REGISTERS
-			*pdata++ = bdos_param_h;
-			*pdata++ = bdos_param_l;
-		#else
-			*pdata++ = 0;
-			*pdata++ = 0;
-		#endif
-		
-		// Add stack pointer
-		//*pdata++ = (word)bdos_sp >> 8;
-		//*pdata++ = (word)bdos_sp & 0xff;
-		*pdata++ = bdos_s;
-		*pdata++ = bdos_p;
-		
-		// Add stack dump
-		stack_count = 16;
-		*pdata++ = stack_count;
-		pstack = (byte *)(((word)bdos_s * 256) + (word)bdos_p);
-		memcpy(pstack, pdata, stack_count * 2);
-		
-		host_send(data, 1 + 7 + 2 + 1 + stack_count * 2);
-	
-	}
-	//#endif
-	
-#endif
-
-
-
-#ifdef BDOS_TRAP
-	#define TRAP_SIZE 10
-	
-	byte *trap_addr;
-	byte trap_backup[TRAP_SIZE];
-	
-	void trap_set(byte *a) {
-		// Install a "trap" at specified address
-		
-		trap_addr = a;	// Store trap address
-		memcpy(a, &trap_backup[0], TRAP_SIZE);
-		
-		// PUSH all
-		*a++ = 0xf5;	// PUSH AF
-		*a++ = 0xc5;	// PUSH BC
-		*a++ = 0xd5;	// PUSH DE
-		*a++ = 0xe5;	// PUSH HL
-		
-		// LD C, #0xff
-		*a++ = 0x0e;	// LD C, #..
-		*a++ = 0xff;	// 0xff
-		
-		// CALL 0x0005
-		*a++ = 0xcd;	// CALL ....
-		*a++ = 0x05;	// low
-		*a++ = 0x00;	// high
-	}
-	
-	void trap_unset() {
-		memcpy(&trap_backup[0], trap_addr, TRAP_SIZE);
-	}
-	
-	void trap_trigger() __naked {
-		__asm
-			pop af	; Initial POP (has been pushed on call)
-			
-			; Store all registers
-			push af
-			push bc
-			push de
-			push hl
-			
-			
-			; Dump BEFORE fixing
-			;call _host_sendstack
-			
-			; Fix return address to point at trap origin
-			ld hl,#0x0008
-			add hl,sp
-			ld d, h
-			ld e, l
-			
-			ld hl, (_trap_addr)
-			ld a, l
-			ld (de), a
-			inc de
-			ld a,h
-			ld (de), a
-			
-		__endasm;
-		
-		bdos_puts("** TRAP **");
-		
-		#ifdef BDOS_USE_HOST
-			host_sendstack();
-		#endif
-		
-		getchar();
-		
-		trap_unset();
-		
-		bdos_puts("cont...");
-		__asm
-			
-			pop hl
-			pop de
-			pop bc
-			pop af
-			
-			ret
-			
-			
-		__endasm;
-		
-	}
-#endif
-
-
-
-byte bdos_f_open(struct FCB *fcb) {
-	byte r;
-	
-	#ifdef BDOS_USE_HOST
-		// Send request to host
-		host_sendfcb(BDOS_FUNC_F_OPEN, fcb);
-		r = host_receivefcb(fcb);
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_open n/a");
-		r = 0xff;
-	#endif
-	
-	if (r != 0xff) {
-		fcb->s2 |= 0x80;	// Make it "0x80" even if not found
-		
-		/*
-		//bdos_file_ofs = 0;
-		fcb->ex = 0;	// Current extent
-		fcb->s1 = 2;	//@TODO: ?
-		fcb->s2 |= 0x80;	// mark "open"?
-		fcb->rc = 0x80;	// @TODO: Number of records in extend
-		//fcb->d = .... whatever
-		fcb->cr = 0;
-		fcb->r0 = 0;
-		fcb->r1 = 0;
-		fcb->r2 = 0;
-		// Rest is zero
-		*/
-	}
-	
-	return r;
-}
-
-byte bdos_f_close(struct FCB *fcb) {
-	byte r;
-	
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_CLOSE, fcb);
-		r = 0x00;
-	#else
-		//@TODO: Implement bare-metal version
-		(void)fcb;	// Quiet the compiler
-		bdos_puts("bdos_f_close n/a!");
-		r = 0xff;
-	#endif
-	
-	if (r != 0xff) {
-		fcb->s2 &= 0x7f;	// remove "open" flag?
-	}
-	return r;
-}
-
-byte bdos_f_read(struct FCB *fcb) {
-	word l;
-	word rn;
-	word ex;
-	
-	#ifdef BDOS_USE_HOST
-		//host_sendfcb(BDOS_FUNC_F_READ, fcb);
-		host_sendfcb(bdos_param_c, fcb);
-		
-		// Receive data
-		l = host_receivedma();
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_read n/a!");
-		l = 0;
-	#endif
-	
-	// Return 1 on EOF
-	if (l == 0) {
-		return 1;	// 1 = EOF
-	}
-	
-	if (l < 128) {
-		// Fill with EOFs
-		bdos_memset(bios_dma + l, 0x1a, 128 - l);
-	}
-	
-	/*
-	bdos_file_ofs += l;
-	fcb->cr = SEQ_CR(bdos_file_ofs);
-	fcb->ex = SEQ_EX(bdos_file_ofs);
-	fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
-	*/
-	
-	rn = fcb->cr + (fcb->ex * 128) + ((fcb->s2 & 1) * 16384);
-	rn++;
-	ex = rn / 128;
-	fcb->cr = rn % 128;
-	fcb->ex = ex % 32;
-	fcb->s2 = (0x80 | (ex / 32));
-	
-	//bdos_puts("readOK");
-	return 0x00;
-}
-
-byte bdos_f_readrand(struct FCB *fcb) {
-	byte r;
-	word rn;
-	word ex;
-	//word l;
-	
-	//bdos_puts("ReadRand");
-	
-	//host_sendfcb(BDOS_FUNC_F_READRAND, fcb);
-	//l = host_receivedma();
-	// Return 1 on EOF
-	//if (l == 0) return 1;
-	//return 0x00;	// Fake "OK"
-	
-	/*
-	// Calculate absolute offset (in bytes)
-	bdos_file_ofs = ((long)fcb->r0 + ((long)fcb->r1 * 256)) * 128L;
-	fcb->cr = SEQ_CR(bdos_file_ofs);
-	fcb->ex = SEQ_EX(bdos_file_ofs);
-	fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
-	*/
-	// Calculate absolute offset (in records)
-	rn = (word)fcb->r0 + ((word)fcb->r1 * 256);
-	ex = rn / 128;
-	fcb->cr = rn % 128;
-	fcb->ex = ex % 32;
-	fcb->s2 = (0x80 | (ex / 32));
-	
-	// Proceed with sequencial read
-	r = bdos_f_read(fcb);
-	return r;
-}
-
-byte bdos_f_write(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITE, fcb);
-		//return 0xff;
-		return 0x00;	// Fake "OK"
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_write n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-	
-}
-
-byte bdos_f_writerand(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITERAND, fcb);
-		//return 0xff;
-		return 0x00;	// Fake "OK"
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_writerand n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-}
-
-/*
-byte bdos_f_writezf(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITEZF, fcb);
-		
-		//return 0xff;
-		return 0x00;	// Fake "OK"
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_writezf n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-}
-*/
-
-byte bdos_f_sfirst(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_SFIRST, fcb);
-		return host_receivefcb(fcb);
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_sfirst n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-}
-byte bdos_f_snext(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_SNEXT, fcb);
-		return host_receivefcb(fcb);
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_snext n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-}
-
-
-
-void bdos_init() __naked {
-	//bdos_dma = (byte *)0x0080;
-	bdos_delimiter = '$';
-	bdos_user = 1;
-	
-	bdos_memset((byte *)bdos_fcb, 0x00, 36);	//sizeof(FCB));
-	
-	#ifdef BDOS_PATCH_JUMP_TO_TOP
-		// At the moment, the BODS entry point "bdos()" is not at the top of RAM / bottom of code segment.
-		// We need to patch the JP instruction at 0x0005 to point to the end of RAM.
-		// Reason: ZORK looks at the address at 0x0006 to determine where to put its own stuff below.
-		// So 0x0006 must point to the top of RAM, below the BDOS/BIOS/CCP code segment.
-		
-		// Clone the original jump instruction from 0x0005 to the end of RAM
-		// It consists of three bytes: 0xC3 [lo] [hi]
-		memcpy((byte *)0x0005, (byte *)(BDOS_TOP_OF_RAM - 2), 3);	// TOP_OF_RAM - 2 = 0x7ffd
-		
-		// Alter the pointer at 0x0006 to point to the cloned jump
-		// We use 0x0006, since the byte at 0x0005 is 0xc3 (opcode for "JP") and the actual address is at 0x0006 and 0x0007
-		*(word *)0x0006 = (BDOS_TOP_OF_RAM - 3);
-	#endif
-	
-	
-	//@TODO: Load CCP to transient area and run it!
-	bdos_puts("Must load CCP now (n/a)");
-	bdos_getchar();
-	
-}
-
-// Main BDOS entry point (0x0005 should jumps here)
-void bdos_entry() __naked {
+// Main BDOS entry point (0x0005 should point here AND it should be the first bytes in _CODE area)
+void bdos() __naked {
 	char *pc;
 	char c;
 	byte s;
@@ -626,12 +27,13 @@ void bdos_entry() __naked {
 	byte bdos_func;
 	//FCB *fcb;
 	
-	// BDOS
-	
 	// Ideally this whole procedure should be done in pure ASM
 	// But while developing, it is much easier to debug in C
 	
 	__asm
+		
+		;.asciz 'BDOS!'	; Mark in binary, so we can check if it is REALLY the first bytes in _CODE area
+		
 		//#ifdef BDOS_TRACE_CALLS
 		#ifdef BDOS_SAVE_ALL_REGISTERS
 			; Save EVERYTHING
@@ -641,7 +43,6 @@ void bdos_entry() __naked {
 			; Save register "A" first, we need that register
 			ld (_bdos_param_a), a
 			
-			
 			; Store register "B"
 			ld a, b
 			ld (_bdos_param_b), a
@@ -650,7 +51,6 @@ void bdos_entry() __naked {
 			ld a, c
 			ld (_bdos_param_c), a
 			
-			
 			; Store register "D"
 			ld a, d
 			ld (_bdos_param_d), a
@@ -658,7 +58,6 @@ void bdos_entry() __naked {
 			; Store register "E"
 			ld a, e
 			ld (_bdos_param_e), a
-			
 			
 			; Store register "H"
 			ld a, h
@@ -718,7 +117,6 @@ void bdos_entry() __naked {
 	
 	//@TODO: Add a custom BDOS command for "breakpoint" / "single step"
 	// => Put a "ld c, BDOS_FUNC_BREAK, call 0x0005" into memory to stop execution
-	// stop compilation here!
 	
 	
 	// For debugging
@@ -739,12 +137,12 @@ void bdos_entry() __naked {
 	switch(bdos_func) {
 		
 		case BDOS_FUNC_P_TERMCPM:	// 0: System reset
-			// We call this from BIOS on wboot
+			// We call this from BIOS at the end of bios_wboot()
 			
-			bdos_puts("TERMCPM");
-			bdos_getchar();
+			//bdos_puts("TERMCPM");
+			//bdos_getchar();
 		
-			//@TODO: Warm boot / go to CCP
+			// Warm boot / go to CCP
 			//ccp();
 			/*
 			__asm
@@ -752,6 +150,8 @@ void bdos_entry() __naked {
 				jp 0x0000
 			__endasm;
 			*/
+			
+			// (Re-)initialize BDOS, load and run CCP
 			__asm
 				jp _bdos_init
 			__endasm;
@@ -1080,5 +480,602 @@ void bdos_entry() __naked {
 		ret
 	__endasm;
 }
+
+
+
+
+
+
+// I/O Helpers
+// Make puts / gets etc. talk directly to BIOS
+void bdos_putchar(char c) {
+	bios_conout(c);
+}
+byte bdos_getchar() {
+	return bios_conin();
+}
+
+void bdos_puts(const char *str) {
+	while(*str) bios_conout(*str++);
+}
+void bdos_gets(char *pc) {
+	char *pcs;
+	char c;
+	pcs = pc;
+	
+	while(1) {
+		c = bios_conin();
+		if ( (c == 8) || (c == 127) ) {
+			// Backspace/DEL
+			if (pc > pcs) {
+				pc--;
+				/*
+				if (lcd_x > 0) {
+					lcd_x--;
+					vgl_lcd_set_cursor();
+				}
+				*/
+			}
+			continue;
+		}
+		
+		bios_conout(c);
+		
+		if ((c == '\n') || (c == '\r') || (c == 0)) {
+			// End of string
+			
+			// Terminate string
+			*pc = 0;
+			return;
+		}
+		
+		// Add char
+		*pc++ = c;
+	}
+}
+
+// STDIO Helpers
+void bdos_printf(char *pc) {
+	char c;
+	c = *pc;
+	while(c != 0) {
+		bios_conout(c);
+		pc++;
+	}
+}
+
+void bdos_printf_d(char *pc, byte d) {
+	byte i;
+	
+	bdos_printf(pc);
+	i = 100;
+	while(i > 0) {
+		bios_conout('0' + ((d / i) % 10));
+		i /= 10;
+	}
+	//bios_conout('\n');
+}
+
+
+
+// String Helpers
+byte bdos_strlen(const char *c) {
+	byte l;
+	l = 0;
+	while (*c++ != 0)  {
+		l++;
+	}
+	return l;
+}
+void bdos_memset(byte *addr, byte b, word count) {
+	while(count > 0) {
+		*addr++ = b;
+		count--;
+	}
+}
+
+// Host communication
+#ifdef BDOS_USE_HOST
+	//void host_send(const byte *data, byte ldata);
+	//int host_receive(byte *data);
+	
+	#ifdef BDOS_USE_HOST_SOFTSERIAL
+		#include "host_softserial.h"
+	#endif
+	
+	#ifdef BDOS_USE_HOST_MAME
+		#include "host_mame.h"
+	#endif
+	
+	void host_sendfcb(byte num, struct FCB *fcb) {
+		byte data[1+1+2+36];
+		byte *pdata;
+		byte *pfcb;
+		byte i;
+		
+		// Show on screen
+		//printf_d("F", num); printf(fcb2name(fcb));
+		
+		
+		// Dump to serial
+		pdata = data;
+		
+		*pdata++ = 'F';
+		*pdata++ = num;
+		
+		*pdata++ = (word)fcb >> 8;
+		*pdata++ = (word)fcb & 0xff;
+		
+		pfcb = (char *)fcb;
+		for (i = 0; i < 36; i++) {
+			*pdata++ = *pfcb++;
+		}
+		
+		host_send(data, 1+1+2+36);
+		
+		//@TODO: Handle answer from companion
+	}
+	
+	
+	byte host_receivefcb(struct FCB *fcb) {
+		byte data[1 + 36 + 16];
+		byte l;
+		byte r;
+		
+		// Receive result only (make FCB alterations manually)
+		//r = host_receivebyte();
+		
+		// Receive result and FCB
+		do {
+			l = host_receive(data);
+		} while(l == 0);
+		
+		// Get result
+		r = data[0];
+		
+		if (r == 0xff) {
+			//@TODO: Error codes!?
+			//printf("FCB FUN ERR!\n");
+		} else {
+			// Copy the received FCB over
+			memcpy((byte *)fcb, (byte *)&data[1], 36);
+		}
+		
+		return r;
+	}
+	
+	word host_receivedma() {
+		byte data[255];
+		int l;
+		byte *p;
+		word ltotal;
+		
+		p = bios_dma;
+		ltotal = 0;
+		l = 1;
+		while(l > 0) {
+			l = host_receive(data);
+			if (l > 0) {
+				memcpy(p, data, l);
+				p += l;
+			}
+		}
+		
+		ltotal = p - bios_dma;
+		return ltotal;
+	}
+	
+	byte host_receivebyte() {
+		byte data[MAX_DATA];
+		int l;
+		
+		l = 0;
+		while(l == 0) {
+			l = host_receive(data);
+		}
+		
+		return data[0];
+	}
+	
+	
+	//#ifdef BDOS_TRACE_CALLS
+	volatile byte bdos_s;
+	volatile byte bdos_p;
+	void host_sendstack() {
+		byte data[MAX_DATA];
+		byte *pdata;
+		byte *pstack;
+		byte stack_count;
+		
+		/*
+		//word bdos_sp;
+		
+		// Get stack pointer
+		__asm
+			; Write SP to bdos_param_s
+			push af
+			push hl
+			
+			ld hl, #0x04	; Skip the items we just pushed ourselves
+			add hl, sp
+			
+			; Write to a global
+			ld a, h
+			ld (_bdos_s), a
+			ld a, l
+			ld (_bdos_p), a
+			
+			pop hl
+			pop af
+		__endasm;
+		*/
+		
+		// Dump to serial
+		pdata = &data[0];
+		
+		*pdata++ = 'D';	// D for Debug
+		
+		// Add registers
+		#ifdef BDOS_SAVE_ALL_REGISTERS
+			*pdata++ = bdos_param_a;
+			*pdata++ = bdos_param_b;
+		#else
+			*pdata++ = 0;
+			*pdata++ = 0;
+		#endif
+		
+		*pdata++ = bdos_param_c;
+		*pdata++ = bdos_param_d;
+		*pdata++ = bdos_param_e;
+		
+		#ifdef BDOS_SAVE_ALL_REGISTERS
+			*pdata++ = bdos_param_h;
+			*pdata++ = bdos_param_l;
+		#else
+			*pdata++ = 0;
+			*pdata++ = 0;
+		#endif
+		
+		// Add stack pointer
+		//*pdata++ = (word)bdos_sp >> 8;
+		//*pdata++ = (word)bdos_sp & 0xff;
+		*pdata++ = bdos_s;
+		*pdata++ = bdos_p;
+		
+		// Add stack dump
+		stack_count = 16;
+		*pdata++ = stack_count;
+		pstack = (byte *)(((word)bdos_s * 256) + (word)bdos_p);
+		memcpy(pdata, pstack, stack_count * 2);
+		
+		host_send(data, 1 + 7 + 2 + 1 + stack_count * 2);
+	
+	}
+	//#endif
+	
+#endif
+
+
+
+#ifdef BDOS_TRAP
+	#define TRAP_SIZE 10
+	
+	byte *trap_addr;
+	byte trap_backup[TRAP_SIZE];
+	
+	void trap_set(byte *a) {
+		// Install a "trap" at specified address
+		
+		trap_addr = a;	// Store trap address
+		memcpy(&trap_backup[0], a, TRAP_SIZE);
+		
+		// PUSH all
+		*a++ = 0xf5;	// PUSH AF
+		*a++ = 0xc5;	// PUSH BC
+		*a++ = 0xd5;	// PUSH DE
+		*a++ = 0xe5;	// PUSH HL
+		
+		// LD C, #0xff
+		*a++ = 0x0e;	// LD C, #..
+		*a++ = 0xff;	// 0xff
+		
+		// CALL 0x0005
+		*a++ = 0xcd;	// CALL ....
+		*a++ = 0x05;	// low
+		*a++ = 0x00;	// high
+	}
+	
+	void trap_unset() {
+		memcpy(trap_addr, &trap_backup[0], TRAP_SIZE);
+	}
+	
+	void trap_trigger() __naked {
+		__asm
+			pop af	; Initial POP (has been pushed on call)
+			
+			; Store all registers
+			push af
+			push bc
+			push de
+			push hl
+			
+			
+			; Dump BEFORE fixing
+			;call _host_sendstack
+			
+			; Fix return address to point at trap origin
+			ld hl,#0x0008
+			add hl,sp
+			ld d, h
+			ld e, l
+			
+			ld hl, (_trap_addr)
+			ld a, l
+			ld (de), a
+			inc de
+			ld a,h
+			ld (de), a
+			
+		__endasm;
+		
+		bdos_puts("** TRAP **");
+		
+		#ifdef BDOS_USE_HOST
+			host_sendstack();
+		#endif
+		
+		getchar();
+		
+		trap_unset();
+		
+		bdos_puts("cont...");
+		__asm
+			
+			pop hl
+			pop de
+			pop bc
+			pop af
+			
+			ret
+			
+			
+		__endasm;
+		
+	}
+#endif
+
+
+
+byte bdos_f_open(struct FCB *fcb) {
+	byte r;
+	
+	#ifdef BDOS_USE_HOST
+		// Send request to host
+		host_sendfcb(BDOS_FUNC_F_OPEN, fcb);
+		r = host_receivefcb(fcb);
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_open n/a");
+		r = 0xff;
+	#endif
+	
+	if (r != 0xff) {
+		fcb->s2 |= 0x80;	// Make it "0x80" even if not found
+		
+		/*
+		//bdos_file_ofs = 0;
+		fcb->ex = 0;	// Current extent
+		fcb->s1 = 2;	//@TODO: ?
+		fcb->s2 |= 0x80;	// mark "open"?
+		fcb->rc = 0x80;	// @TODO: Number of records in extend
+		//fcb->d = .... whatever
+		fcb->cr = 0;
+		fcb->r0 = 0;
+		fcb->r1 = 0;
+		fcb->r2 = 0;
+		// Rest is zero
+		*/
+	}
+	
+	return r;
+}
+
+byte bdos_f_close(struct FCB *fcb) {
+	byte r;
+	
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_CLOSE, fcb);
+		r = 0x00;
+	#else
+		//@TODO: Implement bare-metal version
+		(void)fcb;	// Quiet the compiler
+		bdos_puts("bdos_f_close n/a!");
+		r = 0xff;
+	#endif
+	
+	if (r != 0xff) {
+		fcb->s2 &= 0x7f;	// remove "open" flag?
+	}
+	return r;
+}
+
+byte bdos_f_read(struct FCB *fcb) {
+	word l;
+	word rn;
+	word ex;
+	
+	#ifdef BDOS_USE_HOST
+		//host_sendfcb(BDOS_FUNC_F_READ, fcb);
+		host_sendfcb(bdos_param_c, fcb);
+		
+		// Receive data
+		l = host_receivedma();
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_read n/a!");
+		l = 0;
+	#endif
+	
+	// Return 1 on EOF
+	if (l == 0) {
+		return 1;	// 1 = EOF
+	}
+	
+	if (l < 128) {
+		// Fill with EOFs
+		bdos_memset(bios_dma + l, 0x1a, 128 - l);
+	}
+	
+	/*
+	bdos_file_ofs += l;
+	fcb->cr = SEQ_CR(bdos_file_ofs);
+	fcb->ex = SEQ_EX(bdos_file_ofs);
+	fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
+	*/
+	
+	rn = fcb->cr + (fcb->ex * 128) + ((fcb->s2 & 1) * 16384);
+	rn++;
+	ex = rn / 128;
+	fcb->cr = rn % 128;
+	fcb->ex = ex % 32;
+	fcb->s2 = (0x80 | (ex / 32));
+	
+	//bdos_puts("readOK");
+	return 0x00;
+}
+
+byte bdos_f_readrand(struct FCB *fcb) {
+	byte r;
+	word rn;
+	word ex;
+	//word l;
+	
+	//bdos_puts("ReadRand");
+	
+	//host_sendfcb(BDOS_FUNC_F_READRAND, fcb);
+	//l = host_receivedma();
+	// Return 1 on EOF
+	//if (l == 0) return 1;
+	//return 0x00;	// Fake "OK"
+	
+	/*
+	// Calculate absolute offset (in bytes)
+	bdos_file_ofs = ((long)fcb->r0 + ((long)fcb->r1 * 256)) * 128L;
+	fcb->cr = SEQ_CR(bdos_file_ofs);
+	fcb->ex = SEQ_EX(bdos_file_ofs);
+	fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
+	*/
+	// Calculate absolute offset (in records)
+	rn = (word)fcb->r0 + ((word)fcb->r1 * 256);
+	ex = rn / 128;
+	fcb->cr = rn % 128;
+	fcb->ex = ex % 32;
+	fcb->s2 = (0x80 | (ex / 32));
+	
+	// Proceed with sequencial read
+	r = bdos_f_read(fcb);
+	return r;
+}
+
+byte bdos_f_write(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_WRITE, fcb);
+		//return 0xff;
+		return 0x00;	// Fake "OK"
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_write n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+	
+}
+
+byte bdos_f_writerand(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_WRITERAND, fcb);
+		//return 0xff;
+		return 0x00;	// Fake "OK"
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_writerand n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+}
+
+/*
+byte bdos_f_writezf(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_WRITEZF, fcb);
+		
+		//return 0xff;
+		return 0x00;	// Fake "OK"
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_writezf n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+}
+*/
+
+byte bdos_f_sfirst(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_SFIRST, fcb);
+		return host_receivefcb(fcb);
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_sfirst n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+}
+byte bdos_f_snext(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_SNEXT, fcb);
+		return host_receivefcb(fcb);
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_snext n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+}
+
+
+
+void bdos_init() __naked {
+	// Called by bios_wboot(), which invokes BDOS_FUNC_P_TERMCPM
+	
+	//bios_setdma(0x0080);	// Is done at bios_wboot()
+	
+	bdos_delimiter = '$';
+	bdos_user = 1;
+	
+	bdos_memset((byte *)bdos_fcb, 0x00, 36);	//sizeof(FCB));
+	
+	#ifdef BDOS_PATCH_JUMP_TO_TOP
+		// At the moment, the BODS entry point "bdos()" is not at the top of RAM / bottom of code segment.
+		// We need to patch the JP instruction at 0x0005 to point to the end of RAM.
+		// Reason: ZORK looks at the address at 0x0006 to determine where to put its own stuff below.
+		// So 0x0006 must point to the top of RAM, below the BDOS/BIOS/CCP code segment.
+		
+		// Clone the original jump instruction from 0x0005 to the end of RAM
+		// It consists of three bytes: 0xC3 [lo] [hi]
+		memcpy((byte *)(BDOS_TOP_OF_RAM - 2), (byte *)0x0005, 3);	// TOP_OF_RAM - 2 = 0x7ffd
+		
+		// Alter the pointer at 0x0006 to point to the cloned jump
+		// We use 0x0006, since the byte at 0x0005 is 0xc3 (opcode for "JP") and the actual address is at 0x0006 and 0x0007
+		*(word *)0x0006 = (BDOS_TOP_OF_RAM - 3);
+	#endif
+	
+	
+	//@TODO: Load CCP to transient area and run it!
+	bdos_puts("Must load CCP now (n/a)");
+	bdos_getchar();
+	
+}
+
 
 #endif	// __BDOS_C

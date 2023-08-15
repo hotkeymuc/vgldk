@@ -116,6 +116,15 @@ char *fcb2name(struct FCB *fcb) {
 #endif
 #include <hex.h>	// for printf_x2, printf_x4, ...
 
+void ccp_print_error(byte a) {
+	printf("ERR 0x");
+	printf_x2(a);
+	printf("\r\n");
+}
+void ccp_print_ok() {
+	printf("OK\r\n");
+}
+
 
 #ifdef CCP_CMD_PORT
 byte port_in(byte p) {
@@ -222,8 +231,9 @@ void ccp_run() __naked {
 		jp 0x0100
 		;call 0x0100
 	__endasm;
+	
 	// Will not exit, but rather invoke BIOS warm boot
-	//printf("OK\n");
+	ccp_print_ok();
 }
 
 volatile byte ccp_ret_a;
@@ -331,7 +341,8 @@ byte ccp_fopen(char *filename) {
 	char *pc;
 	
 	//@FIXME: Extract drive from filename!
-	def_fcb.dr = bios_curdsk;	// Default drive
+	//def_fcb.dr = bios_curdsk;	// Default drive (setting it to bios_curdsk will throw "invalid drive" in yaze)
+	def_fcb.dr = 0;	// this works in YAZE
 	
 	pc = filename;
 	for(i = 0; i < 8; i++) {
@@ -352,21 +363,25 @@ byte ccp_fopen(char *filename) {
 	}
 	while (i < 3) def_fcb.t[i++] = 0x20;
 	
-	
 	// Prep fcb.ex
 	def_fcb.ex = 0;
 	def_fcb.s1 = 0;
 	def_fcb.s2 = 0;
+	
 	def_fcb.cr = 0;
 	def_fcb.r0 = 0;
 	def_fcb.r1 = 0;
 	def_fcb.r2 = 0;
+	
+	//printf("Opening...\r\n");
+	//dump((word)(&def_fcb), 36);
 	
 	__asm
 		push af
 		push bc
 		push de
 		push hl
+		
 		ld c, #15	; BDOS_FUNC_F_OPEN = 15
 		ld d, #0x00
 		ld e, #0x5c
@@ -379,6 +394,8 @@ byte ccp_fopen(char *filename) {
 		pop bc
 		pop af
 	__endasm;
+	
+	// FCB shoud be at DMA + A*32
 	
 	return ccp_ret_a;
 }
@@ -415,12 +432,11 @@ byte ccp_load(char *filename) {
 	r = ccp_fopen(filename);
 	
 	if (ccp_ret_a != 0x00) {
-		printf("ERR 0x");
-		printf_x2(ccp_ret_a);
+		ccp_print_error(ccp_ret_a);
 		return ccp_ret_a;
 	}
 	
-	printf("OK\r\n");
+	ccp_print_ok();
 	
 	//@TODO: Load data
 	printf("Load...");
@@ -432,6 +448,7 @@ byte ccp_load(char *filename) {
 			push bc
 			push de
 			push hl
+			
 			ld c, #20	; BDOS_FUNC_F_READ = 20
 			ld d, #0x00
 			ld e, #0x5c
@@ -444,15 +461,24 @@ byte ccp_load(char *filename) {
 			pop bc
 			pop af
 		__endasm;
+		
+		//printf_x2(ccp_ret_a);
+		
+		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
+		if (ccp_ret_a != 0)
+			break;
+		
 		memcpy(a, ccp_dma, 128);
 		a += 128;
+		
 	} while(ccp_ret_a == 0x00);
-	printf("OK\r\n");
+	
+	ccp_print_ok();
 	
 	//@TODO: Close file
 	ccp_fclose();
 	
-	printf("Run...");
+	//printf("Run...");
 	ccp_run();
 	
 	return 0x00;
@@ -497,7 +523,7 @@ void handle(char *input) {
 		// Upper case
 		if (ccp_reg_e >= 32) ccp_reg_e -= 32;
 		if (ccp_reg_e > 25) {
-			printf("Invalid\r\n");
+			printf("INV\r\n");
 			return;
 		}
 		
@@ -525,9 +551,7 @@ void handle(char *input) {
 		
 		/*
 		if (ccp_ret_a != 0) {
-			printf("ERR 0x");
-			printf_x2(ccp_ret_a);
-			printf("\r\n");
+			ccp_print_error(ccp_ret_a);
 		}
 		*/
 		// YAZE does not change bios_curdsk after that, so let's do it manually...
@@ -753,8 +777,9 @@ void handle(char *input) {
 		//printf("\"%s\"?\n", arg);
 		
 		if (ccp_load(input) == 0xff) {
+			//ccp_print_error(r);
 			printf(input);
-			printf("?\n");
+			printf("?\r\n");
 		} else {
 			ccp_run();
 		}

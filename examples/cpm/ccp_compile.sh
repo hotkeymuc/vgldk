@@ -2,10 +2,12 @@
 
 NAME=ccp
 
+# CCP can/should live somewhere else than 0x100, because it has to load other programs to that address!
 # Transient area starts at 0x100. That's where it is going to be loaded to.
 # LOC_CODE must leave enough space for CRT0 code.
 #LOC_CODE=0x0180
-LOC_CODE=0x0108
+#LOC_CODE=0x0108
+LOC_CODE=0x1000
 LOC_DATA=0x4000
 
 OUT_DIR=out

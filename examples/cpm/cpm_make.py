@@ -98,9 +98,9 @@ def compile():
 	
 	lib_path = None	#'../../include'
 	include_path = '../../include'
-	loc_code = 0x7000	#0x8000 for cart code, < 0x8000 for CP/M
+	loc_code = 0x8000 - 0x0F00	#0x8000 for cart code, < 0x8000 for CP/M
 	loc_data = 0xc000	# static variable data and gsinit-code will be put to this address in binary file
-	loc_idata = 0xc800	# ?
+	loc_idata = None	#0xc800	# ?
 	defines = {
 		'VGLDK_SERIES': 4000
 	}
@@ -146,14 +146,22 @@ def compile():
 	
 	### Compile source file(s) using SDCC, generate .hex file
 	cmd = 'sdcc -mz80'
+	
+	# --model-small
+	# --no-std-crt0
+	# --nostdlib
 	cmd += ' --no-std-crt0'	# Provide our own crt0 .rel
-	#cmd += ' --vc'	# vc = messages are compatible with Micro$oft visual studio
+	
 	if lib_path is not None: cmd += ' --lib-path %s' % lib_path
 	if include_path is not None: cmd += ' -I %s' % include_path
 	
 	cmd += ' --code-loc 0x%04X' % loc_code
 	if loc_data is not None: cmd += ' --data-loc 0x%04X' % loc_data
 	if loc_idata is not None: cmd += ' --idata-loc 0x%04X' % loc_idata
+	
+	# --xram-loc 0xc000
+	# --verbose
+	#cmd += ' --vc'	# vc = messages are compatible with Micro$oft visual studio
 	
 	for k,v in defines.items():
 		cmd += ' -D %s=%s' % (k, v)
@@ -296,7 +304,8 @@ def compile():
 		data = h.read()
 	return data
 
-def cpm_prepare(data):
+
+def cpm_upload(data):
 	comp = monitor.Monitor()	#(port=port, baud=baud)
 	comp.open()
 	
@@ -350,22 +359,28 @@ def cpm_prepare(data):
 	
 	put('Preparing RAM...')
 	#comp.upload(filename='out/cpm.bin', src_addr=0, dest_addr=0x0000, max_size=0x200, chunk_size=32, verify=True)
-	comp.upload(data=data, src_addr=0x0000, dest_addr=0x0000, chunk_size=32, skip_zeros=True, verify=True)
-	sys.exit(0)
+	comp.upload(data=data, src_addr=0x0000, dest_addr=0x0000, chunk_size=16, skip_zeros=True, verify=True)
 	
-
+	
+	#sys.exit(0)
+	
+	put('Disabling serial and calling 0x%04X...' % dest)
+	dest = 0x0000
+	comp.write('sio;call %04x\n' % dest)
+	
 
 
 if __name__ == '__main__':
 	
 	data = compile()
-	
 	hexdump(data[:0x0120], 0x0000)
 	hexdump(data[0x7000:0x8000], 0x7000)
 	
-	bin_filename = 'out/cpm.bin'
-	cmd = 'z80dasm --address --labels --source --origin=0000h %s' % bin_filename
-	os.system(cmd)
+	#bin_filename = 'out/cpm.bin'
+	#cmd = 'z80dasm --address --labels --source --origin=0000h %s' % bin_filename
+	#os.system(cmd)
 	
-	#cpm_prepare(data)
+	#cpm_upload(data)
+	
+	#cpm_run()
 	

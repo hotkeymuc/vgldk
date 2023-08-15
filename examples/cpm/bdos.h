@@ -14,7 +14,7 @@
 //#define BDOS_TRACE_CALLS	// Send stack traces on each call to host for in-depth analysis
 //#define BDOS_TRAP	// Add trap functions
 
-//#define BDOS_PATCH_JUMP_TO_TOP	// Compatibility patch: Make 0x0005 a jump to the top of user-usable RAM
+//#define BDOS_PATCH_JUMP_TO_TOP	// Compatibility patch: Make 0x0005 a jump to the top of user-usable RAM. Use if you can not guarantee bdos() to be first bytes of _CODE area
 //#define BDOS_TOP_OF_RAM 0x7fff	// Address of the highest RAM byte after which BDOS/CPM/CCP/ROM etc. start. Used in "bdos_init()"
 
 // Re-direct file operations to a host computer
@@ -22,7 +22,8 @@
 //#define BDOS_USE_HOST_SOFTSERIAL	// Include soft serial functions (not available in emu)
 //#define BDOS_USE_HOST_MAME	// Include MAME debug functions (not available in real hw)
 
-#include <vgldk.h>	// Basic types (byte, word, ...)
+
+#include <basictypes.h>	// byte, word, true, false, NULL, ...
 
 /*
 	BDOS Helpers
@@ -256,6 +257,35 @@ __asm\
 	ld l, a\
 	ret\
 __endasm;}
+
+
+void bdos();	// Main entry point
+
+// I/O Helpers
+void bdos_putchar(char c);
+byte bdos_getchar();
+void bdos_puts(const char *str);
+void bdos_gets(char *pc);
+
+// STDIO Helpers
+void bdos_printf(char *pc);
+void bdos_printf(char *pc);
+void bdos_printf_d(char *pc, byte d);
+
+// String Helpers
+byte bdos_strlen(const char *c);
+void bdos_memset(byte *addr, byte b, word count);
+
+
+byte bdos_f_open(struct FCB *fcb);
+byte bdos_f_close(struct FCB *fcb);
+byte bdos_f_read(struct FCB *fcb);
+byte bdos_f_readrand(struct FCB *fcb);
+byte bdos_f_write(struct FCB *fcb);
+byte bdos_f_writerand(struct FCB *fcb);
+//byte bdos_f_writezf(struct FCB *fcb);
+byte bdos_f_sfirst(struct FCB *fcb);
+byte bdos_f_snext(struct FCB *fcb);
 
 void bdos_init();
 

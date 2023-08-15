@@ -14,7 +14,7 @@
 	; Global C functions
 	.globl _main	; cpm.c:main()
 	.globl _bint	; bint.c:bint()
-	;.globl _bios_boot
+	.globl _bios_boot	; bios.c:bios_boot()
 	.globl _bdos	; bdos.c:bdos()
 	
 
@@ -40,7 +40,7 @@ bios_curdsk:
 ; Byte at 0x0006 (High byte of BDOS address) is used by user programs to determine free usable RAM
 .org 0x0005
 bdos_call:
-	jp _bdos	; Jump to first byte in _CODE segment which does the "jp _bdos"
+	jp _bdos	; Jump to first byte in _CODE segment (which should be the BDOS entry function)
 
 
 ;; IM2 vectors
@@ -79,6 +79,7 @@ bdos_call:
 ;; Default FCB
 .org 0x5c
 ;default_fcb:
+	.asciz '[fcb]'
 
 ;; Workarea / DMA
 .org 0x80
@@ -89,17 +90,17 @@ bdos_call:
 ;; CP/M transient area
 .org 0x100
 ;transient_area:
-	.asciz '[cpm_transient area]'
+	.asciz '[transient_area]'
 	jp init
 
 
 
 ;; First run code
 ; Should stay in lower memory, so that a cold boot can be performed at all times
-;.org 0x150	; Fit it somewhere at the transient area
-;.area _CODE
-.org 0x40	; Fit it between vector table and working area
-.asciz '[init:]'	; Just a marker inside the binary
+.org 0x40	; Fit it between vector table and working area (Must keep it short or it will interfere with default_fcb at 0x5c!)
+;.org 0x150	; Fit it somewhere in the transient area
+;.area _CODE	; Fit it in _CODE area
+;.asciz '[init:]'	; Just a marker inside the binary
 init:
 	
 	;; Set up interrupt mode
@@ -114,27 +115,27 @@ init:
 	;; Bare minimum VTech hardware init
 	
 	; Parallel port reset
-	ld	a, #0x00				; Set all D0-D7 to HIGH
-	out	(0x10), a
+	;ld	a, #0x00				; Set all D0-D7 to HIGH
+	;out	(0x10), a
 	
-	ld a, #0xff	; GL4000 0edd: output 0xff to port 0x11
-	out (0x11), a
+	;ld a, #0xff	; GL4000 0edd: output 0xff to port 0x11
+	;out (0x11), a
 	
 	; Periphery reset (speaker etc.)
-	ld a, #0xde	; GL4000 0ee1: output 0xde to port 0x12 (default mode)
-	;ld a, #0xfe	; All on, except bit 0 which powers off the system
-	;ld a, #0xf6	; All on, except PowerOff and Beep
-	out (0x12), a	
+	;ld a, #0xde	; GL4000 0ee1: output 0xde to port 0x12 (default mode)
+	;;ld a, #0xfe	; All on, except bit 0 which powers off the system
+	;;ld a, #0xf6	; All on, except PowerOff and Beep
+	;out (0x12), a	
 	
 	
 	;; Prepare bank switching
 	xor a
 	out (0x00), a	; rombank0 (0x0000 - 0x3fff) to internal ROM 0x0000
 	;out (0x01), a	; rombank1 (0x4000 - 0x7fff)
-	out (0x02), a	; ?
+	;out (0x02), a	; ?
 	;out (0x03), a	; rombank2 (0x8000 - 0xffff): Sending "0x00" would disable the cartridge port!
-	out (0x04), a	; ?
-	out (0x05), a	; ?
+	;out (0x04), a	; ?
+	;out (0x05), a	; ?
 	
 	ld a, #0x01	; Offset inside ROM: 0x01 = 1 x 0x4000 = 0x4000
 	out (0x01), a	; rombank1 (0x4000 - 0x7fff) to internal ROM 0x4000
@@ -142,8 +143,8 @@ init:
 	ld a, #0x80	; BIOS4000 0f3e: Turn on cartridge
 	out (0x03), a	; cartridge (0x8000 - 0xbfff) to cartridge ROM 0x0000
 	
-	ld a, #0x40	; GL4000 0f15: Output 0x40 to port 0x06 - dunno what this does
-	out (0x06), a
+	;ld a, #0x40	; GL4000 0f15: Output 0x40 to port 0x06 - dunno what this does
+	;out (0x06), a
 	
 	
 	;; Setup global static variables
@@ -152,9 +153,10 @@ init:
 	
 	;; Call main code
 	;call _main
-	jp _main
-	;jp _bios_boot
+	;jp _main	; VGLDK default entry point
+	jp _bios_boot	; CP/M entry point
 	;jp _exit
+	
 init_end:	; Store end of init
 init_size .equ (init_end - init)	; Store how big the init code is
 ;.asciz '[init_end]'

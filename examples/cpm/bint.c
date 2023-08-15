@@ -1,7 +1,9 @@
 #ifndef __BINT_C
 #define __BINT_C
 
-// BINT - Global Interrupt Handler
+/*
+	BINT - Global Interrupt Handler
+*/
 
 #include "bint.h"
 
@@ -9,6 +11,7 @@
 void bint() __naked {
 	
 	__asm
+		;.asciz '[BINT]'	; Marker to find segment in binary
 		push	af
 		push	bc
 		push	de
@@ -50,7 +53,6 @@ void bint() __naked {
 	}
 	*/
 	
-	
 	__asm
 		pop	iy
 		pop	ix
@@ -64,6 +66,8 @@ void bint() __naked {
 	__asm
 		ei
 		reti
+		
+		;.asciz '[BINT end]'
 	__endasm;
 }
 
