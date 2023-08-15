@@ -1,0 +1,11 @@
+-mjwx
+-i out/cpm.hex
+-b _CODE = 0x8000
+-b _DATA = 0xc000
+-k /usr/bin/../share/sdcc/lib/z80
+-k /usr/share/sdcc/lib/z80
+-l z80
+out/cpm.rel
+out/cpm_crt0.rel
+
+-e

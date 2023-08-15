@@ -1,0 +1,28 @@
+XL2
+H 9 areas 3 global symbols
+M cpm
+O -mz80
+S .__.ABS. Def0000
+A _CODE size 8 flags 0 addr 0
+S _main Def0000
+A _DATA size 0 flags 0 addr 0
+A _INITIALIZED size 1 flags 0 addr 0
+S _foo Def0000
+A _DABS size 0 flags 8 addr 0
+A _HOME size 0 flags 0 addr 0
+A _GSINIT size 0 flags 0 addr 0
+A _GSFINAL size 0 flags 0 addr 0
+A _INITIALIZER size 1 flags 0 addr 0
+A _CABS size 0 flags 8 addr 0
+T 00 00
+R 00 00 02 00
+T 00 00
+R 00 00 02 00
+T 00 00
+R 00 00 00 00
+T 00 00 FD 21 00 00 FD 36 00 AA
+R 00 00 00 00 00 04 02 00
+T 00 00
+R 00 00 07 00
+T 00 00 44
+R 00 00 07 00
