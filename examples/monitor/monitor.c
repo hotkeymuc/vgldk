@@ -21,15 +21,16 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_HELP_LONG	// Include "long" help functionality (needs quite some space for the strings...)
 
 #define MONITOR_SERIAL	// Include serial functions
-//#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart (currently only GL4000)
-#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use ASM-based softserial (custom for each architecture)
-#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
-#define SOFTUART_BAUD 9600
+	//#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart (currently only GL4000/6000)
+	#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use ASM-based softserial (custom for each architecture)
+	//#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
+	#define SOFTUART_BAUD 9600
+	//#define SOFTUART_BAUD 19200
 
 //#define MONITOR_FILES	// Include file system stuff
-//#define MONITOR_FILES_FS_NULL	// Include FS driver for NULL filesystem
-//#define MONITOR_FILES_FS_INTERNAL	// Include FS driver for "internal" ROM data
-//#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
+	//#define MONITOR_FILES_FS_NULL	// Include FS driver for NULL filesystem
+	//#define MONITOR_FILES_FS_INTERNAL	// Include FS driver for "internal" ROM data
+	//#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
 
 // Commands to include (affects how big the binary gets)
 //#define MONITOR_CMD_BEEP
@@ -40,12 +41,11 @@ char cmd_arg[MAX_INPUT];
 #define MONITOR_CMD_HELP	// Even without MONITOR_HELP_LONG, the HELP command can list all commands
 //#define MONITOR_CMD_INTERRUPTS
 //#define MONITOR_CMD_LOOP
+//#define MONITOR_CMD_PAUSE
 #define MONITOR_CMD_PEEKPOKE	// Required for uploading via serial
 #define MONITOR_CMD_CALL
-//#define MONITOR_CMD_PAUSE
 #define MONITOR_CMD_PORT
-//#define MONITOR_CMD_PAUSE
-//#define MONITOR_CMD_VER	// ~54 bytes
+#define MONITOR_CMD_VER	// ~54 bytes
 //#define MONITOR_CMD_LOAD	// Requires MONITOR_FILES
 //#define MONITOR_CMD_RUN	// Requires MONITOR_CMD_LOAD and MONITOR_CMD_CALL
 
@@ -1199,7 +1199,7 @@ void main() __naked {
 	#endif
 	
 	#ifdef MONITOR_CMD_VER
-	// Banner
+	// Show startup Banner (required CMD_VER to be built-in)
 	cmd_ver(0, NULL);
 	#endif
 	
