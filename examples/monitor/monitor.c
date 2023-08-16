@@ -72,6 +72,8 @@ int atoi(const char *a) {
 }
 
 //#include <string.h>	// For strcmp
+#include <strcmpmin.h>	// For strcmp, stricmp1, stricmp
+/*
 byte strcmp(const char *cs, const char *ct) {
 	while ((*cs != 0) && (*ct != 0)) {
 		if (*cs++ != *ct++) return 1;
@@ -93,7 +95,10 @@ byte stricmp(const char *cs, const char *ct) {
 	if (stricmp1(*cs, *ct)) return 1;
 	return 0;
 }
-
+*/
+#ifdef MONITOR_CMD_PEEKPOKE
+	#include <stringmin.h>	// for memcpy, memset
+#endif
 
 
 #ifdef MONITOR_CMD_DUMP
@@ -351,6 +356,37 @@ int cmd_poke(int argc, char *argv[]) {
 		b+=2;
 		a++;
 	} while (*b != 0);
+	
+	return ERR_OK;
+}
+
+int cmd_memcpy(int argc, char *argv[]) {
+	word a_dst;
+	word a_src;
+	word l;
+	if (argc < 4) return ERR_MISSING_ARGUMENT;
+	
+	a_dst = hextow(argv[1]);
+	a_src = hextow(argv[2]);
+	l = hextow(argv[3]);
+	
+	memcpy((byte *)a_dst, (byte *)a_src, l);
+	
+	return ERR_OK;
+}
+
+int cmd_memset(int argc, char *argv[]) {
+	word a_dst;
+	word l;
+	byte p;
+	
+	if (argc < 3) return ERR_MISSING_ARGUMENT;
+	
+	a_dst = hextow(argv[1]);
+	p = hextob(argv[2]);
+	l = hextow(argv[3]);
+	
+	memset((byte *)a_dst, p, l);
 	
 	return ERR_OK;
 }
@@ -871,6 +907,8 @@ const t_commandEntry COMMANDS[] = {
 	#ifdef MONITOR_CMD_PEEKPOKE
 		T_COMMAND_ENTRY("peek", cmd_peek, "View mem"),
 		T_COMMAND_ENTRY("poke", cmd_poke, "Modfiy mem"),
+		T_COMMAND_ENTRY("memcpy", cmd_memcpy, "Copy mem DST SRC LEN"),
+		T_COMMAND_ENTRY("memset", cmd_memset, "Fill mem DST pat LEN"),
 	#endif
 	#ifdef MONITOR_CMD_CALL
 		T_COMMAND_ENTRY("call", cmd_call, "Call mem"),
