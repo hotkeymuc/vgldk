@@ -28,7 +28,8 @@ import os
 
 # FTDI
 SERIAL_PORT = '/dev/ttyUSB0'
-SERIAL_BAUD = 9600	# Software Serial currrently only supports 9600 baud (fixed)
+#SERIAL_BAUD = 9600	# Stable
+SERIAL_BAUD = 19200	# Experimental (using SoftUART.h)
 SERIAL_TIMEOUT = 0.05
 SERIAL_TIMEOUT_SHORT = 0.05
 
@@ -141,6 +142,9 @@ if __name__ == '__main__':
 	comp = monitor.Monitor(port=port, baud=baud)
 	comp.open()
 	
+	# Quiet output
+	monitor.SHOW_TRAFFIC = False
+	
 	# Wait for the monitor logo/prompt
 	comp.wait_for_monitor()
 	
@@ -149,10 +153,16 @@ if __name__ == '__main__':
 	#comp.wait_for_prompt()
 	
 	# Upload app binary
-	comp.upload(filename, dest)
+	#comp.upload(filename=filename, dest_addr=dest)
+	comp.upload(filename=filename, dest_addr=dest, verify=True)
 	
-	# Call to function
+	# Wait a bit
+	#time.sleep(0.2)
+	comp.wait_for_prompt()
+	
+	### Call to function
 	put('Calling 0x%04X...' % dest)
+	
 	# Call right away (having serial I/O as stdio)
 	#comp.call(dest)
 	

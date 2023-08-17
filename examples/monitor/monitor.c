@@ -21,11 +21,13 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_HELP_LONG	// Include "long" help functionality (needs quite some space for the strings...)
 
 #define MONITOR_SERIAL	// Include serial functions
-	//#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart (currently only GL4000/6000)
-	#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use ASM-based softserial (custom for each architecture)
 	//#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
-	#define SOFTUART_BAUD 9600
-	//#define SOFTUART_BAUD 19200
+	
+	//#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use ASM-based softserial (custom for each architecture)
+	
+	#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart (currently only GL4000/6000)
+	//#define SOFTUART_BAUD 9600	// Solid and stable
+	#define SOFTUART_BAUD 19200	// Experimental
 
 //#define MONITOR_FILES	// Include file system stuff
 	//#define MONITOR_FILES_FS_NULL	// Include FS driver for NULL filesystem
@@ -102,8 +104,8 @@ byte stricmp(const char *cs, const char *ct) {
 
 
 #ifdef MONITOR_CMD_DUMP
-  #define HEX_USE_DUMP
-  #define HEX_DUMP_WIDTH 8 //((DISPLAY_COLS-6)/3)
+	#define HEX_USE_DUMP
+	#define HEX_DUMP_WIDTH 4 //((DISPLAY_COLS-6)/3)
 #endif
 #include <hex.h>	// For hex stuff
 
@@ -1199,6 +1201,13 @@ void main() __naked {
 	#endif
 	
 	#ifdef MONITOR_SERIAL
+	
+	#if SOFTUART_BAUD == 19200
+		printf("19200 Baud\n");
+	#else
+		printf("9600 Baud\n");
+	#endif
+	
 	#ifdef MONITOR_SERIAL_AUTOSTART
 	//if (serial_isReady()) {
 		// If serial cable is connected: Ask for which I/O to use

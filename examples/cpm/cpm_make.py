@@ -306,7 +306,8 @@ def compile():
 
 
 def cpm_upload(data):
-	comp = monitor.Monitor()	#(port=port, baud=baud)
+	#comp = monitor.Monitor()
+	comp = monitor.Monitor(baud=19200)	# Requires monitor to be compiled using SoftUART and 19200 baud
 	comp.open()
 	
 	monitor.SHOW_TRAFFIC = False	# disable verbose traffic
@@ -359,13 +360,14 @@ def cpm_upload(data):
 	
 	put('Preparing RAM...')
 	#comp.upload(filename='out/cpm.bin', src_addr=0, dest_addr=0x0000, max_size=0x200, chunk_size=32, verify=True)
-	comp.upload(data=data, src_addr=0x0000, dest_addr=0x0000, chunk_size=16, skip_zeros=True, verify=True)
+	#comp.upload(data=data, src_addr=0x0000, dest_addr=0x0000, chunk_size=16, skip_zeros=True, verify=True)
+	comp.upload(data=data[:0x8000], src_addr=0x0000, dest_addr=0x0000, chunk_size=56, skip_zeros=True, verify=True)
 	
 	
 	#sys.exit(0)
 	
-	put('Disabling serial and calling 0x%04X...' % dest)
 	dest = 0x0000
+	put('Disabling serial and calling 0x%04X...' % dest)
 	comp.write('sio;call %04x\n' % dest)
 	
 
@@ -373,14 +375,15 @@ def cpm_upload(data):
 if __name__ == '__main__':
 	
 	data = compile()
-	hexdump(data[:0x0120], 0x0000)
+	#hexdump(data[:0x0120], 0x0000)
 	hexdump(data[0x7000:0x8000], 0x7000)
 	
+	# Decompile using z80dasm
 	#bin_filename = 'out/cpm.bin'
 	#cmd = 'z80dasm --address --labels --source --origin=0000h %s' % bin_filename
 	#os.system(cmd)
 	
-	#cpm_upload(data)
+	cpm_upload(data)
 	
 	#cpm_run()
 	

@@ -32,7 +32,7 @@ import os
 # FTDI
 SERIAL_PORT = '/dev/ttyUSB0'
 SERIAL_BAUD = 9600	#19200	# Software Serial currrently only supports 9600 baud (and 19200 on some models)
-SERIAL_TIMEOUT = 0.1	#0.1
+SERIAL_TIMEOUT = 0.05	#0.1
 
 DEST_DEFAULT = 0xc800
 
@@ -204,7 +204,7 @@ class Monitor:
 					break
 		"""
 		
-		self.put('Activating console...')
+		self.put('Activating console... (Enter "SIO" at the prompt if nothing happens)')
 		while True:
 			
 			# Get banner
