@@ -162,6 +162,55 @@ init_size .equ (init_end - init)	; Store how big the init code is
 ;.asciz '[init_end]'
 
 
+;; ----------------------------------------
+;; Also do the VTech cartridge auto-start header
+
+
+;; Cartridge ROM space
+.org 0x8000
+cart_sig:
+
+;; ROM signature
+	;; cartridge ROM header
+	.db #0x55
+	.db #0xaa
+	
+	;; Normal signature (i.e. non-autostart program cartridge)
+	;.db #0x47 ; "G"
+	;.db #0x41 ; "A"
+	
+	;; Auto-start signatures (if present: program will start instantly on boot)
+	;; Select one of these two:
+	
+	;; PreComputer1000 auto-start signature
+	;.db #0x33  ; 0x33 = autostart jump to 0x8010
+	;.db #0x00  ; Dont care
+	
+	;; GL2000/4000 auto-start signature
+	.db #0x59	; "Y"
+	.db #0x45	; "E"
+	
+
+cart_code4000:
+	;; First executed instruction on GL2000/4000 (usually a jump)
+	;di
+	;im 1
+	jp	init	; Jump to CP/M bootstrap code
+
+.org 0x8010
+cart_code1000:
+	;; First executed instruction on PC1000 (usually a jump)
+	;di
+	;im 1
+	jp	init	; Jump to CP/M bootstrap code
+
+cart_end:
+;.asciz '[cart_end]'
+
+
+;; back to normal CRT0
+;; ----------------------------------------
+
 ;; Ordering of segments for the linker.
 	.area _CODE
 	.area _INITIALIZER

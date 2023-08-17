@@ -12,8 +12,50 @@ For more info about the LCD see MAME code:
 
 
 TODO:
-	Implement proper "lcd_busy()" check as described in:
-	http://www.8051projects.net/lcd-interfacing/commands.php
+	* Implement proper "lcd_busy()" check as described in:
+		http://www.8051projects.net/lcd-interfacing/commands.php
+	* Implement user definable chars:
+		
+		putchar(0x00);
+		putchar(0x01);
+		putchar(0x02);
+		putchar(0x03);
+		putchar(0x04);
+		putchar(0x05);
+		putchar(0x06);
+		putchar(0x07);
+		
+		
+		vgl_lcd_writeControl(0x40);
+		vgl_lcd_writeData(0b00100);
+		vgl_lcd_writeData(0b01010);
+		vgl_lcd_writeData(0b01110);
+		vgl_lcd_writeData(0b01010);
+		vgl_lcd_writeData(0b01010);
+		vgl_lcd_writeData(0b01010);
+		vgl_lcd_writeData(0b10101);
+		vgl_lcd_writeData(0b01010);
+		
+		
+		vgl_lcd_writeControl(0x41);
+		vgl_lcd_writeData(0x04);
+		vgl_lcd_writeData(0x0e);
+		vgl_lcd_writeData(0x0e);
+		vgl_lcd_writeData(0x0e);
+		vgl_lcd_writeData(0x0e);
+		vgl_lcd_writeData(0x1f);
+		vgl_lcd_writeData(0x04);
+		vgl_lcd_writeData(0x00);
+		
+		
+		putchar(0x00);
+		putchar(0x01);
+		putchar(0x02);
+		putchar(0x03);
+		putchar(0x04);
+		putchar(0x05);
+		putchar(0x06);
+		putchar(0x07);
 
 
 2020-01-21 Bernhard "HotKey" Slawik
@@ -24,6 +66,8 @@ TODO:
 #define word unsigned short
 
 #define clear lcd_clear	// Make it available as well known "clear()" command
+
+//#define LCD_MINIMAL	// Minimize footprint by dropping some functionality (e.g. scrolling)
 
 // HDD44780 specific definitions
 #define LCD_CLEARDISPLAY 0x01
@@ -115,7 +159,7 @@ __sfr __at LCD_PORT_DATA lcd_dataPort;
 byte lcd_x = 0;
 byte lcd_y = 0;
 
-#ifndef lcd_MINIMAL
+#ifndef LCD_MINIMAL
 	// "Minimal" version does not include a screen buffer and custom scrolling
 	byte lcd_cursor = 1;
 	byte lcd_buffer[LCD_ROWS * LCD_COLS];
@@ -170,6 +214,8 @@ void lcd_writeData(byte a) {
 	lcd_delay_short();
 }
 
+
+
 /*
 void lcd_cursor_on() {
 	lcd_cursor = 1;
@@ -181,7 +227,7 @@ void lcd_cursor_off() {
 }
 */
 
-#ifndef lcd_MINIMAL
+#ifndef LCD_MINIMAL
 void lcd_set_cursor() {
 	// Set cursor to position
 	byte o;
@@ -194,7 +240,7 @@ void lcd_set_cursor() {
 #endif
 
 void lcd_clear() {
-	#ifndef lcd_MINIMAL
+	#ifndef LCD_MINIMAL
 	byte i;
 	#endif
 	
@@ -206,7 +252,7 @@ void lcd_clear() {
 	lcd_x = 0;
 	lcd_y = 0;
 	
-	#ifndef lcd_MINIMAL
+	#ifndef LCD_MINIMAL
 	//@TODO: Use fillmem function!
 	for(i = 0; i < (LCD_COLS * LCD_ROWS); i++) {
 		lcd_buffer[i] = 0x20;
@@ -217,7 +263,63 @@ void lcd_clear() {
 }
 
 
-#ifndef lcd_MINIMAL
+void lcd_init() {
+	// This performs the LCD initialization
+	// as seen in several ROMs and in the HD44780 data sheet itself.
+	// Most important fact is that a delay after each port access is MANDATORY.
+	// GL4000 05b4
+	
+	// Enter 8 bit mode
+	lcd_writeControl(0x38);	//Function set: 2 Line, 8-bit, 5x7 dots
+	lcd_writeControl(0x38);
+	lcd_writeControl(0x38);
+	lcd_writeControl(0x38);
+	
+	// CLS
+	lcd_writeControl(LCD_CLEARDISPLAY);
+	
+	//lcd_cursor = 0;
+	//lcd_writeControl(LCD_DISPLAYCONTROL | LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF);
+	
+	//lcd_cursor = 1;
+	lcd_writeControl(LCD_DISPLAYCONTROL | LCD_DISPLAYON | LCD_CURSORON | LCD_BLINKON);
+	
+	lcd_writeControl(LCD_ENTRYMODESET | LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT );
+	
+	
+	// First byte is missing if we do not delay enough
+	//lcd_delay_long();
+	
+	
+	//lcd_x = 0;
+	//lcd_y = 0;
+	
+	#ifndef LCD_MINIMAL
+	lcd_cursor = 1;
+	lcd_scroll_cb = 0;
+	#endif
+	
+	lcd_clear();
+	
+	/*
+	// CLS
+	lcd_writeControl(LCD_CLEARDISPLAY);
+	
+	// Home
+	lcd_writeControl(LCD_RETURNHOME);
+	
+	lcd_x = 0;
+	lcd_y = 0;
+	for(i = 0; i < (LCD_COLS * LCD_ROWS); i++) {
+		lcd_buffer[i] = 0x20;
+	}
+	//lcd_update();
+	*/
+	//lcd_delay_long();
+}
+
+
+#ifndef LCD_MINIMAL
 void lcd_refresh() {
 	// Put buffer to screen
 	byte *p0;
@@ -263,7 +365,7 @@ void lcd_scroll() {
 	
 	#if LCD_ROWS > 1
 	// Copy from row 1 to row 0
-	//@TODO: memcpy(dst, src, l)
+	//@TODO: memcpy(dst, src, l) / opcode "LDIR" (src=HL, dst=DE, count=BC)
 	p1 = &lcd_buffer[LCD_COLS];
 	for(i = 0; i < (LCD_COLS * (LCD_ROWS-1)); i++) {
 		*p0++ = *p1++;
@@ -280,61 +382,6 @@ void lcd_scroll() {
 }
 #endif
 
-
-void lcd_init() {
-	// This performs the LCD initialization
-	// as seen in several ROMs and in the HD44780 data sheet itself.
-	// Most important fact is that a delay after each port access is MANDATORY.
-	// GL4000 05b4
-	
-	// Enter 8 bit mode
-	lcd_writeControl(0x38);	//Function set: 2 Line, 8-bit, 5x7 dots
-	lcd_writeControl(0x38);
-	lcd_writeControl(0x38);
-	lcd_writeControl(0x38);
-	
-	// CLS
-	lcd_writeControl(LCD_CLEARDISPLAY);
-	
-	//lcd_cursor = 0;
-	//lcd_writeControl(LCD_DISPLAYCONTROL | LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF);
-	
-	//lcd_cursor = 1;
-	lcd_writeControl(LCD_DISPLAYCONTROL | LCD_DISPLAYON | LCD_CURSORON | LCD_BLINKON);
-	
-	lcd_writeControl(LCD_ENTRYMODESET | LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT );
-	
-	
-	// First byte is missing if we do not delay enough
-	//lcd_delay_long();
-	
-	
-	//lcd_x = 0;
-	//lcd_y = 0;
-	
-	#ifndef lcd_MINIMAL
-	lcd_cursor = 1;
-	lcd_scroll_cb = 0;
-	#endif
-	
-	lcd_clear();
-	
-	/*
-	// CLS
-	lcd_writeControl(LCD_CLEARDISPLAY);
-	
-	// Home
-	lcd_writeControl(LCD_RETURNHOME);
-	
-	lcd_x = 0;
-	lcd_y = 0;
-	for(i = 0; i < (LCD_COLS * LCD_ROWS); i++) {
-		lcd_buffer[i] = 0x20;
-	}
-	//lcd_update();
-	*/
-	//lcd_delay_long();
-}
 
 /*
 void lcd_scroll_cb_scroll() {
@@ -358,7 +405,7 @@ void lcd_putchar_at(byte x, byte y, char c) {
 	lcd_writeData(c);
 	
 	/*
-	#ifndef lcd_MINIMAL
+	#ifndef LCD_MINIMAL
 	// Store in buffer (for scrolling)
 	lcd_buffer[o] = c;
 	
@@ -396,7 +443,7 @@ void lcd_putchar(byte c) {
 	}
 	
 	if (lcd_y >= LCD_ROWS) {
-		#ifndef lcd_MINIMAL
+		#ifndef LCD_MINIMAL
 		// Invoke scroll callback
 		if (lcd_scroll_cb != 0)
 			(*lcd_scroll_cb)();
@@ -424,7 +471,7 @@ void lcd_putchar(byte c) {
 		lcd_writeData(c);
 		lcd_x++;
 		
-		#ifndef lcd_MINIMAL
+		#ifndef LCD_MINIMAL
 		// Store in buffer (for scrolling)
 		lcd_buffer[o] = c;
 		

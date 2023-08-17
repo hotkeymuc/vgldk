@@ -442,7 +442,9 @@ byte ccp_load(char *filename) {
 	printf("Load...");
 	a = (byte *)0x0100;
 	do {
-		printf(".");
+		
+		//printf(".");	// Progress
+		
 		__asm
 			push af
 			push bc
@@ -494,17 +496,23 @@ void handle(char *input) {
 	// Copy "command tail" (i.e. args) to bdos_dma area at 0x0080-0x00ff
 	c = &input[0];
 	input_l = strlen(input);
+	if (input_l > CCP_MAX_INPUT) return;
 	if (input_l == 0) return;
 	
 	// Get args
+	//@FIXME: Regular CCP stores length of arg string in ccp_args[0], then zero-terminated args including first space
+	// e.g. "CCP ARGS1234" -> 0x09 " ARGS1234" 0x00
 	ccp_args[0] = 0;
 	while(*c != 0) {
 		if (*c == 0x20) {
-			memcpy((byte *)&ccp_args[0], (byte *)c+1, input_l);
+			// Copy arg string over
+			//memcpy((byte *)&ccp_args[0], (byte *)c+1, input_l);
+			memcpy((byte *)&ccp_args[0], (byte *)c, input_l);	// Include the space!
 			break;
 		}
 		c++;
 	}
+	ccp_argl = strlen(ccp_args);
 	cmd_l = (word)c - (word)&input[0];	// Length of command part
 	
 	// Actually handle commands
@@ -516,7 +524,7 @@ void handle(char *input) {
 		return;
 	} else
 	
-	// Change drive
+	// Change drive (e.g. "A:")
 	if ((input_l == 2) && (input[1] == ':')) {
 		ccp_reg_e = input[0] - 'A';
 		
@@ -562,6 +570,7 @@ void handle(char *input) {
 	
 	// DIR
 	if (strncmp(input, "DIR",3) == 0) {
+		//@TODO: Handle args
 		ccp_dir();
 		
 	} else
@@ -705,25 +714,26 @@ void handle(char *input) {
 	#ifdef CCP_CMD_DUMP
 	//if (strcmp(input, "DUMP") == 0) {
 	if (strncmp(input, "DUMP",4) == 0) {
-		//dump((byte *)hextow(&ccp_args[0]));
-		dump(hextow(&ccp_args[0]), 32);
+		byte l = 32;
+		if (ccp_argl > 5) l = hextow(&ccp_args[6]);
+		dump(hextow(&ccp_args[1]), 32);
 	} else
 	#endif
 	#ifdef CCP_CMD_PORT
 	if (strncmp(input, "PORT",4) == 0) {
 		//dump((byte *)hextow(&arg[5]));
-		port_out(hextob(&ccp_args[0]), hextob(&ccp_args[3]));
+		port_out(hextob(&ccp_args[1]), hextob(&ccp_args[4]));
 	} else
 	#endif
-	if (strncmp(input, "MEM",3) == 0) {
+	if (strncmp(input, "POKE",4) == 0) {
 		//dump((byte *)hextow(&arg[5]));
-		*(byte *)hextow(&ccp_args[0]) = hextob(&ccp_args[5]);
+		*(byte *)hextow(&ccp_args[1]) = hextob(&ccp_args[6]);
 	} else
 	
 	#ifdef CCP_CMD_TRAP
 	if (strncmp(input, "TRAP",4) == 0) {
 		//dump((byte *)hextow(&input[5]));
-		trap_set((byte *)hextow(&ccp_args));
+		trap_set((byte *)hextow(&ccp_args[1]));
 	} else
 	#endif
 	
@@ -791,8 +801,25 @@ void main() {
 	char input[CCP_MAX_INPUT];
 	
 	//printf("CCP!\n");
+	//printf("args:\r\n");
+	//dump((word)&ccp_args[0], 128);
 	
-	ccp_running = 1;
+	if (ccp_argl > 0) {
+		// Handle command line input...
+		// Copy over (or it will be overwritten by handle()!)
+		memcpy(&input[0], &ccp_args[1], CCP_MAX_INPUT);
+		printf("Handling args: \"");
+		printf(input);
+		printf("\"...\r\n");
+		
+		handle(input);
+		
+		//@TODO: Could also add "; EXIT"?
+		// ...and exit
+		ccp_running = 0;
+	}
+	
+	//ccp_running = 1;
 	input[0] = 0;
 	while(ccp_running) {
 		

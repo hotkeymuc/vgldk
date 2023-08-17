@@ -19,7 +19,7 @@ __asm
 __endasm;
 }
 
-void vgl_sound(word frq, word len) {
+void vgl_sound_tone(word frq, word len) {
 	// Perform a beep (frq is actually a delay...)
 	(void)frq;	// suppress warning "unreferenced function argument"
 	(void)len;	// suppress warning "unreferenced function argument"
@@ -31,7 +31,7 @@ void vgl_sound(word frq, word len) {
 	len |= 0x0001;
 	
 	__asm
-		di
+		;di
 		
 		push	af
 		push	hl
@@ -105,13 +105,17 @@ void vgl_sound(word frq, word len) {
 		pop	de
 		pop	hl
 		pop	af
-		ei
+		;ei
 	__endasm;
 	
 }
 
 
-void vgl_sound_note(word n, word len) {
+// General names
+#define sound_off vgl_sound_off
+#define sound_tone vgl_sound_tone
+
+void sound_note(word n, word len) {
 	word frq;
 	
 	switch(n % 12) {
@@ -131,10 +135,10 @@ void vgl_sound_note(word n, word len) {
 	
 	frq = frq >> (n/12);
 	len = 150 * (len / frq);	// Length to wave length, correcting for rough milliseconds
-	vgl_sound(frq, len);
+	sound_tone(frq, len);
 }
 
 void beep() {
-	vgl_sound_note(12*4+0, 0x0111);
+	sound_note(12*4+0, 0x0111);
 }
 #endif // __VGL_SOUND_H

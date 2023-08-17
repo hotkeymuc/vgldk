@@ -6,6 +6,8 @@
 System header for the VTech Genius LEADER 6000SL / PreComputer Prestige
 also works for the 7007SL
 
+TODO:
+	Shutdown: out 0x0b:=0 (YENO Compusavant Emulator)
 
 What's known so far (mostly from MAME's "prestige" driver):
 	* Screen is memory-mapped to e000-ebb8, 1 bbp

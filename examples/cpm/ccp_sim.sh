@@ -6,6 +6,8 @@ NAME=ccp
 
 # Must have a different name than "CCP"...
 NAME_YAZE=CCPRUN
+FILE_ARGS=" DIR"
+#FILE_ARGS=" DUMP 0000"
 FILE_COM=${NAME}.com
 FILE_COM_YAZE=${NAME_YAZE}.COM
 OUT_DIR=`realpath out`
@@ -41,7 +43,7 @@ echo go>>${YAZE_RC_FILE}
 
 # Prepare autorun file (which is run by CPM's A:PROFILE.SUB file)
 #echo PIP A:PROFILE.SUB=O:PROFILE.SUB>${YAZE_AUTORUN_FILE}
-echo ${FILE_COM_YAZE}>${YAZE_AUTORUN_FILE}
+echo ${FILE_COM_YAZE}${FILE_ARGS}>${YAZE_AUTORUN_FILE}
 
 
 # Run YAZE

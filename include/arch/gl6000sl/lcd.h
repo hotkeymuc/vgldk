@@ -7,7 +7,7 @@
 
 const byte lcd_w = LCD_W;
 const byte lcd_h = LCD_H;
-const word lcd_addr = 0xe000;
+const word lcd_addr = LCD_ADDR;
 #define LCD_FRAMEBUFFER_SIZE ((LCD_W * LCD_H) / 8)
 
 byte lcd_x = 0;
@@ -20,13 +20,17 @@ byte lcd_y = 0;
 const byte font_w = 8;
 const byte font_h = 8;
 #define font_data font_console_8x8
+
 //#define LCD_COLS (LCD_W/font_w)
 //#define LCD_ROWS (LCD_H/font_h)
 #define LCD_COLS 30
 #define LCD_ROWS 12
 
+__sfr __at 0x31 lcd_port;
+#define lcd_put_data(v) lcd_port=v
 
-void port_out_0x31(byte a) __naked {(void)a;
+/*
+void lcd_put_data(byte a) __naked {(void)a;
 __asm
 	; Get parameter from stack into a
 	ld hl,#0x0002
@@ -38,7 +42,7 @@ __asm
 	ret
 __endasm;
 }
-
+*/
 
 void lcd_clear() {
 	byte x, y;
@@ -89,7 +93,7 @@ void lcd_init() {
 	
 	/*
 	// Dump of init port sequence (as captured in custom MAME)
-	port_out(0x31, 0x03);
+	lcd_put_data(0x03);
 	
 	port_out(0x22, 0x00);
 	port_out(0x21, 0xe0);
@@ -122,15 +126,13 @@ void lcd_init() {
 	lcd_y = 0;
 	
 	// LCD on (?)
-	//port_out(0x31, 0x83);
-	port_out_0x31(0x83);
+	//lcd_put_data(0x83);
+	lcd_put_data(0x83);
 	
-	//port_out(0x31, 0x83);
-	port_out_0x31(0x83);
+	//lcd_put_data(0x83);
+	lcd_put_data(0x83);
 
 }
-
-
 
 
 

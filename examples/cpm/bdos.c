@@ -5,8 +5,11 @@
 	BDOS - Basic Disk Operating System
 	==================================
 	
-	The BDOS sits "on top" of BIOS and takes care of file access
+	The BDOS talks to the BIOS and takes care of file access.
 	
+	Reference: https://www.seasip.info/Cpm/bdos.html
+	
+	2023-08-15 Bernhard "HotKey" Slawik
 */
 
 #include "fcb.h"	// For files
@@ -403,6 +406,7 @@ void bdos() __naked {
 			// Some versions can use user areas 16-31, but these should be avoided for compatibility reasons.
 			// DOS+ returns the number set in A.
 			
+			//@FIXME: User is usually stored in the upper bits of bios_curdsk [0x0004]
 			if (bdos_param_e == 0xff) {
 				bdos_return1(bdos_user);
 			} else {

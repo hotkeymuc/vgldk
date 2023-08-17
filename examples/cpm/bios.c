@@ -36,15 +36,15 @@ In CP/M 3 and later, the rest also follows.
 
 #include "bios.h"
 
-#include "cpm.h"	// For headers
+#include "cpm.h"	// For the banner
 
-#include "bint.c"	// For resetting the timer on boot
+#include "bint.h"	// For resetting the timer on boot
 
-//#include "vgl_ports.h"
-//#include "vgl_sound.h"
-//#include "vgl_lcd.h"
-//#include "vgl_keys.h"
-#include <vgldk.h>
+//#define VGLDK_SERIES 4000
+//#define VGLDK_VARIABLE_STDIO
+//#define VGLDK_STDOUT_PUTCHAR lcd_putchar
+//#define VGLDK_STDIN_GETCHAR keyboard_getchar
+#include <vgldk.h>	// For hardware specific stuff
 
 //#include <stdio.h>	// for puts() putchar() gets() getchar()
 #include <stdiomin.h>	// for puts() putchar() gets() getchar()
@@ -199,6 +199,7 @@ void bios_list(byte c) {
 	
 	//@TODO: Handle bios_iobyte, bits 6,7: 00=TTY, 01=CRT, 10=LPT, 11=UL1
 	//@TODO: Actually send to VTech printer periphery!
+	//vgl_printer_putchar(c);
 	putchar(c);
 }
 
@@ -207,6 +208,7 @@ void bios_punch(byte c) {
 	
 	//@TODO: Handle bios_iobyte, bits 4,5: 00=TTY, 01=PTP, 10=UP1, 11=UP2
 	//@TODO: Send to SoftUART!
+	//softuart_sendByte(c);
 	putchar(c);
 }
 
@@ -215,6 +217,7 @@ byte bios_reader() {
 	
 	//@TODO: Handle bios_iobyte, bits 2,3: 00=TTY, 01=PTR, 10=UR1, 11=UR2
 	//@TODO: Read from SoftUART!
+	//softuart_receiveByte();
 	return getchar();
 }
 

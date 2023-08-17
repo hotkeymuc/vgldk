@@ -27,23 +27,19 @@ def human_readable(s, rom_info=True):
 	
 	if rom_info:
 		ROM_MIN_SIZE_KB = 1
-		sCeil = math.pow(2, math.ceil(math.log(s, 2))) if s > 0 else 0
-		sCeil = max(1024*ROM_MIN_SIZE_KB, sCeil)
+		s_ceil = math.pow(2, math.ceil(math.log(s, 2))) if s > 0 else 0
+		s_ceil = max(1024*ROM_MIN_SIZE_KB, s_ceil)
 		stats += [
 			'fits in',
-			'% 4d KByte' % (sCeil // 1024),
-			'% 4d Kbit' % ((sCeil*8) // 1024),
+			'% 4d KByte' % (s_ceil // 1024),
+			'% 4d Kbit' % ((s_ceil*8) // 1024),
 			#'ROM'
 		]
 	r = sep.join(stats)
 	return r
 
-if __name__ == '__main__':#
-	if len(sys.argv) < 2:
-		put('Specify a .bin file!')
-		sys.exit(1)
-	
-	filename = sys.argv[1]
+
+def analyze(filename):
 	put('Filename  : "%s"' % filename)
 	
 	with open(filename, 'rb') as h:
@@ -71,4 +67,14 @@ if __name__ == '__main__':#
 	else:
 		# Unaligned
 		pass
+
+
+if __name__ == '__main__':
+	if len(sys.argv) < 2:
+		put('Specify a .bin file!')
+		sys.exit(1)
+	
+	filename = sys.argv[1]
+	analyze(filename)
 	sys.exit(0)
+	

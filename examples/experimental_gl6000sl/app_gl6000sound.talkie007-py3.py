@@ -574,7 +574,7 @@ if __name__ == '__main__':
 	
 	## Good ones:
 	#say_file(filename, ofs=0x6D131+1, l=10)	# Bing (confirmed!)
-	#say_file(filename, ofs=0x6D13b, l=146)	# Upwards-Arpeggio Jingle
+	say_file(filename, ofs=0x6D13b, l=146)	# Upwards-Arpeggio Jingle
 	#say_file(filename, ofs=0x6D1cd, l=112)	# Beuysh
 	#say_file(filename, ofs=0x6D23d, l=183)	# Goiing up!
 	#say_file(filename, ofs=0x6D2f7, l=58)	# Reverb
@@ -584,7 +584,7 @@ if __name__ == '__main__':
 	#say_file(filename, ofs=0x6D41d, l=35+29)	# Hack
 	## ...data...
 	#say_file(filename, ofs=0x6D5e5, l=81)	# goyeeeeee
-	say_file(filename, ofs=0x6D635, l=228)	# Boioiooi
+	#say_file(filename, ofs=0x6D635, l=228)	# Boioiooi
 	## ...data...
 	#say_file(filename, ofs=0x6D8a9, l=153)	# Tone (lower)
 	#say_file(filename, ofs=0x6D941, l=121)	# Tone (higher)

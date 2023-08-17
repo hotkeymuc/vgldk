@@ -60,11 +60,13 @@ class Symbol:
 
 class Area:
 	"One area of symbols within a .rel file"
-	def __init__(self, name=AREA_NAME_EXT, size=0, area_num=0):
+	def __init__(self, name=AREA_NAME_EXT, size=0, area_num=0, flags=0, addr=0):
 		self.name = name
 		self.size = size
 		self.symbols = []
 		self.area_num = area_num
+		self.flags = flags
+		self.addr = addr
 		self.index = 0 # For Ref's which we have to count manually...
 		
 	
@@ -116,7 +118,11 @@ class Area:
 				sym_ofs = (addr - sym.addr)
 				return sym, sym_ofs
 		
-		#put('Unknown symbol address 0x%04X in %s' % (addr, str(self)))
+		if addr == self.addr:
+			put('Reference to area itself: %s' % str(self))
+			return None, self.addr	# Return own addr?
+		
+		put('Unknown symbol address 0x%04X in %s' % (addr, str(self)))
 		#sys.exit(3)
 		return None, None
 	
@@ -130,7 +136,7 @@ class Area:
 		return None
 	
 	def __repr__(self):
-		return 'Area "%s", size=%d / 0x%04X' % (self.name, self.size, self.size)
+		return 'Area "%s", addr=0x%04X, size=%d / 0x%04X' % (self.name, self.addr, self.size, self.size)
 
 def process_rel_file(filename_rel, filename_bin_linked=None):
 	"Reads and parses the given .rel file (without extension). If linked binary is availble, it is loaded for reference."
@@ -184,12 +190,12 @@ def process_rel_file(filename_rel, filename_bin_linked=None):
 			# Area
 			area_name = parts[1]
 			area_size = int(parts[3], 16) if (parts[2] == 'size') else 0
-			area_flags = parts[5]	# Unhandled, yet
-			area_addr = parts[7]	# Unhandled, yet
+			area_flags = int(parts[5], 16) if (parts[4] == 'flags') else 0
+			area_addr = int(parts[7], 16) if (parts[6] == 'addr') else 0
 			
-			put('Adding area #%d: "%s"' % (area_num, area_name))
+			#put('Adding area #%d: "%s"' % (area_num, area_name))
 			
-			current_area = Area(name=area_name, size=area_size, area_num=area_num)
+			current_area = Area(name=area_name, size=area_size, area_num=area_num, flags=area_flags, addr=area_addr)
 			if SHOW_ADDS:
 				put('Adding area %s' % str(current_area))
 			
@@ -238,8 +244,9 @@ def process_rel_file(filename_rel, filename_bin_linked=None):
 			
 			# @FIXME: Skip initial 4 zeros, because I don't know their meaning
 			if (l[:13] != 'R 00 00 00 00'):
-				put('Line %d: Ignoring unknown relocation header: "%s" (expected all zeros)' % (line_num, l))
+				#put('Line %d: Ignoring unknown relocation header: "%s" (expected all zeros)' % (line_num, l))
 				#continue
+				pass
 			rel_unknown_1 = int(parts[1], 16)
 			rel_unknown_2 = int(parts[2], 16)
 			rel_unknown_3_4 = int(parts[3], 16) + 0x100 * int(parts[4], 16)	#@TODO: Default area?
@@ -286,9 +293,11 @@ def process_rel_file(filename_rel, filename_bin_linked=None):
 				if (rel_type == 0x00):
 					
 					sym, sym_ofs = a.symbol_by_address(org_addr)
-					
 					put('Line %d / offset %d / 0x%04X: Normal Relocation (rel_type=%02X), rel_index=%d: org_addr=%04X, linked_addr=%04X (Area %s: Symbol "%s")' % (line_num, rel_ofs_abs, rel_ofs_abs, rel_type, rel_index, org_addr, linked_addr, a.name, sym.name if sym is not None else '???'))
-					sym.linked_addr = linked_addr - sym_ofs	# Update linked address
+					
+					#@FIXME: I encountered the relocation of "_HEADER9", which is an AREA (each usage of ".org 0x1234" creates one), not a symbol...
+					if sym is not None:
+						sym.linked_addr = linked_addr - sym_ofs	# Update linked address
 					u = Usage(bin_ofs=rel_ofs_abs, sym_ofs=sym_ofs)
 				
 				elif (rel_type == 0x02):
@@ -329,7 +338,10 @@ def process_rel_file(filename_rel, filename_bin_linked=None):
 				
 				if SHOW_USAGES:
 					put('Usage of symbol "%s" (%s, addr=0x%04X, linked_addr=0x%04X), sym_ofs=%d at binary position %d / 0x%04X' % (sym.name, a.name, sym.addr, sym.linked_addr, u.sym_ofs, rel_ofs_abs, rel_ofs_abs))
-				sym.add_usage(u)
+				
+				#@FIXME: Unknown symbol?
+				if sym is not None:
+					sym.add_usage(u)
 				
 				
 				# Store the sym_ofs inside the binary to safe space in the relocation table?

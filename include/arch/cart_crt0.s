@@ -44,7 +44,7 @@
 
 
 init:
-	;di ; disable interrupts
+	di ; disable interrupts
 	
 	;; Set stack pointer directly above top of memory.
 	;ld	sp, #0xdff0	; Load StackPointer to 0xdff0

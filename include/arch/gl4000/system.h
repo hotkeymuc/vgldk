@@ -35,6 +35,7 @@ for use with SDCC compiler
 //#define VGLDK_STDIN_GETS stdio_gets
 //#define VGLDK_STDIN_INKEY keyboard_inkey
 
+// Entry point from crt0.s
 void vgldk_init() __naked {
 	__asm
 		di
@@ -44,7 +45,7 @@ void vgldk_init() __naked {
 	__endasm;
 	
 	lcd_init();
-	vgl_sound_off();
+	sound_off();
 	lcd_clear();
 	
 	//main();
@@ -53,4 +54,24 @@ void vgldk_init() __naked {
 	__endasm;
 }
 
+/*
+void vgl_shutdown() {
+	port_0x12_out(0x01);	// BIOS4000 0181
+	__asm
+		halt
+	__endasm;
+
+}
+void vgl_shutdown() {
+	__asm
+		;; V-Tech power down:
+		ld	a, 1
+		out	(0ah), a
+		
+		ld	a, 1
+		out	(12h), a
+		halt
+	__endasm;
+}
+*/
 #endif

@@ -23,6 +23,7 @@ This is still heavily work in progress, but usable. For some working proof-of-co
 		VTech Genius LEADER 6000 SL [DE]
 		VTech Genius LEADER 7007 SL [DE]
 		VTech PC PRESTIGE [US]
+		VTech PC Navigator [US]
 		(YENO COMPUSAVANT [FR])
 
 Newer models ("CX" series, circa 1999 onward) use a completely different system architecture, namely a CompactRISC CR16B CPU. Refer to the [VCXDK](https://www.github.com/hotkeymuc/vcxdk) for those models.

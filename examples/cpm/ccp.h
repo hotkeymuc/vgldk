@@ -12,7 +12,7 @@
 
 //#include <basictypes.h>	// byte, word, true, false, NULL, ...
 
-#define CCP_MAX_INPUT 32
+#define CCP_MAX_INPUT 128	//32
 
 //#define CCP_CMD_PORT	// Port access
 
@@ -47,7 +47,10 @@
 
 
 struct FCB __at(0x005c) def_fcb;	// Default FCB at 0x005c
-char __at(0x0080) ccp_args[128];	// Args at 0x0080
+
+char __at(0x0080) ccp_argl;	// Arg length at 0x0080 (including initial space)
+char __at(0x0081) ccp_args[128];	// Args at 0x0081 (starting with initial space)
+
 char __at(0x0080) ccp_dma[128];	// DMA at 0x0080
 
 unsigned char __at(0x0003) bios_iobyte;

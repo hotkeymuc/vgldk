@@ -6,13 +6,6 @@ Keyboard matrix for the VTech Genius LEADER 6000SL / PreComputer Prestige
 
 
 TODO:
-	* Use __sfr port access variables instead of chunky "port_out_...()" functions!
-		#define KEYBOARD_PORT_ROW_OUT 0x40
-		#define KEYBOARD_PORT_COL_IN 0x41
-		#define KEYBOARD_PORT_COL_IN2 0x42
-		__sfr __at KEYBOARD_PORT_ROW_OUT keyboard_port_matrixRowOut;
-		__sfr __at KEYBOARD_PORT_COL_IN keyboard_port_matrixColIn;
-		__sfr __at KEYBOARD_PORT_COL_IN2 keyboard_port_matrixColIn2;
 	
 	* Turn on/off CAPS LOCK LED:
 		OUT 0x21, bit 6, bit 7 or 0xE0 (default)
@@ -20,9 +13,22 @@ TODO:
 
 */
 
-// Keyboard at 0x40w, 0x41r, 0x42r
+// Keyboard matrix at 0x40w, 0x41r, 0x42r
+#define KEYBOARD_PORT_ROW_OUT 0x40
+#define KEYBOARD_PORT_COL_IN1 0x41
+#define KEYBOARD_PORT_COL_IN2 0x42
+
+/*
+__sfr __at KEYBOARD_PORT_ROW_OUT keyboard_port_w;
+__sfr __at KEYBOARD_PORT_COL_IN1 keyboard_port_r1;
+__sfr __at KEYBOARD_PORT_COL_IN2 keyboard_port_r2;
+
+#define keyboard_matrix_out(v) keyboard_port_w=v
+#define keyboard_matrix_in1() keyboard_port_r1
+#define keyboard_matrix_in2() keyboard_port_r2
+*/
 // Keyboard matrix write
-void port_out_0x40(byte a) __naked {(void)a;
+void keyboard_matrix_out(byte a) __naked {(void)a;
 __asm
 	; Get parameter from stack into a
 	ld hl,#0x0002
@@ -30,22 +36,22 @@ __asm
 	ld a,(hl)
 	
 	; Put it to port
-	out	(0x40), a
+	out	(KEYBOARD_PORT_ROW_OUT), a	; 0x40
 	ret
 __endasm;
 }
 // Keyboard matrix read 1
-byte port_in_0x41() __naked {
+byte keyboard_matrix_in1() __naked {
 __asm
-	in	a, (0x41)
+	in	a, (KEYBOARD_PORT_COL_IN1)	; 0x41
 	ld	l, a
 	ret
 __endasm;
 }
 // Keyboard matrix read 2
-byte port_in_0x42() __naked {
+byte keyboard_matrix_in2() __naked {
 __asm
-	in	a, (0x42)
+	in	a, (KEYBOARD_PORT_COL_IN2)	; 0x42
 	ld	l, a
 	ret
 __endasm;
@@ -53,6 +59,7 @@ __endasm;
 
 
 
+// Key codes
 #define KEY_MOUSE_LMB 1
 #define KEY_MOUSE_RMB 2
 
@@ -118,6 +125,7 @@ const keycode_t KEY_CODES[8*8*2] = {
 	KEY_TOUCH_RMB, 0,0,0,0,0,0,0,
 };
 
+
 #define KEYBOARD_PRESSED_MAX 6
 #define KEYBOARD_BUFFER_MAX 8
 #define KEYBOARD_SCANCODE_INVALID 0xff
@@ -154,18 +162,22 @@ byte keyboard_ispressed() {
 	byte b;
 	
 	// Activate ALL matrix lines
-	port_out_0x40(0x00);
+	keyboard_matrix_out(0x00);
 	
 	// Get both matrix return values (active LOW, so ANDing them will yield zeros if any of the lines is zero)
-	b = (port_in_0x41() & port_in_0x42());
+	//b = (keyboard_matrix_in1() & keyboard_matrix_in2());
+	b = keyboard_matrix_in1();
+	b &= keyboard_matrix_in2();
 	
 	// Disable ALL matrix lines
-	port_out_0x40(0xff);
+	keyboard_matrix_out(0xff);
 	
 	// Check if ANY of the bits are LOW
-	if (b != 0xff) return 1;	// At least one key is pressed
+	// At least one key is pressed
+	if (b != 0xff) return 1;
 	
-	return 0;	// No keys are pressed
+	// No keys are pressed
+	return 0;
 }
 
 void keyboard_update() {
@@ -185,11 +197,10 @@ void keyboard_update() {
 		// Scan the keyboard matrix
 		
 		for(my = 0; my < 8; my++) {
-			port_out_0x40(0xff - (1 << my));
-			//port_out_0x40(my);
+			keyboard_matrix_out(0xff - (1 << my));
 			
 			// Check matrix input 1
-			b = port_in_0x41();
+			b = keyboard_matrix_in1();
 			for(mx = 0; mx < 8; mx++) {
 				if (!(b & (1 << mx))) {
 					// Store scan code
@@ -199,7 +210,7 @@ void keyboard_update() {
 			}
 			
 			// Check matrix input 2
-			b = port_in_0x42();
+			b = keyboard_matrix_in2();
 			for(mx = 0; mx < 8; mx++) {
 				if (!(b & (1 << mx))) {
 					// Store scan code

@@ -216,7 +216,7 @@
 //	|	7C
 
 char bdos_delimiter;
-byte bdos_user;
+byte bdos_user;	// This should be the upper bits of the bios_curdsk 0x0004
 
 struct FCB __at(0x005c) bdos_fcb;	// Default FCB at 0x005c
 //long bdos_file_ofs;

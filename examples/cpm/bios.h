@@ -74,6 +74,7 @@
 #define BIOS_FUNC_RESERV2	21	// These calls are reserved and contain JMP 0 instructions.
 */
 
+#include <basictypes.h>	// byte, word, true, false, NULL, ...
 
 // Disk parameter header
 typedef struct {
