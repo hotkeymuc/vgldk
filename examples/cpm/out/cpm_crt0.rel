@@ -1,88 +1,133 @@
 XL2
-H 12 areas 5 global symbols
+H 1D areas 5 global symbols
 M cpm_crt0
 S _main Ref0000
+S _bdos Ref0000
+S _bint Ref0000
 S .__.ABS. Def0000
-A _CODE size A flags 0 addr 0
-S __clock Def0000
-S _exit Def0004
+S _bios_boot Ref0000
+A _CODE size 0 flags 0 addr 0
 A _HEADER size 0 flags 8 addr 0
 A _HEADER0 size 3 flags 8 addr 0
-A _HEADER1 size 2 flags 8 addr 8
-A _HEADER2 size 2 flags 8 addr 10
-A _HEADER3 size 2 flags 8 addr 18
-A _HEADER4 size 2 flags 8 addr 20
-A _HEADER5 size 2 flags 8 addr 28
-A _HEADER6 size 2 flags 8 addr 30
-A _HEADER7 size 2 flags 8 addr 38
-A _HEADER8 size 3 flags 8 addr 100
-A _HEADER9 size 25 flags 8 addr 150
+A _HEADER1 size 1 flags 8 addr 3
+A _HEADER2 size 1 flags 8 addr 4
+A _HEADER3 size 3 flags 8 addr 5
+A _HEADER4 size 3 flags 8 addr 8
+A _HEADER5 size 3 flags 8 addr 10
+A _HEADER6 size 3 flags 8 addr 18
+A _HEADER7 size 3 flags 8 addr 20
+A _HEADER8 size 3 flags 8 addr 28
+A _HEADER9 size 3 flags 8 addr 30
+A _HEADERa size 3 flags 8 addr 38
+A _HEADERb size 0 flags 8 addr 40
+A _HEADERc size 6 flags 8 addr 5C
+A _HEADERd size B flags 8 addr 80
+A _HEADERe size 14 flags 8 addr 100
+A _HEADERf size 14 flags 8 addr 40
+A _HEADER10 size 7 flags 8 addr 8000
+A _HEADER11 size 3 flags 8 addr 8010
+A _INITIALIZER size 0 flags 0 addr 0
 A _HOME size 0 flags 0 addr 0
 A _GSINIT size 0 flags 0 addr 0
-S gsinit Def0000
-A _GSFINAL size 1 flags 0 addr 0
+A _GSFINAL size 0 flags 0 addr 0
 A _DATA size 0 flags 0 addr 0
+A _INITIALIZED size 0 flags 0 addr 0
+A _BSEG size 0 flags 0 addr 0
 A _BSS size 0 flags 0 addr 0
 A _HEAP size 0 flags 0 addr 0
 T 00 00
 R 00 00 02 00
-T 00 00 C3 50 01
-R 00 00 02 00 00 03 0B 00
-T 08 00
+T 00 00 C3 40 00
+R 00 00 02 00 00 03 11 00
+T 03 00
 R 00 00 03 00
-T 08 00 ED 4D
+T 03 00
 R 00 00 03 00
-T 10 00
-R 00 00 04 00
-T 10 00 ED 4D
-R 00 00 04 00
-T 18 00
-R 00 00 05 00
-T 18 00 ED 4D
-R 00 00 05 00
-T 20 00
-R 00 00 06 00
-T 20 00 ED 4D
-R 00 00 06 00
-T 28 00
-R 00 00 07 00
-T 28 00 ED 4D
-R 00 00 07 00
-T 30 00
-R 00 00 08 00
-T 30 00 ED 4D
-R 00 00 08 00
-T 38 00
-R 00 00 09 00
-T 38 00 ED 4D
-R 00 00 09 00
-T 00 01
-R 00 00 0A 00
-T 00 01 C3 50 01
-R 00 00 0A 00
-T 50 01
-R 00 00 0B 00
-T 50 01
-R 00 00 0B 00
-T 50 01 F3 31 F0 DF CD 00 00 3E FF D3 11 3E DE D3
-R 00 00 0B 00 00 07 0D 00
-T 5E 01 12 AF D3 01 D3 02 D3 04 D3 05 32 F1 DF 3E
-R 00 00 0B 00
-T 6C 01 40 D3 06 CD 00 00 C3 04 00
-R 00 00 0B 00 02 06 00 00 00 09 00 00
-T 00 00
-R 00 00 00 00
-T 00 00 3E 02 CF C9
-R 00 00 00 00
+T 03 00 00
+R 00 00 03 00
 T 04 00
-R 00 00 00 00
-T 04 00 3E 00 CF
-R 00 00 00 00
-T 07 00
-R 00 00 00 00
-T 07 00 76 18 FD
-R 00 00 00 00
-T 00 00
+R 00 00 04 00
+T 04 00
+R 00 00 04 00
+T 04 00 00
+R 00 00 04 00
+T 05 00
+R 00 00 05 00
+T 05 00
+R 00 00 05 00
+T 05 00 C3 00 00
+R 00 00 05 00 02 03 01 00
+T 08 00
+R 00 00 06 00
+T 08 00 C3 00 00
+R 00 00 06 00 02 03 02 00
+T 10 00
+R 00 00 07 00
+T 10 00 C3 00 00
+R 00 00 07 00 02 03 02 00
+T 18 00
+R 00 00 08 00
+T 18 00 C3 00 00
+R 00 00 08 00 02 03 02 00
+T 20 00
+R 00 00 09 00
+T 20 00 C3 00 00
+R 00 00 09 00 02 03 02 00
+T 28 00
+R 00 00 0A 00
+T 28 00 C3 00 00
+R 00 00 0A 00 02 03 02 00
+T 30 00
+R 00 00 0B 00
+T 30 00 C3 00 00
+R 00 00 0B 00 02 03 02 00
+T 38 00
+R 00 00 0C 00
+T 38 00 C3 00 00
+R 00 00 0C 00 02 03 02 00
+T 40 00
 R 00 00 0D 00
-T 00 00 C9
+T 5C 00
 R 00 00 0E 00
+T 5C 00 5B 66 63 62 5D 00
+R 00 00 0E 00
+T 80 00
+R 00 00 0F 00
+T 80 00 5B 62 69 6F 73 5F 64 6D 61 5D 00
+R 00 00 0F 00
+T 00 01
+R 00 00 10 00
+T 00 01 5B 74 72 61 6E 73 69 65 6E 74 5F 61 72 65
+R 00 00 10 00
+T 0E 01 61 5D 00 C3 40 00
+R 00 00 10 00 00 06 11 00
+T 40 00
+R 00 00 11 00
+T 40 00
+R 00 00 11 00
+T 40 00 F3 ED 56 31 F0 DF AF D3 00 3E 01 D3 01 3E
+R 00 00 11 00
+T 4E 00 80 D3 03 C3 00 00
+R 00 00 11 00 02 06 04 00
+T 54 00
+R 00 00 11 00
+T 00 80
+R 00 00 12 00
+T 00 80
+R 00 00 12 00
+T 00 80 55 AA 59 45
+R 00 00 12 00
+T 04 80
+R 00 00 12 00
+T 04 80 C3 40 00
+R 00 00 12 00 00 03 11 00
+T 10 80
+R 00 00 13 00
+T 10 80
+R 00 00 13 00
+T 10 80 C3 40 00
+R 00 00 13 00 00 03 11 00
+T 13 80
+R 00 00 13 00
+T 00 00
+R 00 00 16 00
