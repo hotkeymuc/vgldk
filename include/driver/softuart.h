@@ -62,14 +62,19 @@
 		#define SOFTUART_RX_DELAY 16	// GL4000 at 9600 baud: 16-17
 		#define SOFTUART_RX_DELAY_EDGE 1	// Usually 1
 		
-		#define SOFTUART_DELAY_TX 22	// GL4000 at 9600 baud: L=23	=> 836us/8 =>  9569 baud
+		#define SOFTUART_DELAY_TX 22	// GL4000 at 9600 baud: L=22-23	=> 836us/8 =>  9569 baud
 		#define SOFTUART_TX_OPS nop
 	
 	#elif SOFTUART_BAUD == 19200
 		// 19200 baud:
-		#warning "SOFTUART_BAUD 19200 has timing problems. Only working for GL6000 as of now. Use 9600 baud."
+		#warning "SOFTUART_BAUD at 19200 has timing problems. Use with caution!"
 		
-		#define SOFTUART_RX_DELAY 6	// GL4000 at 19200 baud: 5-6
+		#define SOFTUART_RX_DELAY 5	// GL4000 at 19200 baud: 5-6
+		#define SOFTUART_RX_OPS nop\
+			nop\
+			nop\
+			nop\
+			nop
 		#define SOFTUART_RX_DELAY_EDGE 0	// Usually 1, but in this case: 0, to not miss the highest bit
 		
 		
@@ -321,6 +326,9 @@
 
 
 
+
+
+
 void softuart_tx_delay() {
 	// Delay between bits for sending
 	
@@ -353,45 +361,6 @@ void softuart_tx_delay() {
 		pop hl
 	__endasm;
 }
-
-void softuart_rx_delay() {
-	// Delay between bits for receiving
-	
-	byte i;
-	
-	// GL4000 at 9600 baud: 16-17
-	// GL4000 at 9600 baud with MARK at each bit: 9
-	// GL4000 at 19200 baud: 5
-	// GL4000 at ~38400 baud: 1
-	for(i = 0; i < SOFTUART_RX_DELAY; i++) {
-		__asm
-			nop
-		__endasm;
-	}
-	
-	/*
-	__asm
-		push hl
-		ld	l, #23	; cserial.c on GL4000: L=23	=> 2200us/8 =>  3630 baud
-		_softuart_rx_delay_loop:
-			dec	l
-			jr	nz, _softuart_rx_delay_loop
-		pop hl
-	__endasm;
-	*/
-}
-void softuart_rx_delayEdge() {
-	// Delay between edge and middle of bit while receiving (usually a single nop)
-	
-	byte i;
-	for(i = 0; i < SOFTUART_RX_DELAY_EDGE; i++) {
-		__asm
-			nop
-		__endasm;
-	}
-}
-
-
 
 void softuart_sendByte(byte d) {
 	// Transmit one byte
@@ -443,6 +412,52 @@ void softuart_sendByte(byte d) {
 	#endif
 }
 
+
+
+
+void softuart_rx_delay() {
+	// Delay between bits for receiving
+	
+	byte i;
+	
+	// GL4000 at 9600 baud: 16-17
+	// GL4000 at 9600 baud with MARK at each bit: 9
+	// GL4000 at 19200 baud: 5
+	// GL4000 at ~38400 baud: 1
+	for(i = 0; i < SOFTUART_RX_DELAY; i++) {
+		__asm
+			nop
+		__endasm;
+	}
+	
+	#ifdef SOFTUART_RX_OPS
+	__asm
+		; Allow some custom NOP slides
+		SOFTUART_RX_OPS
+	__endasm;
+	#endif
+	
+	/*
+	__asm
+		push hl
+		ld	l, #23	; cserial.c on GL4000: L=23	=> 2200us/8 =>  3630 baud
+		_softuart_rx_delay_loop:
+			dec	l
+			jr	nz, _softuart_rx_delay_loop
+		pop hl
+	__endasm;
+	*/
+}
+void softuart_rx_delayEdge() {
+	// Delay between edge and middle of bit while receiving (usually a single nop)
+	
+	byte i;
+	for(i = 0; i < SOFTUART_RX_DELAY_EDGE; i++) {
+		__asm
+			nop
+		__endasm;
+	}
+}
 
 int softuart_receiveByte() {
 	// Receive one byte
