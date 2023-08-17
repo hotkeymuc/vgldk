@@ -5,6 +5,7 @@
 //#define word unsigned short
 typedef unsigned char byte;
 typedef unsigned short word;
+
 typedef byte * p_byte;
 typedef char * p_char;
 
@@ -14,4 +15,4 @@ typedef char * p_char;
 #define NULL ((void *)0)
 //const void *NULL = (void *)0;
 
-#endif __BASICTYPES_H__
+#endif // __BASICTYPES_H__

@@ -115,6 +115,11 @@ word gethex(byte digits) {
 #ifndef HEX_DUMP_WIDTH
 	#define HEX_DUMP_WIDTH 4
 #endif
+#ifndef HEX_DUMP_EOL
+	#define HEX_DUMP_EOL "\r\n"
+#endif
+//#define HEX_DUMP_INTRA_HEX " "
+
 void dump(word a, byte len) {
 	byte i;
 	byte b;
@@ -143,6 +148,9 @@ void dump(word a, byte len) {
 			} else {
 				printf("  ");
 			}
+			#ifdef HEX_DUMP_INTRA_HEX
+				printf(HEX_DUMP_INTRA_HEX);
+			#endif
 			l++;
 			o++;
 		}
@@ -159,7 +167,7 @@ void dump(word a, byte len) {
 			o++;
 		}
 		a += HEX_DUMP_WIDTH;
-		printf("\n");
+		printf(HEX_DUMP_EOL);	//("\n");
 	}
 	
 	/*

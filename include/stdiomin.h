@@ -3,6 +3,7 @@
 
 /*
 Some bare minimum stdio functions
+@TODO: Use optimized SDCC/Z88DK library functions!
 */
 
 #ifdef VGLDK_VARIABLE_STDIO
@@ -65,7 +66,16 @@ Some bare minimum stdio functions
 #endif
 
 
-//#include <stdio.h>	// for printf() putchar() gets() getchar()
+
+
+// The C library function int puts(const char *str) writes a string to stdout up to but not including the null character.
+// A newline character is appended to the output.
+int puts(const char *str) {
+	while(*str) putchar(*str++);
+	putchar('\n');
+	return 1;
+}
+
 void printf(const char *pc) {
 	/*
 	char c;
@@ -131,7 +141,6 @@ char *gets(char *pc) {
 			}
 			continue;
 		}
-
 		
 		if ((c == '\n') || (c == '\r') || (c == 0)) {
 			// End of string
@@ -145,37 +154,6 @@ char *gets(char *pc) {
 		*pc++ = c;
 	}
 	//return pcs;
-}
-
-
-byte strlen(const char *c) {
-	byte l;
-	l = 0;
-	while (*c++ != 0)  {
-		l++;
-	}
-	return l;
-}
-
-
-void memcpy(byte *dst_addr, byte *src_addr, word count) {
-	word i;
-	byte *ps;
-	byte *pd;
-	
-	//@TODO: Use Opcode for faster copy!!!
-	ps = src_addr;
-	pd = dst_addr;
-	for (i = 0; i < count; i++) {
-		*pd++ = *ps++;
-	}
-}
-
-void memset(byte *addr, byte b, word count) {
-	while(count > 0) {
-		*addr++ = b;
-		count--;
-	}
 }
 
 #endif	// __STDIOMIN_H
