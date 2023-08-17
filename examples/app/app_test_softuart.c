@@ -15,11 +15,15 @@
 #include <stdiomin.h>
 
 // Since apps are compiled as "VGLDK_SERIES=0", but softuart needs to know the hardware, we specify it.
-//#define SOFTUART_SERIES 4000
-#define SOFTUART_SERIES 6000
+
+#define SOFTUART_SERIES 4000
+//#define SOFTUART_SERIES 6000
+
 //#define SOFTUART_BAUD 9600
 #define SOFTUART_BAUD 19200
 #include <driver/softuart.h>
+
+#include <hex.h>	// for print_x2()
 
 //void main() __naked {
 //void main() {
@@ -36,12 +40,31 @@ int main(int argc, char *argv[]) {
 	printf("Press key to send...");
 	c = getchar();
 	
+	//softuart_sendByte(0x00);
+	
 	for(j = 0; j < 3; j++) {
 		printf_d(j);
+		
+		for(i = 0; i < 64; i++) {
+			//softuart_sendByte(i);	// 0x00, 0x01, 0x02, ...
+			softuart_sendByte(0x00);
+			softuart_sendByte(0x01);
+			softuart_sendByte(0x00);
+			softuart_sendByte(0x02);
+			softuart_sendByte(0x00);
+			softuart_sendByte(0x55);
+			softuart_sendByte(0x00);
+			softuart_sendByte(0xAA);
+			softuart_sendByte(0x00);
+			softuart_sendByte(0xFF);
+		}
+		
+		softuart_sendByte('\n');
 		for(i = 0; i < 26; i++) {
-			softuart_sendByte(0x40 + i);
+			softuart_sendByte(0x40 + i);	// ABC...
 		}
 		softuart_sendByte('\n');
+		
 	}
 	printf("done.\nNow receiving...\n");
 	
@@ -52,6 +75,7 @@ int main(int argc, char *argv[]) {
 			//putchar('.');
 		} else {
 			putchar(i);
+			printf_x2(i);
 		}
 	}
 	
