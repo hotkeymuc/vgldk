@@ -45,8 +45,10 @@ int main(int argc, char *argv[]) {
 	for(j = 0; j < 3; j++) {
 		printf_d(j);
 		
+		/*
+		// Binary sync pattern
 		for(i = 0; i < 64; i++) {
-			//softuart_sendByte(i);	// 0x00, 0x01, 0x02, ...
+			//softuart_sendByte(i);
 			softuart_sendByte(0x00);
 			softuart_sendByte(0x01);
 			softuart_sendByte(0x00);
@@ -58,10 +60,12 @@ int main(int argc, char *argv[]) {
 			softuart_sendByte(0x00);
 			softuart_sendByte(0xFF);
 		}
-		
 		softuart_sendByte('\n');
+		*/
+		
+		// ABC...
 		for(i = 0; i < 26; i++) {
-			softuart_sendByte(0x40 + i);	// ABC...
+			softuart_sendByte(0x40 + i);
 		}
 		softuart_sendByte('\n');
 		
@@ -75,7 +79,7 @@ int main(int argc, char *argv[]) {
 			//putchar('.');
 		} else {
 			putchar(i);
-			printf_x2(i);
+			//printf_x2(i);
 		}
 	}
 	
