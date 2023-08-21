@@ -49,6 +49,7 @@ In CP/M 3 and later, the rest also follows.
 //#include <stdio.h>	// for puts() putchar() gets() getchar()
 #include <stdiomin.h>	// for puts() putchar() gets() getchar()
 
+// Stringmin
 void bios_memset(byte *addr, byte b, word count) {
 	while(count > 0) {
 		*addr++ = b;
@@ -56,22 +57,24 @@ void bios_memset(byte *addr, byte b, word count) {
 	}
 }
 /*
-byte myscroll_counter;
-void myscroll() {
-	// Scroll callback that pauses every page
+// Pause-after-one-page callback
+// Can be installed after lcd_init() by setting "vgl_scroll_cb = &bios_scroll_cb;"
+byte bios_scroll_counter;
+void bios_scroll_cb() {
+	// Scroll callback that pauses after each page of text
 	
 	while(lcd_y >= LCD_ROWS) {
 		
-		if (myscroll_counter >= LCD_ROWS) {
+		if (bios_scroll_counter >= LCD_ROWS) {
 			// Sleep on scroll
 			sound_note(12*5, 100);
 			getchar();
-			myscroll_counter = 0;
+			bios_scroll_counter = 0;
 		}
 		
 		lcd_y--;
-		lcd_scroll();
-		myscroll_counter++;
+		lcd_scroll();	// Invoke native scroll function
+		bios_scroll_counter++;
 	}
 }
 */
@@ -79,9 +82,14 @@ void myscroll() {
 
 void bios();	// Forward declaration to function table (located at the end of this file)
 
-// Initial function
+// Initial function, invoked by CPM_CRT0.s on init
 void bios_boot() __naked {
 	// Cold boot - should never be invoked by a user
+	
+	__asm
+		di
+		ld sp, #BIOS_STACK	; GL4000: ld sp, #0xdff0 - leave just a little bit more
+	__endasm;
 	
 	// BINT state
 	bint_timer = 0;
@@ -104,15 +112,16 @@ void bios_boot() __naked {
 	lcd_init();
 	sound_off();
 	
-	// Add "wait" while scrolling
-	//myscroll_counter = LCD_ROWS;
-	//lcd_scroll_cb = &myscroll;
+	// Add "wait" while scrolling callback
+	//bios_scroll_counter = LCD_ROWS;
+	//lcd_scroll_cb = &bios_scroll_cb;
+	
 	
 	// Show banner
 	puts(CPM_TITLE);
 	puts(CPM_VERSION);
 	
-	sound_note(12*4, 250);
+	//sound_note(12*4, 250);
 	
 	//bios_wboot();
 	__asm

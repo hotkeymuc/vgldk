@@ -10,8 +10,8 @@
 
 //byte __at(0x0040) bios_workarea[0x100];	// located in lowstorage
 
-#define MAX_DATA 128
-
+//#define MAX_DATA 128
+#define BIOS_STACK 0xDFF0	// BIOS (re)sets stack pointer there
 
 // BIOS function numbers
 // https://www.seasip.info/Cpm/bios.html

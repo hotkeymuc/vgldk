@@ -27,9 +27,18 @@ USER <area>
 	The system has "user areas" numbered from 0 to 15. On start-up, the User area is set to "0". The DIR command displays files in the current user area and only programs in the current user area can be executed. The USER command is used to select another User area.
 */
 
+// Entry point
+void main() __naked {
+	__asm
+		jp _ccp
+		;.asciz '[<- CCP entry]'	; Marker in binary to see if this is actually the first byte, jumping to CCP
+	__endasm;
+}
+
 #include <basictypes.h>
 
-//#define PROGRAM_GETS_LOCAL_ECHO	// Output typed characters in gets()
+//#define PROGRAM_GETS_LOCAL_ECHO	// Force local echo (even though getchar() and gets() output the typed character as per spec.!)
+
 #include "program.c"
 
 #include "ccp.h"
@@ -41,7 +50,6 @@ USER <area>
 
 #include <strcmpmin.h>	// For strcmp
 
-byte ccp_running;	// To be able to stop the input loop
 
 byte fcb_isspace(byte b) {
 	if (b <= 0x20) return 1;
@@ -740,6 +748,10 @@ void handle(char *input) {
 	if (strcmp(input, "RUN") == 0) {
 		ccp_run();
 	} else
+	
+	if (strcmp(input, "VER") == 0) {
+		puts("VGLDK CCP");
+	} else
 	/*
 	if (strcmp(input, "BEEP") == 0) {
 		vgl_sound_note(12*4 + 9, 250);
@@ -797,48 +809,56 @@ void handle(char *input) {
 }
 
 
-void main() {
-	char input[CCP_MAX_INPUT];
+
+void ccp() __naked {
 	
-	//printf("CCP!\n");
-	//printf("args:\r\n");
-	//dump((word)&ccp_args[0], 128);
+	//putchar('!');
+	puts('CCP');
+	//printf("CCP!"); getchar();
+	memset(&ccp_input[0], 0, CCP_MAX_INPUT);	// Zero out the input buffer
 	
 	if (ccp_argl > 0) {
 		// Handle command line input...
-		// Copy over (or it will be overwritten by handle()!)
-		memcpy(&input[0], &ccp_args[1], CCP_MAX_INPUT);
-		printf("Handling args: \"");
-		printf(input);
-		printf("\"...\r\n");
+		// Copy args over to input (or they would be overwritten by handle()!)
+		memcpy(&ccp_input[0], &ccp_args[1], CCP_MAX_INPUT);	// Skip initial space (which is included at ccp_args[0])
 		
-		handle(input);
+		//printf("args["); printf_x2(ccp_argl); printf("]: \""); printf(ccp_input); printf("\"?");
+		//if (getchar() == 'Y')
+		
+		handle(ccp_input);
 		
 		//@TODO: Could also add "; EXIT"?
 		// ...and exit
 		ccp_running = 0;
+	} else {
+		ccp_running = 1;
 	}
 	
-	//ccp_running = 1;
-	input[0] = 0;
+	
+	//input[0] = 0;
 	while(ccp_running) {
 		
 		/*
 		// Restore scroll callback
 		vgl_lcd_scroll_cb = &myscroll;
 		*/
+		
 		// Prompt
 		putchar('A' + bios_curdsk);
-		printf(">");
+		putchar('>');
 		
+		// Zero out the buffer
+		memset(&ccp_input[0], 0x00, CCP_MAX_INPUT);
+	
 		//arg[0] = CCP_MAX_INPUT;
 		//arg[1] = 0;
-		gets(&input[0]);
+		gets(&ccp_input[0]);
 		
 		//printf("You said: \"%s\"\n", input);
-		putchar('\n');	// Input ends in "\r"
+		//printf("You said: \""); printf(&ccp_input[0]); printf("\"...");
+		//putchar('\n');	// Input ends in "\r"
 		
-		handle(input);
+		handle(ccp_input);
 	}
 }
 

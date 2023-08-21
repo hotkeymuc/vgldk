@@ -19,10 +19,32 @@
 
 // First bytes of the _CODE area should be the BDOS entry function.
 // The jump at CRT0 0x0005 should point here.
-// Its address marks the end of the transient memory area (e.g. ZORK checks 0x0005 for that).
+// Its address marks the end of the transient memory area (e.g. ZORK checks 0x0005 for that address to determine maximum RAM usage).
 
-// Main BDOS entry point (0x0005 should point here AND it should be the first bytes in _CODE area)
 void bdos() __naked {
+	__asm
+		ld hl, #_bdos_funcs	; BDOS function jump table
+		
+		; Function number is stored in C
+		; Add it to the address (as BC, so just zero out B and we are fine)
+		ld b, #0
+		; Table consists of "JP xxxx" (3 bytes) entries. So add BC 3 times.
+		add hl, bc
+		add hl, bc
+		add hl, bc
+		jp (hl)	; Jump to BDOS function jump
+		
+	__endasm;
+}
+
+/*
+//@FIXME: This should be done in assembly...
+void bdos() __naked {
+//void bdos() {
+	
+	//@FIXME: Without "__naked", the switch statement requires ix to be pointed to sp and a is pushed... dunno why!
+	//@FIXME ====> Jump using jump table!
+	
 	char *pc;
 	char c;
 	byte s;
@@ -35,7 +57,7 @@ void bdos() __naked {
 	
 	__asm
 		
-		;.asciz 'BDOS!'	; Mark in binary, so we can check if it is REALLY the first bytes in _CODE area
+		;.asciz '[BDOS!]'	; Mark in binary, so we can check if it is REALLY the first bytes in _CODE area
 		
 		//#ifdef BDOS_TRACE_CALLS
 		#ifdef BDOS_SAVE_ALL_REGISTERS
@@ -43,7 +65,7 @@ void bdos() __naked {
 			push af
 			push hl
 			
-			; Save register "A" first, we need that register
+			; Save register "A" first, we need that register later
 			ld (_bdos_param_a), a
 			
 			; Store register "B"
@@ -72,12 +94,13 @@ void bdos() __naked {
 			
 			
 			; Now get the stack pointer
-			ld hl, #0x04	; Skip the items we just pushed ourselves
+			ld hl, #0x04	; Skip the registers we just pushed ourselves
 			add hl, sp
 			
 			; Write SP to global variable(s)
 			ld a, h
 			ld (_bdos_s), a
+			
 			ld a, l
 			ld (_bdos_p), a
 			
@@ -131,12 +154,16 @@ void bdos() __naked {
 	bdos_func = bdos_param_c;
 	bdos_param_de = (word)bdos_param_d * 256 + (word)bdos_param_e;
 	
+	//bdos_printf("BDOS0x");
+	//bdos_printf_d(bdos_param_c);
+	//bdos_printf_x2(bdos_param_c);
 	
-	//printf_d("BDOS", bdos_func);
+	//bdos_printf_d(bdos_func);
 	//printf("FCB="); printf_x4(bdos_param_de);
 	//printf("\n");
 	
 	// BDOS function selection
+	//switch(bdos_param_c) {
 	switch(bdos_func) {
 		
 		case BDOS_FUNC_P_TERMCPM:	// 0: System reset
@@ -144,15 +171,6 @@ void bdos() __naked {
 			
 			//bdos_puts("TERMCPM");
 			//bdos_getchar();
-		
-			// Warm boot / go to CCP
-			//ccp();
-			/*
-			__asm
-				// Reset
-				jp 0x0000
-			__endasm;
-			*/
 			
 			// (Re-)initialize BDOS, load and run CCP
 			__asm
@@ -161,8 +179,14 @@ void bdos() __naked {
 			break;
 		
 		case BDOS_FUNC_C_READ:	// 1: Console input
+			//bios_conout('(');	// for debugging
+			
+			//@FIXME: something goes wrong here with the stack...
+			//#error "continue bugfixing here! Something corrupts the stack after typing a key"
+			
 			s = bios_conin();	// Get a char from bios
-			bios_conout(s);	// Echo it
+			bios_conout(s);	// Echo it (as spec.)
+			//bios_conout(')');	// for debugging
 			bdos_return1(s);	// Return it
 			break;
 		
@@ -239,14 +263,31 @@ void bdos() __naked {
 			break;
 		
 		case BDOS_FUNC_C_READSTR:	// 10: Read console buffer
+			// DE points to buffer (first byte is max size). Special case: DE=0 = use DMA area
+			
+			bdos_printf("DE="); bdos_printf_x4(bdos_param_de); bdos_getchar();
+			
+			if (bdos_param_de == 0) bdos_param_de = (word)bios_dma;	// 0x0080
+			
 			pc = (char *)bdos_param_de;
 			s = *pc;	// First byte contains maximum buffer size
-			bdos_gets(pc);
+			
+			bdos_putchar('?'); bdos_getchar();
+			
+			// Actually read str
+			bdos_gets(pc+2, s);	// +0=max_size, +1=len, +2=data (without CR/LF)
+			
+			bdos_putchar('!'); bdos_getchar();
+			
+			// Determine length
+			s = bdos_strlen(pc+2);
+			
+			// Write string length to second byte
+			*(pc+1) = s;
 			
 			// Add delimiter character
-			s = bdos_strlen(pc);
-			pc = (char *)(bdos_param_de + s);
-			*pc = bdos_delimiter;
+			//pc = (char *)(bdos_param_de + s);
+			// *pc = bdos_delimiter;
 			break;
 		
 		case BDOS_FUNC_C_STAT:	// 11: Get console status
@@ -323,30 +364,27 @@ void bdos() __naked {
 		
 		case BDOS_FUNC_F_READ:	// 20: Read sequential
 			// DE=address of FCB. Returns error codes in BA and HL.
-			/*
-			0	OK,
-			1	end of file,
-			9	invalid FCB,
-			10	(CP/M) media changed; (MP/M) FCB checksum error,
-			11	(MP/M) unlocked file verification error,
-			0FFh	hardware error.
-			*/
+			//	0	OK,
+			//	1	end of file,
+			//	9	invalid FCB,
+			//	10	(CP/M) media changed; (MP/M) FCB checksum error,
+			//	11	(MP/M) unlocked file verification error,
+			//	0FFh	hardware error.
 			s = bdos_f_read((struct FCB *)bdos_param_de);
 			bdos_return2(s, 0);
 			break;
 		
 		case BDOS_FUNC_F_WRITE:	// 21: Write sequential
 			// DE=address of FCB. Returns error codes in BA and HL.
-			/*
-			0	OK,
-			1	directory full,
-			2	disc full,
-			8	(MP/M) record locked by another process,
-			9	invalid FCB,
-			10	(CP/M) media changed; (MP/M) FCB checksum error,
-			11	(MP/M) unlocked file verification error,
-			0FFh	hardware error.
-			*/
+			//	0	OK,
+			//	1	directory full,
+			//	2	disc full,
+			//	8	(MP/M) record locked by another process,
+			//	9	invalid FCB,
+			//	10	(CP/M) media changed; (MP/M) FCB checksum error,
+			//	11	(MP/M) unlocked file verification error,
+			//	0FFh	hardware error.
+			
 			bdos_return1(bdos_f_write((struct FCB *)bdos_param_de));
 			break;
 		
@@ -428,28 +466,25 @@ void bdos() __naked {
 		
 		case BDOS_FUNC_F_SIZE:	// 35: Compute file size
 			//@TODO: Return "0", but update FCB's R0, R1, R2 records:
-			/*
-			s.st_size >>= 7;
-			FCB_R0(fcb) = s.st_size & 0xff;
-			s.st_size >>= 8;
-			FCB_R1(fcb) = s.st_size & 0xff;
-			s.st_size >>= 8;
-			FCB_R2(fcb) = s.st_size & 1;
-			*/
+			// s.st_size >>= 7;
+			// FCB_R0(fcb) = s.st_size & 0xff;
+			// s.st_size >>= 8;
+			// FCB_R1(fcb) = s.st_size & 0xff;
+			// s.st_size >>= 8;
+			// FCB_R2(fcb) = s.st_size & 1;
 			bdos_puts("SIZE");
 			break;
 		
 		case BDOS_FUNC_F_RANDREC:	// 36: Set random record
 			// Update FB.R0/R1/R2 to reflect current pos
 			bdos_puts("RANDREC");
-			/*
-			fcb->r0 = (bdos_file_ofs >> 7) & 0xff;
-			fcb->r1 = (bdos_file_ofs >> 7) >> 8;
-			fcb->r2 = (bdos_file_ofs >> 7) >> 16;
-			fcb->cr = SEQ_CR(bdos_file_ofs);
-			fcb->ex = SEQ_EX(bdos_file_ofs);
-			fcb->s2 = SEQ_S2(bdos_file_ofs);
-			*/
+			
+			// fcb->r0 = (bdos_file_ofs >> 7) & 0xff;
+			// fcb->r1 = (bdos_file_ofs >> 7) >> 8;
+			// fcb->r2 = (bdos_file_ofs >> 7) >> 16;
+			// fcb->cr = SEQ_CR(bdos_file_ofs);
+			// fcb->ex = SEQ_EX(bdos_file_ofs);
+			// fcb->s2 = SEQ_S2(bdos_file_ofs);
 			break;
 		
 		case BDOS_FUNC_DRV_RESET:	// 37: Reset drive
@@ -464,7 +499,7 @@ void bdos() __naked {
 			//bdos_return1(bdos_f_writezf((FCB *)bdos_param_de));
 			break;
 		
-		/*
+		
 		#ifdef BDOS_TRAP
 		case 0xff:	// My own custom function to TRAP
 			//bdos_puts("** TRAP **");
@@ -473,18 +508,22 @@ void bdos() __naked {
 			//getchar();
 			break;
 		#endif
-		*/
+		
 		
 		default:
-			bdos_printf_d("BDOS#", bdos_func);
-			bdos_getchar();
+			bdos_printf("BDOS0x");
+			//bdos_printf_d(bdos_func);
+			//bdos_printf_d(bdos_param_c);
+			bdos_printf_x2(bdos_param_c);
+			//bdos_getchar();
 	}
 	
 	__asm
+		; End of BDOS entry
 		ret
 	__endasm;
 }
-
+*/
 
 
 
@@ -500,19 +539,37 @@ byte bdos_getchar() {
 }
 
 void bdos_puts(const char *str) {
+//void bdos_puts(const char *str, char delimiter) {
+	// Output zero terminated string
 	while(*str) bios_conout(*str++);
+	
+	// Output variable terminated string
+	//while(*str != delimiter) bios_conout(*str++);
+	
+	// New line after puts()
+	bios_conout('\n');
 }
-void bdos_gets(char *pc) {
+//void bdos_gets(char *pc) {
+//void bdos_gets(char *pc, char delimiter) {
+void bdos_gets(char *pc, byte max_size) {
 	char *pcs;
 	char c;
 	pcs = pc;
+	byte l;
 	
+	l = 0;
 	while(1) {
 		c = bios_conin();
+		
+		// Echo
+		bios_conout(c);
+		
 		if ( (c == 8) || (c == 127) ) {
 			// Backspace/DEL
-			if (pc > pcs) {
-				pc--;
+			//if (pcs > pc) {
+			if (l > 0) {
+				pcs--;
+				l--;
 				/*
 				if (lcd_x > 0) {
 					lcd_x--;
@@ -523,41 +580,61 @@ void bdos_gets(char *pc) {
 			continue;
 		}
 		
-		bios_conout(c);
-		
-		if ((c == '\n') || (c == '\r') || (c == 0)) {
+		// ENTER, EOF
+		if ((c == '\n') || (c == '\r')) {	// || (c == 0)) {
 			// End of string
 			
-			// Terminate string
-			*pc = 0;
+			// Terminate string with zero
+			*pcs = 0;
+			
+			// Terminate string with given delimiter
+			//*pcs = delimiter;
 			return;
 		}
 		
-		// Add char
-		*pc++ = c;
+		if (l >= max_size) {
+			//sound_beep();
+			continue;
+		}
+		
+		// Add char to buffer
+		*pcs++ = c;
+		l++;
 	}
+	
+	//return pcs;
 }
 
 // STDIO Helpers
 void bdos_printf(char *pc) {
-	char c;
-	c = *pc;
-	while(c != 0) {
-		bios_conout(c);
-		pc++;
-	}
+	while(*pc) bios_conout(*pc++);
 }
 
-void bdos_printf_d(char *pc, byte d) {
+/*
+//void bdos_printf_d(char *pc, byte d) {
+void bdos_printf_d(byte d) {
 	byte i;
-	
-	bdos_printf(pc);
-	i = 100;
+	//bdos_printf(pc);
+	i = 100;	// Maximum decimal digit (1/10/100/1000/...)
 	while(i > 0) {
 		bios_conout('0' + ((d / i) % 10));
 		i /= 10;
 	}
-	//bios_conout('\n');
+}
+*/
+
+//@TODO: Use <hex.h>?
+byte bdos_hexDigit(byte c) {
+	if (c < 10) return ('0'+c);
+	return 'A' + (c-10);
+}
+void bdos_printf_x2(byte b) {
+	bios_conout(bdos_hexDigit(b >> 4));
+	bios_conout(bdos_hexDigit(b & 0x0f));
+}
+void bdos_printf_x4(word w) {
+	bdos_printf_x2(w >> 8);
+	bdos_printf_x2(w & 0x00ff);
 }
 
 
@@ -857,29 +934,30 @@ byte bdos_f_open(struct FCB *fcb) {
 		// Send request to host
 		host_sendfcb(BDOS_FUNC_F_OPEN, fcb);
 		r = host_receivefcb(fcb);
+	
+		if (r != 0xff) {
+			fcb->s2 |= 0x80;	// Make it "0x80" even if not found
+			
+			/*
+			//bdos_file_ofs = 0;
+			fcb->ex = 0;	// Current extent
+			fcb->s1 = 2;	//@TODO: ?
+			fcb->s2 |= 0x80;	// mark "open"?
+			fcb->rc = 0x80;	// @TODO: Number of records in extend
+			//fcb->d = .... whatever
+			fcb->cr = 0;
+			fcb->r0 = 0;
+			fcb->r1 = 0;
+			fcb->r2 = 0;
+			// Rest is zero
+			*/
+		}
 	#else
 		//@TODO: Implement bare-metal version
 		bdos_puts("bdos_f_open n/a");
+		(void)fcb;
 		r = 0xff;
 	#endif
-	
-	if (r != 0xff) {
-		fcb->s2 |= 0x80;	// Make it "0x80" even if not found
-		
-		/*
-		//bdos_file_ofs = 0;
-		fcb->ex = 0;	// Current extent
-		fcb->s1 = 2;	//@TODO: ?
-		fcb->s2 |= 0x80;	// mark "open"?
-		fcb->rc = 0x80;	// @TODO: Number of records in extend
-		//fcb->d = .... whatever
-		fcb->cr = 0;
-		fcb->r0 = 0;
-		fcb->r1 = 0;
-		fcb->r2 = 0;
-		// Rest is zero
-		*/
-	}
 	
 	return r;
 }
@@ -890,6 +968,10 @@ byte bdos_f_close(struct FCB *fcb) {
 	#ifdef BDOS_USE_HOST
 		host_sendfcb(BDOS_FUNC_F_CLOSE, fcb);
 		r = 0x00;
+	
+		if (r != 0xff) {
+			fcb->s2 &= 0x7f;	// remove "open" flag?
+		}
 	#else
 		//@TODO: Implement bare-metal version
 		(void)fcb;	// Quiet the compiler
@@ -897,55 +979,55 @@ byte bdos_f_close(struct FCB *fcb) {
 		r = 0xff;
 	#endif
 	
-	if (r != 0xff) {
-		fcb->s2 &= 0x7f;	// remove "open" flag?
-	}
 	return r;
 }
 
 byte bdos_f_read(struct FCB *fcb) {
-	word l;
-	word rn;
-	word ex;
 	
 	#ifdef BDOS_USE_HOST
+		word l;
+		word rn;
+		word ex;
+	
 		//host_sendfcb(BDOS_FUNC_F_READ, fcb);
 		host_sendfcb(bdos_param_c, fcb);
 		
 		// Receive data
 		l = host_receivedma();
+	
+		// Return 1 on EOF
+		if (l == 0) {
+			return 1;	// 1 = EOF
+		}
+		
+		if (l < 128) {
+			// Fill with EOFs
+			bdos_memset(bios_dma + l, 0x1a, 128 - l);
+		}
+		
+		/*
+		bdos_file_ofs += l;
+		fcb->cr = SEQ_CR(bdos_file_ofs);
+		fcb->ex = SEQ_EX(bdos_file_ofs);
+		fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
+		*/
+		
+		rn = fcb->cr + (fcb->ex * 128) + ((fcb->s2 & 1) * 16384);
+		rn++;
+		ex = rn / 128;
+		fcb->cr = rn % 128;
+		fcb->ex = ex % 32;
+		fcb->s2 = (0x80 | (ex / 32));
+		
+		//bdos_puts("readOK");
+		return 0x00;
 	#else
 		//@TODO: Implement bare-metal version
 		bdos_puts("bdos_f_read n/a!");
-		l = 0;
+		(void)fcb;
+		return 1;	// 1 = EOF
 	#endif
 	
-	// Return 1 on EOF
-	if (l == 0) {
-		return 1;	// 1 = EOF
-	}
-	
-	if (l < 128) {
-		// Fill with EOFs
-		bdos_memset(bios_dma + l, 0x1a, 128 - l);
-	}
-	
-	/*
-	bdos_file_ofs += l;
-	fcb->cr = SEQ_CR(bdos_file_ofs);
-	fcb->ex = SEQ_EX(bdos_file_ofs);
-	fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
-	*/
-	
-	rn = fcb->cr + (fcb->ex * 128) + ((fcb->s2 & 1) * 16384);
-	rn++;
-	ex = rn / 128;
-	fcb->cr = rn % 128;
-	fcb->ex = ex % 32;
-	fcb->s2 = (0x80 | (ex / 32));
-	
-	//bdos_puts("readOK");
-	return 0x00;
 }
 
 byte bdos_f_readrand(struct FCB *fcb) {
@@ -1052,10 +1134,16 @@ byte bdos_f_snext(struct FCB *fcb) {
 void bdos_init() __naked {
 	// Called by bios_wboot(), which invokes BDOS_FUNC_P_TERMCPM
 	
-	//bios_setdma(0x0080);	// Is done at bios_wboot()
+	// Show BDOS banner (BIOS shows CP/M banner)
+	bdos_printf("BDOS");
+	
+	//bios_setdma(0x0080);	// Is already done at bios_wboot()
+	
+	// Restore BDOS entry (if corrupted)
+	//*((word *)(0x0006)) = (word)&bdos_init;
 	
 	bdos_delimiter = '$';
-	bdos_user = 1;
+	bdos_user = 1;	//@FIXME: This should be the upper bits of the bios_curdsk at 0x0004
 	
 	bdos_memset((byte *)bdos_fcb, 0x00, 36);	//sizeof(FCB));
 	
@@ -1074,12 +1162,159 @@ void bdos_init() __naked {
 		*(word *)0x0006 = (BDOS_TOP_OF_RAM - 3);
 	#endif
 	
+	// Install scroll callback to pause after one page of text
+	// ! Must be handled by BIOS - it "knows" the LCD driver.
+	//bios_scroll_counter = LCD_ROWS;
+	//lcd_scroll_cb = &bios_scroll_cb;
 	
-	//@TODO: Load CCP to transient area and run it!
-	bdos_puts("Must load CCP now (n/a)");
-	bdos_getchar();
+	
+	// Load CCP to transient area and run it!
+	//@TODO: Load from file using BDOS functions!
+	while(1) {
+		bdos_printf("Load CCP?");
+		char c = bdos_getchar();
+		
+		if (c == 'N') {
+			bdos_printf("cart...");
+			__asm
+				jp 0x8000
+			__endasm;
+		}
+		
+		if (c == 'Y') {
+			// Assuming CCP is included in current RAM image
+			//word ccp_loc_code = 0x6000;
+			bdos_printf("0x6000...");
+			bdos_memset((byte *)0x0080, 0, 128);	// Clear DMA area (CCP command line arguments)
+			//*((byte *)0x0080) = 0;	// Clear CCP argl (dma area)
+			//*((byte *)0x0081) = 0;	// Clear CCP args (dma area+1)
+			
+			// Invoke CCP entry point (must match LOC_CODE of ccp compilation!)
+			__asm
+				;push af
+				;push hl
+				
+				jp 0x6000
+				;call 0x6000
+				
+				;pop hl
+				;pop af
+				
+			__endasm;
+		}
+	}
+}
+
+void bdos_c_read() __naked {	// BDOS_FUNC_C_READ:	// 1: Console input
+	/*
+	char c = bios_conin();	// Get a char from bios
+	bios_conout(c);	// Echo it (as spec.)
+	//bios_conout(')');	// for debugging
+	bdos_return1(c);	// Return it
+	*/
+	__asm
+		call _bios_conin
+		; Result should be in L
+		
+		; Local echo (as per spec.)
+		push hl	; Push parameter L (dont care about D). L will be the most recent stack argument, thats all that matters.
+		call _bios_conout
+		pop hl	; Pop parameter(s)
+		
+		; Result is still in L, great! So just return.
+		ret
+	__endasm;
+}
+
+void bdos_c_write(char c) __naked {	// BDOS_FUNC_C_WRITE:	// 2: Console output
+	(void)c;	// Silencethe  compiler about unused argument
+	
+	//bios_conout(bdos_param_e);
+	__asm
+		push de	; Push parameter E (dont care about D). E will be the most recent stack argument, thats all that matters.
+		call _bios_conout
+		pop de	; Pop the parameter(s). We pushed D and E, so we must pop both.
+		ret
+	__endasm;
+}
+
+void bdos_c_readstr(void *de) __naked {	// BDOS_FUNC_C_READSTR:	// 10: Read console buffer
+	word bdos_param_de;
+	char *pc;
+	char s;
+	
+	// DE points to buffer (first byte is max size). Special case: DE=0 = use DMA area
+	(void)de;	// Silence the compiler about unused argument
+	//bdos_printf("DE="); bdos_printf_x4(bdos_param_de); bdos_getchar();
+	__asm
+		; Store register "D"
+		ld a, d
+		ld (_bdos_param_d), a
+		
+		; Store register "E"
+		ld a, e
+		ld (_bdos_param_e), a
+	__endasm;
+	
+	bdos_param_de = (word)bdos_param_d * 256 + (word)bdos_param_e;
+	if (bdos_param_de == 0) bdos_param_de = (word)bios_dma;	// 0x0080
+	
+	pc = (char *)bdos_param_de;
+	s = *pc;	// First byte contains maximum buffer size
+	
+	//bdos_putchar('?'); bdos_getchar();
+	
+	// Actually read str (as zero-terminated c string)
+	bdos_gets(pc+2, s);	// +0=max_size, +1=len, +2=data (without CR/LF)
+	
+	//bdos_putchar('!'); bdos_getchar();
+	
+	// Determine length
+	s = bdos_strlen(pc+2);
+	
+	// Write string length to second byte
+	*(pc+1) = s;
+	
+	// Add delimiter character
+	//pc = (char *)(bdos_param_de + s);
+	// *pc = bdos_delimiter;
+	
+	__asm
+		ret
+	__endasm;
 	
 }
 
 
+// Catch-all for unimplemented functions
+void bdos_unimplemented() __naked {
+	//@TODO: Also show function number (register C)
+	bdos_puts("UNIMPL!");
+	return;
+}
+
+// BDOS function jump table
+void bdos_funcs() __naked {
+	__asm
+		jp _bdos_init	; BDOS_FUNC_P_TERMCPM:	// 0: System reset
+		jp _bdos_c_read	; BDOS_FUNC_C_READ:	// 1: Console input
+		jp _bdos_c_write	; BDOS_FUNC_C_WRITE:	// 2: Console output
+		
+		jp _bdos_unimplemented	// 3
+		jp _bdos_unimplemented	// 4
+		jp _bdos_unimplemented	// 5
+		jp _bdos_unimplemented	// 6
+		jp _bdos_unimplemented	// 7
+		jp _bdos_unimplemented	// 8
+		jp _bdos_unimplemented	// 9
+		
+		jp _bdos_c_readstr	; BDOS_FUNC_C_READSTR:	// 10: Read console buffer
+		
+		; Pad with "unimplemented" vectors
+		jp _bdos_unimplemented
+		jp _bdos_unimplemented
+		jp _bdos_unimplemented
+		jp _bdos_unimplemented
+	__endasm;
+}
 #endif	// __BDOS_C

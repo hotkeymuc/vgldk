@@ -12,7 +12,8 @@
 
 //#include <basictypes.h>	// byte, word, true, false, NULL, ...
 
-#define CCP_MAX_INPUT 128	//32
+//#define CCP_MAX_INPUT 128	//32
+#define CCP_MAX_INPUT PROGRAM_GETS_MAX_SIZE
 
 //#define CCP_CMD_PORT	// Port access
 
@@ -56,7 +57,11 @@ char __at(0x0080) ccp_dma[128];	// DMA at 0x0080
 unsigned char __at(0x0003) bios_iobyte;
 unsigned char __at(0x0004) bios_curdsk;
 
+byte ccp_running;	// To be able to stop the input loop
+char ccp_input[CCP_MAX_INPUT];
 
-//void ccp();
+void main() __naked;
+void handle(char *input);
+void ccp();
 
 #endif	// __CCP_H

@@ -5,6 +5,7 @@
 	.area	_HEADER (ABS)
 	
 
+; Resulting binary file will have on byte 0 address 0x100!
 ;.org 0x0000
 ;;; First executed instructions (usually "jp 0xf200" on CP/M)
 ;	;di

@@ -221,6 +221,11 @@ byte bdos_user;	// This should be the upper bits of the bios_curdsk 0x0004
 struct FCB __at(0x005c) bdos_fcb;	// Default FCB at 0x005c
 //long bdos_file_ofs;
 
+
+
+//@FIXME: This is super nasty and inefficient!
+// In order to force values to registers, I am shuffling them into memory and back. Please fix!
+
 #ifdef BDOS_SAVE_ALL_REGISTERS
 	volatile byte bdos_param_a;	// Only for debugging
 	volatile byte bdos_param_b;	// Only for debugging
@@ -241,8 +246,16 @@ volatile byte bdos_ret_b;
 #define bdos_return1(A) {\
 	bdos_ret_a = (byte)A;\
 __asm\
+	push af\
 	ld a, (_bdos_ret_a)\
 	ld l, a\
+	pop af\
+	ret\
+__endasm;}
+
+#define bdos_returnL(A) {\
+__asm\
+	ld l, A\
 	ret\
 __endasm;}
 
@@ -264,13 +277,19 @@ void bdos();	// Main entry point
 // I/O Helpers
 void bdos_putchar(char c);
 byte bdos_getchar();
+
 void bdos_puts(const char *str);
-void bdos_gets(char *pc);
+//void bdos_puts(const char *str, char delimiter);
+//void bdos_gets(char *pc);
+//void bdos_gets(char *pc, char delimiter);
+void bdos_gets(char *pc, byte max_size);
 
 // STDIO Helpers
 void bdos_printf(char *pc);
-void bdos_printf(char *pc);
-void bdos_printf_d(char *pc, byte d);
+//void bdos_printf_d(char *pc, byte d);
+void bdos_printf_d(byte d);
+void bdos_printf_x2(byte d);
+void bdos_printf_x4(word w);
 
 // String Helpers
 byte bdos_strlen(const char *c);
@@ -287,6 +306,37 @@ byte bdos_f_writerand(struct FCB *fcb);
 byte bdos_f_sfirst(struct FCB *fcb);
 byte bdos_f_snext(struct FCB *fcb);
 
-void bdos_init();
+// Functions for jump table
+void bdos_init();	// aka. p_termcpm
+void bdos_c_read();	//BDOS_FUNC_C_READ:	// 1: Console input
+void bdos_c_write(char c); // BDOS_FUNC_C_WRITE:	// 2: Console output
+// 3
+// 4
+// 5
+// 6
+// 7
+// 8
+// 9
+void bdos_c_readstr(void *de);	// BDOS_FUNC_C_READSTR:	// 10: Read console buffer
+
+void bdos_unimplemented();	// Catch-all for unimplemented functions
+
+void bdos_funcs();	// BDOS function jump table
+
+// BDOS function table!
+/*
+void *bdos_funcs[] = {
+	&bdos_init,	//BDOS_FUNC_P_TERMCPM:	// 0: System reset
+	&bdos_c_read,	//BDOS_FUNC_C_READ:	// 1: Console input
+	&bdos_c_write,	// BDOS_FUNC_C_WRITE:	// 2: Console output
+	
+	// Pad with "unimplemented" vectors
+	&bdos_unimplemented,
+	&bdos_unimplemented,
+	&bdos_unimplemented,
+	&bdos_unimplemented,
+	&bdos_unimplemented,
+};
+*/
 
 #endif	// __BDOS_H

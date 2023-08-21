@@ -8,7 +8,7 @@
 	2019-11-09 - 2023-08-15 Bernhard "HotKey" Slawik
 */
 
-#define CPM_TITLE "32K VGL CP/M 2.0.0\n"
-#define CPM_VERSION "2023-08-15 by HotKey\n"
+#define CPM_TITLE "32K VGL CP/M 2.0"
+#define CPM_VERSION "2023-08-15 HotKey"
 
 #endif // __CPM_H
