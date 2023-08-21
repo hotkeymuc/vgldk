@@ -75,6 +75,7 @@ int puts(const char *str) {
 	putchar('\n');
 	return 1;
 }
+//#define puts(s) printf(s)
 
 void printf(const char *pc) {
 	/*
@@ -88,7 +89,6 @@ void printf(const char *pc) {
 	*/
 	while(*pc) putchar(*pc++);
 }
-#define puts(s) printf(s)
 
 //void printf_d(char *pc, byte d) {
 void printf_d(byte d) {

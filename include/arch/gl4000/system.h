@@ -45,6 +45,7 @@ void vgldk_init() __naked {
 	__endasm;
 	
 	lcd_init();
+	//lcd_scroll_cb = ...
 	sound_off();
 	lcd_clear();
 	

@@ -332,12 +332,20 @@ class Monitor:
 		
 		self.wait_for_prompt()
 	
+	def memcpy(self, dest, src, size):
+		self.write('memcpy %04X %04X %04X\n' % (dest, src, size))
+		self.wait_for_prompt()
+	def memset(self, dest, pat, size):
+		self.write('memset %04X %02X %04X\n' % (dest, pat, size))
+		self.wait_for_prompt()
+	
 	def call(self, a):
 		self.write('call %04x\n' % a)
 		#self.readline()
 	
 	def upload(self, filename=None, data=None, dest_addr=0x0000, src_addr=0, skip_zeros=False, skip_trailing=True, max_size=None, chunk_size=56, verify=False):
 		# Upload an app
+		t_start = time.monotonic()
 		self.put('Uploading "%s" to 0x%04X...' % (filename, dest_addr))
 		#dest_addr = 0xc800	# LOC_DATA
 		#app_addr_start = dest_addr	#0xd6ad	# Location of vgldk_init()
@@ -407,7 +415,11 @@ class Monitor:
 			addr += chunk_size
 			o += chunk_size
 		
+		t_end = time.monotonic()
+		t_delta = t_end - t_start
 		self.put('Upload OK.')
+		self.put('Finished after %.2f seconds' % (t_delta))
+		
 	
 
 def hexdump(data, addr=0x0000, width=16):

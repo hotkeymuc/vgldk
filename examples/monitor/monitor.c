@@ -21,7 +21,7 @@ char cmd_arg[MAX_INPUT];
 //#define MONITOR_HELP_LONG	// Include "long" help functionality (needs quite some space for the strings...)
 
 #define MONITOR_SERIAL	// Include serial functions
-	//#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
+	#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
 	
 	//#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use ASM-based softserial (custom for each architecture)
 	

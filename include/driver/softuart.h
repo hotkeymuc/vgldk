@@ -67,7 +67,7 @@
 	
 	#elif SOFTUART_BAUD == 19200
 		// 19200 baud:
-		#warning "SOFTUART_BAUD at 19200 has timing problems. Use with caution!"
+		//#warning "SOFTUART_BAUD at 19200 has timing problems. Use with caution!"
 		
 		#define SOFTUART_RX_DELAY 5	// GL4000 at 19200 baud: 5-6
 		#define SOFTUART_RX_OPS nop\
@@ -75,7 +75,7 @@
 			nop\
 			nop\
 			nop
-		#define SOFTUART_RX_DELAY_EDGE 0	// Usually 1, but in this case: 0, to not miss the highest bit
+		#define SOFTUART_RX_DELAY_EDGE 0	// Usually 1, but in this case: 0, to not miss the highest bit. Might give a warning for "unreachable code" (empty loop)
 		
 		
 		#define SOFTUART_DELAY_TX 1	// GL4000 at 19200 baud: 1-3?
