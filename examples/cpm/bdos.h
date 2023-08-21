@@ -296,47 +296,55 @@ byte bdos_strlen(const char *c);
 void bdos_memset(byte *addr, byte b, word count);
 
 
-byte bdos_f_open(struct FCB *fcb);
-byte bdos_f_close(struct FCB *fcb);
-byte bdos_f_read(struct FCB *fcb);
-byte bdos_f_readrand(struct FCB *fcb);
-byte bdos_f_write(struct FCB *fcb);
-byte bdos_f_writerand(struct FCB *fcb);
-//byte bdos_f_writezf(struct FCB *fcb);
-byte bdos_f_sfirst(struct FCB *fcb);
-byte bdos_f_snext(struct FCB *fcb);
 
 // Functions for jump table
-void bdos_init();	// aka. p_termcpm
+void bdos_init();	// aka. 0 = p_termcpm
+
 void bdos_c_read();	//BDOS_FUNC_C_READ:	// 1: Console input
 void bdos_c_write(char c); // BDOS_FUNC_C_WRITE:	// 2: Console output
-// 3
-// 4
-// 5
-// 6
-// 7
-// 8
-// 9
-void bdos_c_readstr(void *de);	// BDOS_FUNC_C_READSTR:	// 10: Read console buffer
+void bdos_a_read();	// BDOS_FUNC_A_READ:	// 3: Reader input
+void bdos_a_write(char c);	//BDOS_FUNC_A_WRITE:	// 4: Punch output
+void bdos_l_write(char c);	// BDOS_FUNC_L_WRITE:	// 5: List output
+void bdos_c_rawio(char c, char e);	//BDOS_FUNC_C_RAWIO:	// 6: Direct console I/O
+void bdos_get_iobyte();	// BDOS_FUNC_GET_IOBYTE:	// 7: Get I/O Byte
+void bdos_set_iobyte(char c);	// BDOS_FUNC_SET_IOBYTE:	// 8: Set I/O Byte
+void bdos_c_writestr(char *de);	// BDOS_FUNC_C_WRITESTR:	// 9: Print string (until delimiter "$")
+void bdos_c_readstr(char *de);	// BDOS_FUNC_C_READSTR:	// 10: Read console buffer
+void bdos_c_stat();	// BDOS_FUNC_C_STAT:	// 11: Get console status
+void bdos_s_bdosver();	// BDOS_FUNC_S_BDOSVER:	// 12: Return version number
+
+void bdos_drv_allreset();	// BDOS_FUNC_DRV_ALLRESET:	// 13: Reset disk system
+void bdos_drv_set(byte e);// BDOS_FUNC_DRV_SET:	// 14: Select disk
+
+byte bdos_f_open(struct FCB *fcb);	// BDOS_FUNC_F_OPEN:	// 15: Open file
+byte bdos_f_close(struct FCB *fcb);	// BDOS_FUNC_F_CLOSE:	// 16: Close file
+byte bdos_f_sfirst(struct FCB *fcb);	// BDOS_FUNC_F_SFIRST:	// 17: Search for first
+byte bdos_f_snext(struct FCB *fcb);	// BDOS_FUNC_F_SNEXT:	// 18: Search for next
+byte bdos_f_delete(struct FCB *fcb);	// BDOS_FUNC_F_DELETE:	// 19: Delete file
+byte bdos_f_read(struct FCB *fcb);	// BDOS_FUNC_F_READ:	// 20: Read sequential
+byte bdos_f_write(struct FCB *fcb);	// BDOS_FUNC_F_WRITE:	// 21: Write sequential
+byte bdos_f_make(struct FCB *fcb);	// BDOS_FUNC_F_MAKE:	// 22: Make file
+byte bdos_f_rename(struct FCB *fcb);	// BDOS_FUNC_F_RENAME:	// 23: Rename file
+byte bdos_drv_loginvec();	// BDOS_FUNC_DRV_LOGINVEC:	// 24: Return login vector
+void bdos_drv_get();	// BDOS_FUNC_DRV_GET:	// 25: Return current disk
+void bdos_f_dmaoff(char *de);	// BDOS_FUNC_F_DMAOFF:	// 26: Set DMA address
+void bdos_drv_allocvec();	// BDOS_FUNC_DRV_ALLOCVEC:	// 27: Get addr (alloc)
+// 28: Write protect disk
+// 29: Get R/O vector
+// 30: Set file attributes
+// 31: Get addr (disk parms)
+byte bdos_f_usernum();	// BDOS_FUNC_F_USERNUM:	// 32: Set/Get user code
+byte bdos_f_readrand(struct FCB *fcb);	// BDOS_FUNC_F_READRAND:	// 33: Read random
+byte bdos_f_writerand(struct FCB *fcb);	// BDOS_FUNC_F_WRITERAND:	// 34: Write random
+void bdos_f_size(struct FCB *fcb);	// BDOS_FUNC_F_SIZE:	// 35: Compute file size
+void bdos_f_randrec(struct FCB *fcb);	// BDOS_FUNC_F_RANDREC:	// 36: Set random record
+void bdos_drv_reset();	// BDOS_FUNC_DRV_RESET:	// 37: Reset drive
+// 38: Undefined - go back
+// 39: Undefined - go back
+byte bdos_f_writezf(struct FCB *fcb);	// BDOS_FUNC_F_WRITEZF:	// 40: Fill random file w/ zeros
 
 void bdos_unimplemented();	// Catch-all for unimplemented functions
 
 void bdos_funcs();	// BDOS function jump table
-
-// BDOS function table!
-/*
-void *bdos_funcs[] = {
-	&bdos_init,	//BDOS_FUNC_P_TERMCPM:	// 0: System reset
-	&bdos_c_read,	//BDOS_FUNC_C_READ:	// 1: Console input
-	&bdos_c_write,	// BDOS_FUNC_C_WRITE:	// 2: Console output
-	
-	// Pad with "unimplemented" vectors
-	&bdos_unimplemented,
-	&bdos_unimplemented,
-	&bdos_unimplemented,
-	&bdos_unimplemented,
-	&bdos_unimplemented,
-};
-*/
 
 #endif	// __BDOS_H

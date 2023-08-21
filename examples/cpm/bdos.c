@@ -1,5 +1,5 @@
-#ifndef __BDOS_C
-#define __BDOS_C
+//#ifndef __BDOS_C
+//#define __BDOS_C
 
 /*
 	BDOS - Basic Disk Operating System
@@ -926,212 +926,9 @@ void bdos_memset(byte *addr, byte b, word count) {
 #endif
 
 
+// BDOS functions
 
-byte bdos_f_open(struct FCB *fcb) {
-	byte r;
-	
-	#ifdef BDOS_USE_HOST
-		// Send request to host
-		host_sendfcb(BDOS_FUNC_F_OPEN, fcb);
-		r = host_receivefcb(fcb);
-	
-		if (r != 0xff) {
-			fcb->s2 |= 0x80;	// Make it "0x80" even if not found
-			
-			/*
-			//bdos_file_ofs = 0;
-			fcb->ex = 0;	// Current extent
-			fcb->s1 = 2;	//@TODO: ?
-			fcb->s2 |= 0x80;	// mark "open"?
-			fcb->rc = 0x80;	// @TODO: Number of records in extend
-			//fcb->d = .... whatever
-			fcb->cr = 0;
-			fcb->r0 = 0;
-			fcb->r1 = 0;
-			fcb->r2 = 0;
-			// Rest is zero
-			*/
-		}
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_open n/a");
-		(void)fcb;
-		r = 0xff;
-	#endif
-	
-	return r;
-}
-
-byte bdos_f_close(struct FCB *fcb) {
-	byte r;
-	
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_CLOSE, fcb);
-		r = 0x00;
-	
-		if (r != 0xff) {
-			fcb->s2 &= 0x7f;	// remove "open" flag?
-		}
-	#else
-		//@TODO: Implement bare-metal version
-		(void)fcb;	// Quiet the compiler
-		bdos_puts("bdos_f_close n/a!");
-		r = 0xff;
-	#endif
-	
-	return r;
-}
-
-byte bdos_f_read(struct FCB *fcb) {
-	
-	#ifdef BDOS_USE_HOST
-		word l;
-		word rn;
-		word ex;
-	
-		//host_sendfcb(BDOS_FUNC_F_READ, fcb);
-		host_sendfcb(bdos_param_c, fcb);
-		
-		// Receive data
-		l = host_receivedma();
-	
-		// Return 1 on EOF
-		if (l == 0) {
-			return 1;	// 1 = EOF
-		}
-		
-		if (l < 128) {
-			// Fill with EOFs
-			bdos_memset(bios_dma + l, 0x1a, 128 - l);
-		}
-		
-		/*
-		bdos_file_ofs += l;
-		fcb->cr = SEQ_CR(bdos_file_ofs);
-		fcb->ex = SEQ_EX(bdos_file_ofs);
-		fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
-		*/
-		
-		rn = fcb->cr + (fcb->ex * 128) + ((fcb->s2 & 1) * 16384);
-		rn++;
-		ex = rn / 128;
-		fcb->cr = rn % 128;
-		fcb->ex = ex % 32;
-		fcb->s2 = (0x80 | (ex / 32));
-		
-		//bdos_puts("readOK");
-		return 0x00;
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_read n/a!");
-		(void)fcb;
-		return 1;	// 1 = EOF
-	#endif
-	
-}
-
-byte bdos_f_readrand(struct FCB *fcb) {
-	byte r;
-	word rn;
-	word ex;
-	//word l;
-	
-	//bdos_puts("ReadRand");
-	
-	//host_sendfcb(BDOS_FUNC_F_READRAND, fcb);
-	//l = host_receivedma();
-	// Return 1 on EOF
-	//if (l == 0) return 1;
-	//return 0x00;	// Fake "OK"
-	
-	/*
-	// Calculate absolute offset (in bytes)
-	bdos_file_ofs = ((long)fcb->r0 + ((long)fcb->r1 * 256)) * 128L;
-	fcb->cr = SEQ_CR(bdos_file_ofs);
-	fcb->ex = SEQ_EX(bdos_file_ofs);
-	fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
-	*/
-	// Calculate absolute offset (in records)
-	rn = (word)fcb->r0 + ((word)fcb->r1 * 256);
-	ex = rn / 128;
-	fcb->cr = rn % 128;
-	fcb->ex = ex % 32;
-	fcb->s2 = (0x80 | (ex / 32));
-	
-	// Proceed with sequencial read
-	r = bdos_f_read(fcb);
-	return r;
-}
-
-byte bdos_f_write(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITE, fcb);
-		//return 0xff;
-		return 0x00;	// Fake "OK"
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_write n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-	
-}
-
-byte bdos_f_writerand(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITERAND, fcb);
-		//return 0xff;
-		return 0x00;	// Fake "OK"
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_writerand n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-}
-
-/*
-byte bdos_f_writezf(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITEZF, fcb);
-		
-		//return 0xff;
-		return 0x00;	// Fake "OK"
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_writezf n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-}
-*/
-
-byte bdos_f_sfirst(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_SFIRST, fcb);
-		return host_receivefcb(fcb);
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_sfirst n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-}
-byte bdos_f_snext(struct FCB *fcb) {
-	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_SNEXT, fcb);
-		return host_receivefcb(fcb);
-	#else
-		//@TODO: Implement bare-metal version
-		bdos_puts("bdos_f_snext n/a!");
-		(void)fcb;	// Quiet the compiler
-		return 0xff;
-	#endif
-}
-
-
-
-void bdos_init() __naked {
+void bdos_init() __naked {	// 0 = TERMCPM
 	// Called by bios_wboot(), which invokes BDOS_FUNC_P_TERMCPM
 	
 	// Show BDOS banner (BIOS shows CP/M banner)
@@ -1205,6 +1002,8 @@ void bdos_init() __naked {
 	}
 }
 
+// Console I/O BDOS functions
+
 void bdos_c_read() __naked {	// BDOS_FUNC_C_READ:	// 1: Console input
 	/*
 	char c = bios_conin();	// Get a char from bios
@@ -1227,7 +1026,7 @@ void bdos_c_read() __naked {	// BDOS_FUNC_C_READ:	// 1: Console input
 }
 
 void bdos_c_write(char c) __naked {	// BDOS_FUNC_C_WRITE:	// 2: Console output
-	(void)c;	// Silencethe  compiler about unused argument
+	(void)c;	// Silence the  compiler about unused argument
 	
 	//bios_conout(bdos_param_e);
 	__asm
@@ -1238,7 +1037,156 @@ void bdos_c_write(char c) __naked {	// BDOS_FUNC_C_WRITE:	// 2: Console output
 	__endasm;
 }
 
-void bdos_c_readstr(void *de) __naked {	// BDOS_FUNC_C_READSTR:	// 10: Read console buffer
+void bdos_a_read() __naked {	// BDOS_FUNC_A_READ:	// 3: Reader input
+	//s = bios_reader();	// Get a char from bios
+	//// Return ^Z on EOF
+	//bdos_return1(s);	// Return it
+	__asm
+		call _bios_reader
+		; Result should be in L
+		
+		; ; Local echo (as per spec.)
+		; push hl	; Push parameter L (dont care about D). L will be the most recent stack argument, thats all that matters.
+		; call _bios_conout
+		; pop hl	; Pop parameter(s)
+		
+		; Result is still in L, great! So just return.
+		ret
+	__endasm;
+}
+
+void bdos_a_write(char c) __naked {	//BDOS_FUNC_A_WRITE:	// 4: Punch output
+	(void)c;	// Silence the  compiler about unused argument
+	
+	//bios_punch(bdos_param_e);
+	__asm
+		push de	; Push parameter E (dont care about D). E will be the most recent stack argument, thats all that matters.
+		call _bios_punch
+		pop de	; Pop the parameter(s). We pushed D and E, so we must pop both.
+		ret
+	__endasm;
+}
+
+void bdos_l_write(char c) __naked {	// BDOS_FUNC_L_WRITE:	// 5: List output
+	(void)c;	// Silence the compiler about unused argument
+	
+	//bios_list(bdos_param_e);
+	__asm
+		push de	; Push parameter E (dont care about D). E will be the most recent stack argument, thats all that matters.
+		call _bios_list
+		pop de	; Pop the parameter(s). We pushed D and E, so we must pop both.
+		ret
+	__endasm;
+}
+
+void bdos_c_rawio(char c, char e) __naked {	//BDOS_FUNC_C_RAWIO:	// 6: Direct console I/O
+	// Entered with C=6, E=code. Returned values (in A) vary.
+	(void)c;(void)e;	// Silence the compiler about unused argument
+	/*
+	switch(bdos_param_e) {
+		case 0xff:
+			// Return a character without echoing if one is waiting; zero if none is available. In MP/M 1, this works like E=0FDh below and waits for a character.
+			//bdos_return1(inkey());	// Non-blocking! Do NOT echo!
+			
+			c = bios_const();
+			if (c == 0xff) {	// Key is pressed
+				c = bios_conin();	// Get that key
+				//if (c == getchar_last) bdos_return1(0);	// No new key
+			} else {
+				//getchar_last = 0;
+				bdos_return1(0);	// No new key
+			}
+			
+			// New key
+			//getchar_last = c;
+			bdos_return1(c);
+			break;
+			
+		case 0xfe:
+			// [CP/M3, NovaDOS, Z80DOS, DOS+] Return console input status. Zero if no character is waiting, nonzero otherwise.
+			//bdos_return1(checkkey());
+			bdos_return1(bios_const());
+			break;
+		case 0xfd:
+			// [CP/M3, DOS+] Wait until a character is ready, return it without echoing.
+			//bdos_return1(getchar());	// Do NOT echo!
+			bdos_return1(bios_conin());	// Do NOT echo!
+		case 0xfc:
+			// [DOS+] One-character lookahead - return the next character waiting but leave it in the buffer.
+			bdos_return1(0);
+		default:
+			bios_conout(bdos_param_e);
+	}
+	*/
+	//@TODO: Implement switch(e)
+	__asm
+		push de	; Push parameter E (dont care about D). E will be the most recent stack argument, thats all that matters.
+		call _bios_conout
+		pop de	; Pop the parameter(s). We pushed D and E, so we must pop both.
+		ret
+	__endasm;
+}
+
+void bdos_get_iobyte() __naked {	// BDOS_FUNC_GET_IOBYTE:	// 7: Get I/O Byte
+	//bdos_return1(bios_iobyte);
+	__asm
+		push af
+		ld a, (_bios_iobyte)
+		ld l, a
+		pop af
+		ret
+	__endasm;
+}
+
+void bdos_set_iobyte(char c) __naked {	// BDOS_FUNC_SET_IOBYTE:	// 8: Set I/O Byte
+	(void)c;	// Silence the compiler about unused argument
+	//bios_iobyte = bdos_param_e;
+	__asm
+		push af
+		ld a, e
+		ld (_bios_iobyte), a
+		pop af
+		ret
+	__endasm;
+}
+
+void bdos_c_writestr(char *de) __naked {	// BDOS_FUNC_C_WRITESTR:	// 9: Print string (until delimiter "$")
+	(void)de;	// Silence the compiler about unused argument
+	
+	// pc = (char *)bdos_param_de;
+	// while(*pc != bdos_delimiter) {
+	// 	bios_conout(*pc++);
+	// }
+	__asm
+		push af
+		push bc
+		
+		ld a, (_bdos_delimiter)
+		ld b, a
+		
+	0$:
+		ld a, (de)	; get byte
+		cp a, b	; check for delimiter
+		jr z, 1$	; delimiter? break!
+		
+		; Invoke bios_conout with A on stack
+		push af	; Push AF...
+		inc sp	; ...but neglect the F
+		call _bios_conout
+		inc sp	; Clean up rest of AF off the stack
+		
+		; increment DE and loop
+		inc de
+		jp 0$
+		
+	1$:
+		pop bc
+		pop af
+	__endasm;
+	
+}
+
+void bdos_c_readstr(char *de) __naked {	// BDOS_FUNC_C_READSTR:	// 10: Read console buffer
 	word bdos_param_de;
 	char *pc;
 	char s;
@@ -1285,12 +1233,617 @@ void bdos_c_readstr(void *de) __naked {	// BDOS_FUNC_C_READSTR:	// 10: Read cons
 	
 }
 
+void bdos_c_stat() __naked {	// BDOS_FUNC_C_STAT:	// 11: Get console status
+	// Returns A=0 if no characters are waiting, nonzero if a character is waiting.
+	//bdos_return1(bios_const());
+	__asm
+		call _bios_const
+		; Result should be in L now
+		ld a, l
+		ret
+	__endasm;
+}
+void bdos_s_bdosver() __naked {	// BDOS_FUNC_S_BDOSVER:	// 12: Return version number
+	// Returns B=H=system type, A=L=version number.
+	// type = 0=8080, 1=8086, 2=68000/Z8000; bit 0 = MP/M, bit 1 = CP/Net, bit 2 = 16-Bit multi-user
+	// Version: Hex representation of major and minor number, e.g. 0x22 = v2.2
+	
+	//bdos_return2(0, 0x22);
+	__asm
+		ld a, #0
+		ld b, a
+		ld h, a
+		
+		ld a, #0x22
+		ld l, a
+		ret
+	__endasm;
+}
+
+void bdos_drv_allreset() __naked {	// BDOS_FUNC_DRV_ALLRESET:	// 13: Reset disk system
+	//@TODO: Implement
+	// Close disks, reset DMA, forget directory
+	return;
+}
+
+void bdos_drv_set(byte e) __naked {	// BDOS_FUNC_DRV_SET:	// 14: Select disk
+	(void)e;	// Silence the  compiler about unused argument
+	// cpm_drive = bdos_param_e;	// 0 = A, 1 = B
+	
+	//@TODO: If disk not available: return A=0xff, H=1
+	//bios_seldsk(bdos_param_e);
+	//bdos_return1(0);	// 0 = OK, 0xff = error
+	__asm
+		push de
+		call _bios_seldsk
+		pop de
+		ld l, #0	; 0 = OK, 0xff = error
+		ret
+	__endasm;
+}
+
+byte bdos_f_open_(struct FCB *fcb) {
+	byte r;
+	
+	#ifdef BDOS_USE_HOST
+		// Send request to host
+		host_sendfcb(BDOS_FUNC_F_OPEN, fcb);
+		r = host_receivefcb(fcb);
+	
+		if (r != 0xff) {
+			fcb->s2 |= 0x80;	// Make it "0x80" even if not found
+			
+			/*
+			//bdos_file_ofs = 0;
+			fcb->ex = 0;	// Current extent
+			fcb->s1 = 2;	//@TODO: ?
+			fcb->s2 |= 0x80;	// mark "open"?
+			fcb->rc = 0x80;	// @TODO: Number of records in extend
+			//fcb->d = .... whatever
+			fcb->cr = 0;
+			fcb->r0 = 0;
+			fcb->r1 = 0;
+			fcb->r2 = 0;
+			// Rest is zero
+			*/
+		}
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_open n/a");
+		(void)fcb;
+		r = 0xff;
+	#endif
+	
+	return r;
+}
+byte bdos_f_open(struct FCB *fcb) __naked {	// BDOS_FUNC_F_OPEN:	// 15: Open file
+	(void)fcb;
+	
+	// DE = FCB address
+	// A = Result (0xff = error, 0-3 = OK)
+	// Some versions (including CP/M 3) always return zero; others return 0-3 to indicate that an image of the directory entry is to be found at (80h+20h*A).
+	__asm
+		push de	; Push argument DE = FCB address
+		call _bdos_f_open_
+		pop de	; Pop argument DE back
+		; Result is in L
+		
+		; Return B=H=0
+		ld a, #0
+		ld b, a
+		ld h, a
+		
+		; Return A=L=status (0xff=error, 0-3=OK)
+		ld a, l
+		ret
+	__endasm;
+}
+
+byte bdos_f_close_(struct FCB *fcb) {
+	byte r;
+	
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_CLOSE, fcb);
+		r = 0x00;
+	
+		if (r != 0xff) {
+			fcb->s2 &= 0x7f;	// remove "open" flag?
+		}
+	#else
+		//@TODO: Implement bare-metal version
+		(void)fcb;	// Quiet the compiler
+		bdos_puts("bdos_f_close n/a!");
+		r = 0xff;
+	#endif
+	
+	return r;
+}
+byte bdos_f_close(struct FCB *fcb) __naked {	// BDOS_FUNC_F_CLOSE:	// 16: Close file
+	(void)fcb;
+	
+	// DE = FCB address
+	// A = Result (0xff = error, 0-3 = OK)
+	// This function closes a file, and writes any pending data. This function should always be used when a file has been written to.
+	// Some versions (including CP/M 3) always return zero; others return 0-3 to indicate that an image of the directory entry is to be found at (80h+20h*A).
+	__asm
+		push de	; Push argument DE = FCB address
+		call _bdos_f_close_
+		pop de	; Pop argument DE back
+		; Result is in L
+		
+		; Return B=H=0
+		ld a, #0
+		ld b, a
+		ld h, a
+		
+		; Return A=L=status (0xff=error, 0-3=OK)
+		ld a, l
+		ret
+	__endasm;
+}
+
+
+byte bdos_f_sfirst_(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_SFIRST, fcb);
+		return host_receivefcb(fcb);
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_sfirst n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+}
+byte bdos_f_sfirst(struct FCB *fcb) __naked {	// BDOS_FUNC_F_SFIRST:	// 17: Search for first
+	(void)fcb;	// Silence the  compiler about unused argument
+	// DE=address of FCB. Returns error codes in BA and HL.
+	// Search for the first occurrence of the specified file; the filename should be stored in the supplied FCB.
+	// The filename can include ? marks
+	//s = bdos_f_sfirst((struct FCB *)bdos_param_de);
+	////bdos_return1(s);
+	//bdos_return2(s, 0);
+	__asm
+		push de	; Push argument DE = FCB address
+		call _bdos_f_sfirst_
+		pop de	; Pop argument DE back
+		; Result is in L
+		
+		; Return B=H=0
+		ld a, #0
+		ld b, a
+		ld h, a
+		
+		; Return A=L=status (0xff=error, 0-3=OK)
+		ld a, l
+		ret
+	__endasm;
+}
+
+byte bdos_f_snext_(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_SNEXT, fcb);
+		return host_receivefcb(fcb);
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_snext n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+}
+byte bdos_f_snext(struct FCB *fcb) __naked {	// BDOS_FUNC_F_SNEXT:	// 18: Search for next
+	(void)fcb;	// Silence the  compiler about unused argument
+	// DE=(address of FCB)? Returns error codes in BA and HL.
+	//s = bdos_f_snext((struct FCB *)bdos_param_de);
+	//bdos_return1(s);
+	__asm
+		push de	; Push argument DE = FCB address
+		call _bdos_f_snext_
+		pop de	; Pop argument DE back
+		; Result is in L
+		
+		; Return B=H=0
+		;ld a, #0
+		;ld b, a
+		;ld h, a
+		
+		; Return A=L=status (0xff=error, 0-3=OK)
+		ld a, l
+		ret
+	__endasm;
+}
+
+byte bdos_f_delete(struct FCB *fcb) __naked {	// BDOS_FUNC_F_DELETE:	// 19: Delete file
+	(void)fcb;	// Silence the  compiler about unused argument
+	// DE=address of FCB. Returns error codes in BA and HL.
+	// Returns A=0FFh if error, otherwise 0-3
+	
+	//@TODO: Implement!
+	__asm
+		ld l, #0xff
+		ret
+	__endasm;
+}
+
+
+byte bdos_f_read_(struct FCB *fcb) {
+	
+	#ifdef BDOS_USE_HOST
+		word l;
+		word rn;
+		word ex;
+	
+		//host_sendfcb(BDOS_FUNC_F_READ, fcb);
+		host_sendfcb(bdos_param_c, fcb);
+		
+		// Receive data
+		l = host_receivedma();
+	
+		// Return 1 on EOF
+		if (l == 0) {
+			return 1;	// 1 = EOF
+		}
+		
+		if (l < 128) {
+			// Fill with EOFs
+			bdos_memset(bios_dma + l, 0x1a, 128 - l);
+		}
+		
+		/*
+		bdos_file_ofs += l;
+		fcb->cr = SEQ_CR(bdos_file_ofs);
+		fcb->ex = SEQ_EX(bdos_file_ofs);
+		fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
+		*/
+		
+		rn = fcb->cr + (fcb->ex * 128) + ((fcb->s2 & 1) * 16384);
+		rn++;
+		ex = rn / 128;
+		fcb->cr = rn % 128;
+		fcb->ex = ex % 32;
+		fcb->s2 = (0x80 | (ex / 32));
+		
+		//bdos_puts("readOK");
+		return 0x00;
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_read n/a!");
+		(void)fcb;
+		return 1;	// 1 = EOF
+	#endif
+	
+}
+byte bdos_f_read(struct FCB *fcb) __naked {	// BDOS_FUNC_F_READ:	// 20: Read sequential
+	(void)fcb;	// Silence the  compiler about unused argument
+	// DE=address of FCB. Returns error codes in BA and HL.
+	//	0	OK,
+	//	1	end of file,
+	//	9	invalid FCB,
+	//	10	(CP/M) media changed; (MP/M) FCB checksum error,
+	//	11	(MP/M) unlocked file verification error,
+	//	0FFh	hardware error.
+	//s = bdos_f_read((struct FCB *)bdos_param_de);
+	//bdos_return2(s, 0);
+	__asm
+		push de	; Push argument DE = FCB address
+		call _bdos_f_read_
+		pop de	; Pop argument DE back
+		; Result is in L
+		
+		; Return B=H=0
+		ld a, #0
+		ld b, a
+		ld h, a
+		
+		; Return A=L=status (0xff=error, 0-3=OK)
+		ld a, l
+		ret
+	__endasm;
+}
+
+byte bdos_f_write_(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_WRITE, fcb);
+		//return 0xff;
+		return 0x00;	// Fake "OK"
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_write n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+	
+}
+byte bdos_f_write(struct FCB *fcb) __naked {	// BDOS_FUNC_F_WRITE:	// 21: Write sequential
+	(void)fcb;	// Silence the  compiler about unused argument
+	// DE=address of FCB. Returns error codes in BA and HL.
+	//	0	OK,
+	//	1	directory full,
+	//	2	disc full,
+	//	8	(MP/M) record locked by another process,
+	//	9	invalid FCB,
+	//	10	(CP/M) media changed; (MP/M) FCB checksum error,
+	//	11	(MP/M) unlocked file verification error,
+	//	0FFh	hardware error.
+	//bdos_return1(bdos_f_write((struct FCB *)bdos_param_de));
+	__asm
+		push de	; Push argument DE = FCB address
+		call _bdos_f_write_
+		pop de	; Pop argument DE back
+		; Result is in L
+		
+		; Return B=H=0
+		;ld a, #0
+		;ld b, a
+		;ld h, a
+		
+		; Return A=L=status (0xff=error, 0-3=OK)
+		ld a, l
+		ret
+	__endasm;
+}
+
+byte bdos_f_make(struct FCB *fcb) __naked {	// BDOS_FUNC_F_MAKE:	// 22: Make file
+	(void)fcb;	// Silence the  compiler about unused argument
+	// DE=address of FCB. Returns error codes in BA and HL.
+	
+	//@TODO: Implement!
+	__asm
+		ld l, #0xff	; 0xff if directory is full
+		ret
+	__endasm;
+}
+
+byte bdos_f_rename(struct FCB *fcb) __naked {	// BDOS_FUNC_F_RENAME:	// 23: Rename file
+	(void)fcb;	// Silence the  compiler about unused argument
+	// DE=address of FCB. Returns error codes in BA and HL.
+	
+	//@TODO: Implement!
+	__asm
+		ld l, #0xff	; // Returns A=0-3 if successful; A=0FFh if error. Under CP/M 3, if H is zero then the file could not be found
+		ret
+	__endasm;
+}
+
+byte bdos_drv_loginvec() __naked {	// BDOS_FUNC_DRV_LOGINVEC:	// 24: Return login vector
+	// Bit 7 of H corresponds to P: while bit 0 of L corresponds to A:. A bit is set if the corresponding drive is logged in.
+	//bdos_return2(0x00, 0x01);	// 0x00 0x01 = Only drive A
+	__asm
+		ld a, #0x01	; 0x01 = Only drive A
+		ld b, a
+		ld h, a
+		
+		ld a, #0x00
+		ld l, a
+		ret
+	__endasm;
+}
+
+void bdos_drv_get() __naked {	// BDOS_FUNC_DRV_GET:	// 25: Return current disk
+	// Entered with C=19h. Returns drive in A. Returns currently selected drive. 0 => A:, 1 => B: etc.
+	//bdos_return1(bios_curdsk);
+	__asm
+		ld a, (_bios_curdsk)
+		ret
+	__endasm;
+}
+
+void bdos_f_dmaoff(char *de) __naked {	// BDOS_FUNC_F_DMAOFF:	// 26: Set DMA address
+	(void)de;	// Silence the  compiler about unused argument
+	// Entered with C=1Ah, DE=address.
+	// Set the Direct Memory Access address; a pointer to where CP/M should read or write data.
+	// Initially used for the transfer of 128-byte records between memory and disc, but over the years has gained many more functions.
+	//bios_setdma((byte *)bdos_param_de);
+	__asm
+		push de
+		call _bios_setdma
+		pop de
+		ret
+	__endasm;
+}
+
+void bdos_drv_allocvec() __naked {	// BDOS_FUNC_DRV_ALLOCVEC:	// 27: Get addr (alloc)
+	// BDOS function 27 (DRV_ALLOCVEC) - Return address of allocation map
+	// Supported by: All versions, but differs in banked versions.
+	// Entered with C=1Bh. Returns address in HL (16-bit versions use ES:BX).
+	// Return the address of the allocation bitmap (which blocks are used and which are free) in HL. Under banked CP/M 3 and MP/M, this will be an address in bank 0 (the system bank) and not easily accessible.
+	// Under previous versions, the format of the bitmap is a sequence of bytes, with bit 7 of the byte representing the lowest-numbered block on disc, and counting starting at block 0 (the directory). A bit is set if the corresponding block is in use.
+	// Under CP/M 3, the allocation vector may be of this form (single-bit) or allocate two bits to each block (double-bit). This information is stored in the SCB.
+	
+	//@TODO: Implement!
+	//bdos_puts("ALLOCVEC");
+	return;
+}
+
+// 28: Write protect disk
+// 29: Get R/O vector
+// 30: Set file attributes
+// 31: Get addr (disk parms)
+
+byte bdos_f_usernum() __naked {	// BDOS_FUNC_F_USERNUM:	// 32: Set/Get user code
+	// BDOS function 32 (F_USERNUM) - get/set user number
+	// Supported by: CP/M 2 and later.
+	// Entered with C=20h, E=number. If E=0FFh, returns number in A.
+	// Set current user number. E should be 0-15, or 255 to retrieve the current user number into A.
+	// Some versions can use user areas 16-31, but these should be avoided for compatibility reasons.
+	// DOS+ returns the number set in A.
+	
+	//@FIXME: User is usually stored in the upper bits of bios_curdsk [0x0004]
+	//if (bdos_param_e == 0xff) {
+	//	bdos_return1(bdos_user);
+	//} else {
+	//	bdos_user = bdos_param_e;
+	//	bdos_return1(bdos_user);
+	//}
+	__asm
+		; e == 0xff?
+		ld a, e
+		cp a, #0xff
+		jr z, 0$
+		; Set user (and return it)
+		ld (_bdos_user), a
+		
+	0$:
+		; Return user
+		ld a, (_bdos_user)
+		ld l, a
+		ret
+	__endasm;
+}
+
+byte bdos_f_readrand_(struct FCB *fcb) {
+	byte r;
+	word rn;
+	word ex;
+	//word l;
+	
+	//bdos_puts("ReadRand");
+	
+	//host_sendfcb(BDOS_FUNC_F_READRAND, fcb);
+	//l = host_receivedma();
+	// Return 1 on EOF
+	//if (l == 0) return 1;
+	//return 0x00;	// Fake "OK"
+	
+	/*
+	// Calculate absolute offset (in bytes)
+	bdos_file_ofs = ((long)fcb->r0 + ((long)fcb->r1 * 256)) * 128L;
+	fcb->cr = SEQ_CR(bdos_file_ofs);
+	fcb->ex = SEQ_EX(bdos_file_ofs);
+	fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
+	*/
+	// Calculate absolute offset (in records)
+	rn = (word)fcb->r0 + ((word)fcb->r1 * 256);
+	ex = rn / 128;
+	fcb->cr = rn % 128;
+	fcb->ex = ex % 32;
+	fcb->s2 = (0x80 | (ex / 32));
+	
+	// Proceed with sequencial read
+	r = bdos_f_read_(fcb);
+	return r;
+}
+byte bdos_f_readrand(struct FCB *fcb) __naked {	// BDOS_FUNC_F_READRAND:	// 33: Read random
+	(void)fcb;
+	
+	//s = bdos_f_readrand((struct FCB *)bdos_param_de);
+	//bdos_return2(s, 0);
+	__asm
+		push de	; Push argument DE = FCB address
+		call _bdos_f_readrand_
+		pop de	; Pop argument DE back
+		; Result is in L
+		
+		; Return B=H=0
+		;ld a, #0
+		;ld b, a
+		;ld h, a
+		
+		; Return A=L=status (0xff=error, 0-3=OK)
+		ld a, l
+		ret
+	__endasm;
+}
+
+
+byte bdos_f_writerand_(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_WRITERAND, fcb);
+		//return 0xff;
+		return 0x00;	// Fake "OK"
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_writerand n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+}
+byte bdos_f_writerand(struct FCB *fcb) __naked {	// BDOS_FUNC_F_WRITERAND:	// 34: Write random
+	(void)fcb;
+	
+	//s = bdos_f_writerand((struct FCB *)bdos_param_de);
+	//bdos_return2(s, 0);
+	__asm
+		push de	; Push argument DE = FCB address
+		call _bdos_f_writerand_
+		pop de	; Pop argument DE back
+		; Result is in L
+		
+		; Return B=H=0
+		;ld a, #0
+		;ld b, a
+		;ld h, a
+		
+		; Return A=L=status (0xff=error, 0-3=OK)
+		ld a, l
+		ret
+	__endasm;
+}
+
+void bdos_f_size(struct FCB *fcb) __naked {	// BDOS_FUNC_F_SIZE:	// 35: Compute file size
+	(void)fcb;	// Silence the  compiler about unused argument
+	//@TODO: Return "0", but update FCB's R0, R1, R2 records:
+	// s.st_size >>= 7;
+	// FCB_R0(fcb) = s.st_size & 0xff;
+	// s.st_size >>= 8;
+	// FCB_R1(fcb) = s.st_size & 0xff;
+	// s.st_size >>= 8;
+	// FCB_R2(fcb) = s.st_size & 1;
+}
+
+void bdos_f_randrec(struct FCB *fcb) __naked {	// BDOS_FUNC_F_RANDREC:	// 36: Set random record
+	(void)fcb;	// Silence the  compiler about unused argument
+	// Update FB.R0/R1/R2 to reflect current pos
+	bdos_puts("RANDREC");
+	
+	// fcb->r0 = (bdos_file_ofs >> 7) & 0xff;
+	// fcb->r1 = (bdos_file_ofs >> 7) >> 8;
+	// fcb->r2 = (bdos_file_ofs >> 7) >> 16;
+	// fcb->cr = SEQ_CR(bdos_file_ofs);
+	// fcb->ex = SEQ_EX(bdos_file_ofs);
+	// fcb->s2 = SEQ_S2(bdos_file_ofs);
+}
+
+void bdos_drv_reset() __naked {	// BDOS_FUNC_DRV_RESET:	// 37: Reset drive
+	//bdos_puts("DRV_RST");
+}
+
+// 38: Undefined - go back
+
+// 39: Undefined - go back
+
+byte bdos_f_writezf_(struct FCB *fcb) {
+	#ifdef BDOS_USE_HOST
+		host_sendfcb(BDOS_FUNC_F_WRITEZF, fcb);
+		
+		//return 0xff;
+		return 0x00;	// Fake "OK"
+	#else
+		//@TODO: Implement bare-metal version
+		bdos_puts("bdos_f_writezf n/a!");
+		(void)fcb;	// Quiet the compiler
+		return 0xff;
+	#endif
+}
+
+byte bdos_f_writezf(struct FCB *fcb) __naked {	// BDOS_FUNC_F_WRITEZF:	// 40: Fill random file w/ zeros
+	(void)fcb;	// Silence the  compiler about unused argument
+	//bdos_return1(bdos_f_writezf((FCB *)bdos_param_de));
+	//@TODO: Implement
+	__asm
+		ld l, #0xff
+		ret
+	__endasm;
+}
+
 
 // Catch-all for unimplemented functions
 void bdos_unimplemented() __naked {
 	//@TODO: Also show function number (register C)
 	bdos_puts("UNIMPL!");
-	return;
+	__asm
+		ld l, #0xff
+		ret
+	__endasm;
 }
 
 // BDOS function jump table
@@ -1299,22 +1852,51 @@ void bdos_funcs() __naked {
 		jp _bdos_init	; BDOS_FUNC_P_TERMCPM:	// 0: System reset
 		jp _bdos_c_read	; BDOS_FUNC_C_READ:	// 1: Console input
 		jp _bdos_c_write	; BDOS_FUNC_C_WRITE:	// 2: Console output
-		
-		jp _bdos_unimplemented	// 3
-		jp _bdos_unimplemented	// 4
-		jp _bdos_unimplemented	// 5
-		jp _bdos_unimplemented	// 6
-		jp _bdos_unimplemented	// 7
-		jp _bdos_unimplemented	// 8
-		jp _bdos_unimplemented	// 9
-		
+		jp _bdos_a_read	; BDOS_FUNC_A_READ:	// 3: Reader input
+		jp _bdos_a_write	; BDOS_FUNC_A_WRITE:	// 4: Punch output
+		jp _bdos_l_write	; BDOS_FUNC_L_WRITE:	// 5: List output
+		jp _bdos_c_rawio	; BDOS_FUNC_C_RAWIO:	// 6: Direct console I/O
+		jp _bdos_get_iobyte	; BDOS_FUNC_GET_IOBYTE:	// 7: Get I/O Byte
+		jp _bdos_set_iobyte	; BDOS_FUNC_SET_IOBYTE:	// 8: Set I/O Byte
+		jp _bdos_c_writestr	; BDOS_FUNC_C_WRITESTR:	// 9: Print string (until delimiter "$")
 		jp _bdos_c_readstr	; BDOS_FUNC_C_READSTR:	// 10: Read console buffer
+		jp _bdos_c_stat	; BDOS_FUNC_C_STAT:	// 11: Get console status
+		jp _bdos_s_bdosver	; BDOS_FUNC_S_BDOSVER:	// 12: Return version number
+		
+		jp _bdos_drv_allreset	; BDOS_FUNC_DRV_ALLRESET:	// 13: Reset disk system
+		jp _bdos_drv_set	; BDOS_FUNC_DRV_SET:	// 14: Select disk
+	
+		jp _bdos_f_open	; BDOS_FUNC_F_OPEN:	// 15: Open file
+		jp _bdos_f_close	; BDOS_FUNC_F_CLOSE:	// 16: Close file
+		jp _bdos_f_sfirst	; BDOS_FUNC_F_SFIRST:	// 17: Search for first
+		jp _bdos_f_snext	; BDOS_FUNC_F_SNEXT:	// 18: Search for next
+		jp _bdos_f_delete	; BDOS_FUNC_F_DELETE:	// 19: Delete file
+		jp _bdos_f_read	; BDOS_FUNC_F_READ:	// 20: Read sequential
+		jp _bdos_f_write	; BDOS_FUNC_F_WRITE:	// 21: Write sequential
+		jp _bdos_f_make	; BDOS_FUNC_F_MAKE:	// 22: Make file
+		jp _bdos_f_rename	; BDOS_FUNC_F_RENAME:	// 23: Rename file
+		
+		jp _bdos_drv_loginvec	; BDOS_FUNC_DRV_LOGINVEC:	// 24: Return login vector
+		jp _bdos_drv_get	; BDOS_FUNC_DRV_GET:	// 25: Return current disk
+		jp _bdos_f_dmaoff	; BDOS_FUNC_F_DMAOFF:	// 26: Set DMA address
+		jp _bdos_drv_allocvec	; BDOS_FUNC_DRV_ALLOCVEC:	// 27: Get addr (alloc)
+		jp _bdos_unimplemented	; // 28: Write protect disk
+		jp _bdos_unimplemented	; // 29: Get R/O vector
+		jp _bdos_unimplemented	; // 30: Set file attributes
+		jp _bdos_unimplemented	; // 31: Get addr (disk parms)
+		jp _bdos_f_usernum	; BDOS_FUNC_F_USERNUM:	// 32: Set/Get user code
+		jp _bdos_f_readrand	; BDOS_FUNC_F_READRAND:	// 33: Read random
+		jp _bdos_f_writerand	; BDOS_FUNC_F_WRITERAND:	// 34: Write random
+		jp _bdos_f_size	; BDOS_FUNC_F_SIZE:	// 35: Compute file size
+		jp _bdos_f_randrec	; BDOS_FUNC_F_RANDREC:	// 36: Set random record
+		jp _bdos_drv_reset	; BDOS_FUNC_DRV_RESET:	// 37: Reset drive
+		jp _bdos_unimplemented	; // 38: Undefined - go back
+		jp _bdos_unimplemented	; // 39: Undefined - go back
+		jp _bdos_f_writezf	; BDOS_FUNC_F_WRITEZF:	// 40: Fill random file w/ zeros
 		
 		; Pad with "unimplemented" vectors
 		jp _bdos_unimplemented
 		jp _bdos_unimplemented
-		jp _bdos_unimplemented
-		jp _bdos_unimplemented
 	__endasm;
 }
-#endif	// __BDOS_C
+//#endif	// __BDOS_C
