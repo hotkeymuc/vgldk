@@ -1,11 +1,14 @@
 #!/bin/sh
 
+# Run a CP/M .com file in YAZE Z80 emulator
+
 # Program config
 #NAME=ccp
 NAME=ccp
 
 # Must have a different name than "CCP"...
 NAME_YAZE=CCPRUN
+#FILE_ARGS=""
 FILE_ARGS=" DIR"
 #FILE_ARGS=" DUMP 0000"
 FILE_COM=${NAME}.com
@@ -53,12 +56,19 @@ echo ${FILE_COM_YAZE}${FILE_ARGS}>${YAZE_AUTORUN_FILE}
 #yaze -v -s ${YAZE_RC_FILE} -b ${OUTPUT_FILE_COM}
 #yaze -v -s ${YAZE_RC_FILE} ${YAZE_COMMANDS}
 #yaze -s ${YAZE_RC_FILE} ${YAZE_COMMANDS}
-yaze -s ${YAZE_RC_FILE}&
 
+## Run YAZE in background, kill the process after some seconds (from foreground)
+yaze -s ${YAZE_RC_FILE}&
 
 # Kill YAZE in case of a system crash
 echo Waiting ${YAZE_KILL_TIMEOUT} seconds before killing YAZE...
 sleep ${YAZE_KILL_TIMEOUT}
 echo Killing YAZE...
 killall yaze_bin
+
+## Run YAZE in foreground, kill the process after some seconds (from background)
+#(sleep ${YAZE_KILL_TIMEOUT}; echo Killing YAZE...; killall yaze_bin)&
+#yaze -s ${YAZE_RC_FILE}
+
+
 echo End.

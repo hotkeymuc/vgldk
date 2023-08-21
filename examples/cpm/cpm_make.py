@@ -35,14 +35,18 @@ Starting up:
 
 import time
 import os
-import shutil
-import subprocess
+#import shutil
+#import subprocess
+import zipfile	# For creating MAME system ROM zip file
+import datetime	# For nice date
 
+# Import VGLDK tools
 import sys
 sys.path.append('../../tools')
 from rel2app import *
 import calcsize
 
+# Import MONITOR tools for uploading output to real hardware
 sys.path.append('../monitor')
 import monitor
 
@@ -81,35 +85,28 @@ def start_emu():
 	pass
 
 
-def compile():
-	src_path = '.'
-	out_path = 'out'
-	
-	### .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
+def compile(
 	crt_s_files = [
-		'%s/cpm_crt0.s' % src_path
-	]
-	crt_rel_file = '%s/cpm_crt0.rel' % out_path
-	
+		'./crt0.s'
+	],
+	crt_rel_file = 'out/crt0.rel',
 	source_files = [
-		crt_rel_file,	# Start with .rel file for SDCC
-		'%s/cpm.c' % src_path
-	]
-	output_hex_file = '%s/cpm.hex' % out_path
-	output_bin_file = '%s/cpm.bin' % out_path
+		'./main.c'	# CRT0 rel file is prepended automatically
+	],
+	output_hex_file = 'out/main.hex',
+	output_bin_file = 'out/main.bin',
+	lib_path = None,	#'../../lib'
+	include_path = None,	#'../../include',
 	
-	lib_path = None	#'../../include'
-	include_path = '../../include'
-	
-	code_size_estimate = 0x1000	# Approx size of CPM data (to determine optimal offset). Must LARGER OR EQUAL to actual binary size
-	loc_code = 0x8000 - code_size_estimate	# Put CPM as far up as possible
-	# Monitor uses 0xd000 for data
-	loc_data = 0xc000	# static variable data and gsinit-code will be put to this address in binary file
-	loc_idata = None	#0xc800	# ?
+	loc_code = 0x8000,
+	#loc_stack = 0x0020,	# ?
+	loc_data = 0xc000,
+	#loc_idata = None,	#0xc800	# ?
+	#loc_xram = None,	# ?
 	
 	defines = {
 		'VGLDK_SERIES': 4000
-	}
+	}):
 	
 	"""
 	### Compile source file(s) using Z88DK, generate .bin file
@@ -143,7 +140,7 @@ def compile():
 	# Compile .s file(s) to .rel file
 	cmd = 'sdasz80 -o %s %s' % (crt_rel_file, ' '.join(crt_s_files))
 	
-	put('%s...' % cmd)
+	put('>> %s' % cmd)
 	r = os.system(cmd)
 	#put(subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env=env).stdout.read())
 	
@@ -153,22 +150,19 @@ def compile():
 	### Compile source file(s) using SDCC, generate .hex file
 	cmd = 'sdcc -mz80'
 	
-	# --code-loc 0x8000
-	# --stack-loc 0x20
-	# --data-loc 0x30
-	# --idata-loc 0x80
-	# --xram-loc 0xc000
-	# --model-small
-	# --no-std-crt0
-	# --nostdlib
+	#cmd += ' --model-small'
 	cmd += ' --no-std-crt0'	# Provide our own crt0 .rel
+	#cmd += ' --nostdlib'
 	
+	#@TODO: Allow multiple paths
 	if lib_path is not None: cmd += ' --lib-path %s' % lib_path
 	if include_path is not None: cmd += ' -I %s' % include_path
 	
 	cmd += ' --code-loc 0x%04X' % loc_code
+	#if loc_stack is not None: cmd += ' --stack-loc 0x%04X' % loc_stack
 	if loc_data is not None: cmd += ' --data-loc 0x%04X' % loc_data
-	if loc_idata is not None: cmd += ' --idata-loc 0x%04X' % loc_idata
+	#if loc_idata is not None: cmd += ' --idata-loc 0x%04X' % loc_idata
+	#if loc_xram is not None: cmd += ' --xram-loc 0x%04X' % loc_xram
 	
 	# --xram-loc 0xc000
 	# --verbose
@@ -178,27 +172,30 @@ def compile():
 		cmd += ' -D %s=%s' % (k, v)
 	
 	cmd += ' -o %s' % output_hex_file
-	cmd += ' %s' % ' '.join(source_files)	# .rel, .c, .c ...
+	cmd += ' %s %s' % (crt_rel_file, ' '.join(source_files))	# .rel, .c, .c ...
 	
-	put('%s...' % cmd)
+	put('>> %s' % cmd)
 	r = os.system(cmd)
-	put('Result: %s' % r)
-	if r != 0: sys.exit(1)
+	if r != 0:
+		put('Result: %s' % r)
+		sys.exit(1)
 	#put(subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env=env).stdout.read())
 	
 	# Show intermediate .rel file
 	#process_rel_file(crt_rel_file)	#, output_bin_file)
 	
 	
+	if output_bin_file is not None:
 	### Convert .hex, generate .bin file
-	cmd = 'objcopy -Iihex -Obinary %s %s' % (output_hex_file, output_bin_file)
-	put('%s...' % cmd)
-	r = os.system(cmd)
-	put('Result: %s' % r)
-	if r != 0: sys.exit(1)
-	#put(subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env=env).stdout.read())
-	
-	#@FIXME: The .bin file also contains some data at the RAM area... (e.g. file offset 0xc000)
+		cmd = 'objcopy -Iihex -Obinary %s %s' % (output_hex_file, output_bin_file)
+		put('>> %s' % cmd)
+		r = os.system(cmd)
+		if r != 0:
+			put('Result: %s' % r)
+			sys.exit(1)
+		#put(subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env=env).stdout.read())
+		
+		#@FIXME: The .bin file also contains some data at the RAM area... (e.g. file offset 0xc000)
 	
 	### Show stats
 	#process_rel_file(crt_rel_file, output_bin_file)
@@ -286,63 +283,125 @@ def cpm_upload(data):
 
 if __name__ == '__main__':
 	
+	src_path = '.'
+	out_path = 'out'
+	lib_path = None
+	include_path = '../../include'
+	
 	# Compile CP/M (CRT0, BIOS, BDOS, BINT)
 	put('Compiling CP/M (CRT0, BINT, BIOS, BDOS)...')
-	cpm_data = compile()
-	bin_filename = 'out/cpm.bin'
+	
+	cpm_code_size_estimate = 0x1000	# Approx size of CPM data (to determine optimal offset). Must LARGER OR EQUAL to actual binary size
+	cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CPM as far up as possible
+	cpm_loc_data = 0xc000	# static variable data and gsinit-code will be put to this address in binary file. Monitor uses 0xd000 for its data
+	cpm_bin_filename = '%s/cpm.bin' % out_path
+	
+	cpm_data = compile(
+		# The .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
+		crt_s_files = [
+			'%s/cpm_crt0.s' % src_path
+		],
+		crt_rel_file = '%s/cpm_crt0.rel' % out_path,
+		
+		source_files = [
+			# The crt_rel_file is automatically prepended by compile()
+			'%s/cpm.c' % src_path
+		],
+		output_hex_file = '%s/cpm.hex' % out_path,
+		output_bin_file = cpm_bin_filename,
+		
+		lib_path = lib_path,	#'../../lib'
+		include_path = include_path,	#'../../include'
+		loc_code = cpm_loc_code,	#0x8000 - code_size_estimate	# Put CPM as far up as possible
+		loc_data = cpm_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
+		
+		defines = {
+			'VGLDK_SERIES': 4000
+		}
+	)
+	
 	#hexdump(cpm_data[:0x0120], 0x0000)
 	#hexdump(cpm_data[0x7000:0x8000], 0x7000)
 	
 	
 	## Compile CCP (as a simple program)
 	put('Compiling CCP...')
-	transient = 0x100	# Start of transient area
-	ccp_filename = 'out/ccp.com'
-	ccp_loc_code = 0x6000	#LOC_CODE=0x6000 - must match CCP makefile!
+	ccp_bin_filename = '%s/ccp.com' % out_path
+	transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
+	ccp_loc_code = 0x6000	# Must be known by BDOS in order to start up CCP!
+	ccp_loc_data = 0x4000	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
 	
-	#@TODO: Reuse compile()
-	r = os.system('/bin/sh ccp_compile.sh')
-	put('Result: %s' % r)
-	if r != 0: sys.exit(1)
+	ccp_data = compile(
+		# The .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
+		crt_s_files = [
+			'%s/program_crt0.s' % src_path
+		],
+		crt_rel_file = '%s/ccp_crt0.rel' % out_path,
+		
+		source_files = [
+			# The crt_rel_file is automatically prepended by compile()
+			'%s/ccp.c' % src_path
+		],
+		output_hex_file = '%s/ccp.hex' % out_path,
+		output_bin_file = ccp_bin_filename,
+		
+		lib_path = lib_path,	#'../../lib'
+		include_path = include_path,	#'../../include'
+		loc_code = ccp_loc_code,	#0x8000 - code_size_estimate	# Put CPM as far up as possible
+		loc_data = ccp_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
+		
+		defines = {
+			'VGLDK_SERIES': 4000
+		}
+	)
 	
-	# Merge CCP into image
-	with open(ccp_filename, 'rb') as h:
-		ccp_data = h.read()
-	
-	# Extract code only
-	ccp_data = ccp_data[ccp_loc_code - transient:]	# Note! Binary does not start at memory 0x0000, but 0x100 (CP/M program!)
+	# Extract CCP code area
+	# Beware of file offsets! File offset 0x5F00 corresponds to memory 0x6000, because only the transient area is included in the .com file!
+	ccp_data = ccp_data[ccp_loc_code - transient:]	# Note! The binary data does not start at memory location 0x0000, but 0x100 (CP/M program transient area!)
+	ccp_code_size = len(ccp_data)
 	#hexdump(ccp_data, ccp_loc_code)
 	
-	## Merge into CP/M image
-	put('Merging CCP into CP/M image...')
+	## Merge CCP binary into CP/M image
+	put('Merging CCP binary (%d bytes) into CP/M image at 0x%04X...' % (ccp_code_size, ccp_loc_code))
 	#cpm_data[ccp_loc_code:ccp_loc_code+len(ccp_data)] = ccp_data[:]
-	cpm_data = cpm_data[:ccp_loc_code] + ccp_data + cpm_data[ccp_loc_code+len(ccp_data):]
+	cpm_data = cpm_data[:ccp_loc_code] + ccp_data + cpm_data[ccp_loc_code+ccp_code_size:]
 	
-	# Write merged output
-	with open(bin_filename, 'wb') as h:
+	# Write merged output CPM binary
+	with open(cpm_bin_filename, 'wb') as h:
 		h.write(cpm_data)
 	
 	## Decompile using z80dasm
-	#cmd = 'z80dasm --address --labels --source --origin=0000h %s' % bin_filename
+	#cmd = 'z80dasm --address --labels --source --origin=0000h %s' % cpm_bin_filename
 	#os.system(cmd)
 	
 	### Debugging
-	## Debug BDOS area
-	bdos_addr = cpm_data[6] + cpm_data[7] * 0x100
-	put('BDOS addr: 0x%04X' % bdos_addr)
-	hexdump(cpm_data[bdos_addr:bdos_addr+128], bdos_addr)
 	
-	dasm_tmp = '/tmp/z80dasm.asm'
-	cmd = 'z80dasm --address --labels --source --origin=%04Xh %s >%s' % (0x0000, bin_filename, dasm_tmp)
-	os.system(cmd)
-	started = False
-	start_label = 'l%04xh:' % bdos_addr	# Label to start output from
-	for l in open(dasm_tmp, 'r'):
-		if l.startswith(start_label):
-			started = True
-		if started: put(l[:-1])
-	sys.exit(1)
-	
+	DISASSEMBLE_BDOS = False
+	if DISASSEMBLE_BDOS:
+		## Disassemble BDOS area to investigate "stack confusion" bugs
+		bdos_addr = cpm_data[6] + cpm_data[7] * 0x100	# Get BDOS vector at location 0x0005-0x0007 ("JP xxxx")
+		put('Extracted BDOS vector at 0x0005: @bdos = 0x%04X' % bdos_addr)
+		put('Debugging BDOS area')
+		hexdump(cpm_data[bdos_addr:bdos_addr+128], bdos_addr)
+		
+		dasm_tmp = '/tmp/z80dasm.asm'
+		cmd = 'z80dasm --address --labels --source --origin=%04Xh %s >%s' % (0x0000, cpm_bin_filename, dasm_tmp)
+		os.system(cmd)
+		started = False
+		start_label = 'l%04xh:' % bdos_addr	# Label to start output from
+		max_lines = 100
+		line_count = 0
+		for l in open(dasm_tmp, 'r'):
+			if l.startswith(start_label):
+				started = True
+			if started:
+				put(l[:-1])
+				line_count += 1
+				if line_count >= max_lines:
+					put('(Stopping output after %d lines.)' % line_count)
+					break
+		#sys.exit(1)
+	#
 	
 	## Upload to hardware running serial MONITOR
 	#put('Uploading CP/M image...')
@@ -357,6 +416,7 @@ if __name__ == '__main__':
 	OUTPUT_FILE_SYSROMZIP = '%s/%s.zip' % (ROM_DIR, OUTPUT_SYS)
 	OUTPUT_FILE_INFO = '_this_is_cpm.txt'
 	
+	"""
 	# Write dynamic info file
 	with open(OUTPUT_FILE_INFO, 'wb') as h:
 		h.write(b'This is a fake system image to emulate a bootstrapped SRAM in system ROM area')
@@ -376,10 +436,25 @@ if __name__ == '__main__':
 	# Clean up files after zipping
 	os.remove(OUTPUT_FILE_SYSROM)
 	os.remove(OUTPUT_FILE_INFO)
+	"""
+	
+	with zipfile.ZipFile(OUTPUT_FILE_SYSROMZIP, 'w') as z:
+		
+		# Write dynamic info file
+		with z.open(OUTPUT_FILE_INFO, 'w') as h:
+			h.write(b'This is a fake system image to emulate a bootstrapped CP/M SRAM mounted in system ROM area.\n')
+			
+			now = datetime.datetime.now()
+			h.write(b'File created by %b on %b.' % (bytes(__file__, 'ascii'), bytes(str(now), 'ascii')))
+		
+		# Write properly named system ROM (must match machine specific name)
+		with z.open(OUTPUT_FILE_SYSROM, 'w') as h:
+			h.write(cpm_data)
 	
 	
 	## Emulate
 	MAMECMD = '/z/data/_code/_c/mame.git/mame64'
+	#MAMECMD = '/z/data/_code/_c/mame.git/mamehtk64'	# Writable ROM version (needed for CP/M)
 	EMUSYS = OUTPUT_SYS	#''gl4000'
 	CART_FILE = 'out/ccp.com'
 	cmd = '%s -nodebug -rompath "%s" %s -cart "%s" -window -nomax -nofilter -sleep -volume -24 -skip_gameinfo -speed 2.00 -nomouse' % (MAMECMD, ROM_DIR, EMUSYS, CART_FILE)

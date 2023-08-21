@@ -1,16 +1,19 @@
 #!/bin/sh
 
+# Note: cpm_make.py also does the same as this .sh file. (Because it is a good idea to re-compile CCP whenever CPM changes)
+
 NAME=ccp
 
 # CCP can/should live somewhere else than 0x100, because it has to load other programs to that address!
 # Transient area starts at 0x100. BDOS is at top of RAM - so we need to be below that.
 # LOC_CODE must leave enough space for CRT0 code AND not collide with BDOS/BIOS
+#LOC_CODE=0x0100
 #LOC_CODE=0x0180
 #LOC_CODE=0x0108
 LOC_CODE=0x6000
 
-# Data could also be stored in INTERNAL RAM (0xc000 - 0xdfff)
-LOC_DATA=0x6a00
+# Data could be stored in INTERNAL RAM (0xc000 - 0xdfff)
+LOC_DATA=0x4000
 
 OUT_DIR=out
 INC_DIR=`realpath ../../include`
