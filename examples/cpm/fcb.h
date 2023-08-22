@@ -23,7 +23,7 @@ S2 = extent high byte, ie (file pointer / 524288). The CP/M Plus source
 
 //typedef struct {
 struct FCB {
-	fcb_byte dr;	// 0=defaul, 1=A, 2=B, ... 16=P
+	fcb_byte dr;	// 0=default, 1=A, 2=B, ... 16=P
 	fcb_byte f[8];	// file name [f1...f8]; also [highest bit]: attributes
 	fcb_byte t[3];	// file type [t1...t3]; also [highest bit]: RO, SYS, ARC attributes
 	fcb_byte ex;	// Current Extent = (file pointer % 524288) / 16384

@@ -221,8 +221,9 @@ byte bdos_user;	// This should be the upper bits of the bios_curdsk 0x0004
 struct FCB __at(0x005c) bdos_fcb;	// Default FCB at 0x005c
 //long bdos_file_ofs;
 
+volatile byte bdos_fcb_num;	// Currently used fcb number (0...3) inside DMA area. Used for bdos_f_sfirst/next
 
-
+/*
 //@FIXME: This is super nasty and inefficient!
 // In order to force values to registers, I am shuffling them into memory and back. Please fix!
 
@@ -270,7 +271,7 @@ __asm\
 	ld l, a\
 	ret\
 __endasm;}
-
+*/
 
 void bdos();	// Main entry point
 
@@ -284,7 +285,7 @@ void bdos_puts(const char *str);
 //void bdos_gets(char *pc, char delimiter);
 void bdos_gets(char *pc, byte max_size);
 
-// STDIO Helpers
+// STDIO Helpers / hex helpers
 void bdos_printf(char *pc);
 //void bdos_printf_d(char *pc, byte d);
 void bdos_printf_d(byte d);
@@ -292,8 +293,8 @@ void bdos_printf_x2(byte d);
 void bdos_printf_x4(word w);
 
 // String Helpers
-byte bdos_strlen(const char *c);
-void bdos_memset(byte *addr, byte b, word count);
+//byte bdos_strlen(const char *c);
+//void bdos_memset(byte *addr, byte b, word count);
 
 
 

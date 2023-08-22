@@ -8,10 +8,13 @@
 	
 */
 
-//byte __at(0x0040) bios_workarea[0x100];	// located in lowstorage
-
 //#define MAX_DATA 128
 #define BIOS_STACK 0xDFF0	// BIOS (re)sets stack pointer there
+
+
+//#define BIOS_USE_PRINTER	// Include printer driver and redirect printer "list" to printer.
+//#define BIOS_PAPER_TAPE_TO_SOFTUART	// Redirect paper tape functions "punch" and "reader" to SoftUART
+//#define BIOS_PAPER_TAPE_TO_MAME	// Redirect paper tape functions "punch" and "reader" to MAME-Host
 
 // BIOS function numbers
 // https://www.seasip.info/Cpm/bios.html
@@ -119,19 +122,6 @@ word bios_sec;
 
 DPH bios_dummy_dph;	// Dummy DPH
 
-
-/*
-byte bios_func;
-byte bios_param_b;
-byte bios_param_c;
-byte bios_ret_a;
-#define bios_returnA(A)\
-	bios_ret_a = (byte)A;\
-__asm\
-	ld a, (_bios_ret_a)\
-	ret\
-__endasm
-*/
 
 void bios_boot();
 void bios_wboot();

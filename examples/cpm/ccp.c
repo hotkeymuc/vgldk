@@ -95,8 +95,8 @@ char *fcb2name(struct FCB *fcb) {
 
 #ifdef CCP_CMD_DUMP
 	#define HEX_USE_DUMP	// Force hex.h to include dump()
-	#define HEX_DUMP_WIDTH 16
-	#define HEX_DUMP_INTRA_HEX " "
+	#define HEX_DUMP_WIDTH 4	//16
+	#define HEX_DUMP_INTRA_HEX ""	//" "
 	#define HEX_DUMP_EOL "\r\n"
 	
 	//	void dump(byte *a) {
@@ -236,8 +236,8 @@ void ccp_run() __naked {
 	// Try running a program
 	//printf("Running...");
 	__asm
-		jp 0x0100
-		;call 0x0100
+		;jp 0x0100
+		call 0x0100
 	__endasm;
 	
 	// Will not exit, but rather invoke BIOS warm boot
@@ -250,6 +250,9 @@ volatile byte ccp_reg_e;
 void ccp_dir() {
 	byte i;
 	char c;
+	word count;
+	struct FCB *dir_fcb;
+	
 	
 	//def_fcb.dr = bios_curdsk;	// current drive or '?' for meta info (disc labels, date stamps)
 	def_fcb.dr = '?';	// '?' for meta info (disc labels, date stamps)
@@ -273,14 +276,16 @@ void ccp_dir() {
 	def_fcb.ex = 0;	// default
 	//def_fcb.ex = '?';	// ? = All suitable extents
 	
+	//printf("sfirst...");
+	//@TODO: Move to program.h:bdos_f_sfirst(fcb)
 	__asm
 		push af
 		push bc
 		push de
 		push hl
 		ld c, #17	; 17 = BDOS_FUNC_F_SFIRST
-		ld d, #0x00	; Address of FCB
-		ld e, #0x5c	; Address of FCB
+		ld d, #>_def_fcb	; Address of FCB (high)
+		ld e, #<_def_fcb	; Address of FCB (low)
 		call 5
 		
 		ld (_ccp_ret_a), a
@@ -291,12 +296,20 @@ void ccp_dir() {
 		pop af
 	__endasm;
 	
-	struct FCB *dir_fcb;
+	
+	//printf("loop...");
+	count = 0;
 	while (ccp_ret_a != 0xff) {
 		
-		// Directory entry is now at memory DMA + a*32
+		// The resulting directory entry is now somewhere at DMA + A*32 (where A=0...3)
 		//dump((word)&ccp_dma + ccp_ret_a * 32, 48);
 		dir_fcb = (struct FCB *)((word)&ccp_dma + ccp_ret_a * 32);
+		
+		// Show buffer offset
+		//putchar('0' + ccp_ret_a); printf(":");
+		
+		// Dump FCB
+		//dump((word)dir_fcb, 32); getchar();
 		
 		if (dir_fcb->dr & 0x20) {
 			// Deleted file
@@ -306,7 +319,9 @@ void ccp_dir() {
 			
 		} else  {
 			// Show filename
+			//printf(fcb2name(&def_fcb));
 			
+			printf("\"");
 			for(i = 0; i < 8; i++) {
 				c = dir_fcb->f[i];
 				if (fcb_isspace(c)) break;	//putchar(' ');
@@ -318,28 +333,37 @@ void ccp_dir() {
 				if (fcb_isspace(c)) break;	//putchar(' ');
 				putchar(c);
 			}
-			//printf(fcb2name(&def_fcb));
-			printf("\r\n");
+			
+			// EOL
+			//printf("\r\n");
+			printf("\"\n");
+			count += 1;
 		}
 		
+		
+		//@TODO: Move to program.h:bdos_f_snext(fcb)
 		__asm
-			push af
+			;push af
 			push bc
 			push de
-			push hl
-			ld c, #18	; BDOS_FUNC_F_SNEXT = 18
-			ld d, #0x00
-			ld e, #0x5c
+			;push hl
+		
+			ld c, #18	; 18 = BDOS_FUNC_F_SNEXT
+			ld d, #>_def_fcb	; Address of FCB (high)
+			ld e, #<_def_fcb	; Address of FCB (low)
 			call 5
 			
 			ld (_ccp_ret_a), a
 			
-			pop hl
+			;pop hl
 			pop de
 			pop bc
-			pop af
+			;pop af
 		__endasm;
 	}
+	
+	printf_x2(count);
+	printf(" entries\n");
 	
 }
 
@@ -390,10 +414,12 @@ byte ccp_fopen(char *filename) {
 		push de
 		push hl
 		
-		ld c, #15	; BDOS_FUNC_F_OPEN = 15
-		ld d, #0x00
-		ld e, #0x5c
+		ld c, #15	; 15 = BDOS_FUNC_F_OPEN
+		ld d, #>_def_fcb	; Address of FCB (high)
+		ld e, #<_def_fcb	; Address of FCB (low)
 		call 5
+		
+		// Result FCB should now (also?) be at DMA + A*32
 		
 		ld (_ccp_ret_a), a
 		
@@ -402,8 +428,6 @@ byte ccp_fopen(char *filename) {
 		pop bc
 		pop af
 	__endasm;
-	
-	// FCB shoud be at DMA + A*32
 	
 	return ccp_ret_a;
 }
@@ -414,8 +438,8 @@ byte ccp_fclose() {
 		push de
 		push hl
 		ld c, #16	; BDOS_FUNC_F_CLOSE = 16
-		ld d, #0x00
-		ld e, #0x5c
+		ld d, #>_def_fcb	; Address of FCB (high)
+		ld e, #<_def_fcb	; Address of FCB (low)
 		call 5
 		
 		ld (_ccp_ret_a), a
@@ -436,32 +460,33 @@ byte ccp_load(char *filename) {
 	printf("Open \"");
 	printf(filename);
 	printf("\"...");
+	//putchar('?');getchar();
 	
 	r = ccp_fopen(filename);
 	
-	if (ccp_ret_a != 0x00) {
-		ccp_print_error(ccp_ret_a);
-		return ccp_ret_a;
+	if (r != 0x00) {
+		ccp_print_error(r);
+		return r;
 	}
 	
 	ccp_print_ok();
+	//putchar('?');getchar();
 	
-	//@TODO: Load data
+	// Load data from file
 	printf("Load...");
-	a = (byte *)0x0100;
+	a = (byte *)0x0100;	// cpm_transient
 	do {
 		
 		//printf(".");	// Progress
-		
 		__asm
 			push af
 			push bc
 			push de
 			push hl
 			
-			ld c, #20	; BDOS_FUNC_F_READ = 20
-			ld d, #0x00
-			ld e, #0x5c
+			ld c, #20	; 20 = BDOS_FUNC_F_READ
+			ld d, #>_def_fcb	; Address of FCB (high)
+			ld e, #<_def_fcb	; Address of FCB (low)
 			call 5
 			
 			ld (_ccp_ret_a), a
@@ -471,7 +496,6 @@ byte ccp_load(char *filename) {
 			pop bc
 			pop af
 		__endasm;
-		
 		//printf_x2(ccp_ret_a);
 		
 		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
@@ -485,11 +509,13 @@ byte ccp_load(char *filename) {
 	
 	ccp_print_ok();
 	
-	//@TODO: Close file
+	// Close file
 	ccp_fclose();
 	
-	//printf("Run...");
-	ccp_run();
+	// Run file
+	printf("Run?");
+	if (getchar() == 'Y')
+		ccp_run();
 	
 	return 0x00;
 	
@@ -623,7 +649,6 @@ void handle(char *input) {
 			
 			;ld c, #0x02	; 2 = C_WRITE
 			;ld e, #0x40
-			
 			
 			call 5
 			
@@ -813,7 +838,7 @@ void handle(char *input) {
 void ccp() __naked {
 	
 	//putchar('!');
-	puts('CCP');
+	puts("CCP");
 	//printf("CCP!"); getchar();
 	memset(&ccp_input[0], 0, CCP_MAX_INPUT);	// Zero out the input buffer
 	

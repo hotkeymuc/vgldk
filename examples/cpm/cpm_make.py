@@ -57,33 +57,6 @@ def put(t):
 def hexdump(data, addr=0):
 	put(monitor.hexdump(data, addr=addr))
 
-def start_emu():
-	"""
-	put('Launching MESS emulator...')
-	
-	#"%MESSPATH%\mess.exe" -rompath "%ROMPATH%" %EMUSYS% -cart "%PROGNAME%.bin" -window -nomax -nofilter -sleep -volume -10 -skip_gameinfo -speed 2.00
-	
-	cmd = '"%s"' % os.path.join(mess_path, 'mess.exe')
-	cmd += ' -rompath "%s"' % (mess_rom_path)
-	cmd += ' %s' % (mess_sys)
-	cmd += ' -cart "%s"' % (os.path.abspath(os.path.join(self.output_path, bin_filename)))
-	cmd += ' -window'
-	cmd += ' -nomax'
-	cmd += ' -nofilter'
-	cmd += ' -sleep'
-	cmd += ' -volume -20'
-	cmd += ' -skip_gameinfo'
-	cmd += ' -speed 2.00'
-	#cmd += ' -debug'	# Attach debug console and STEP
-	
-	self.chdir(self.staging_path)	# Change to staging dir (MESS creates some messy files wherever it is called)
-	r = self.command(cmd)
-	self.chdir(start_path)	# Change back
-	
-	#@TODO: Delete the config file that MESS is creating (CFG)
-	"""
-	pass
-
 
 def compile(
 	crt_s_files = [
@@ -150,7 +123,7 @@ def compile(
 	### Compile source file(s) using SDCC, generate .hex file
 	cmd = 'sdcc -mz80'
 	
-	#cmd += ' --model-small'
+	#cmd += ' --model-small'	# model-small = default, but not supported on Z80
 	cmd += ' --no-std-crt0'	# Provide our own crt0 .rel
 	#cmd += ' --nostdlib'
 	
@@ -170,6 +143,9 @@ def compile(
 	# Add "#define"s
 	for k,v in defines.items():
 		cmd += ' -D %s=%s' % (k, v)
+	
+	#cmd += ' -dD'	# Tell the preprocessor to pass all macro definitions into the output, in their proper sequence in the rest of the output.
+	#cmd += ' --verbose'	# Show stages of compilation
 	
 	cmd += ' -o %s' % output_hex_file
 	cmd += ' %s %s' % (crt_rel_file, ' '.join(source_files))	# .rel, .c, .c ...
@@ -200,7 +176,8 @@ def compile(
 	### Show stats
 	#process_rel_file(crt_rel_file, output_bin_file)
 	
-	calcsize.analyze(output_bin_file)
+	### Show cartridge size statistics
+	#calcsize.analyze(output_bin_file)
 	
 	# Return pure binary data
 	with open(output_bin_file, 'rb') as h:
@@ -283,6 +260,7 @@ def cpm_upload(data):
 
 if __name__ == '__main__':
 	
+	vgldk_series = 4000	# Model of VTech Genius Leader
 	src_path = '.'
 	out_path = 'out'
 	lib_path = None
@@ -290,11 +268,17 @@ if __name__ == '__main__':
 	
 	# Compile CP/M (CRT0, BIOS, BDOS, BINT)
 	put('Compiling CP/M (CRT0, BINT, BIOS, BDOS)...')
+	transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
 	
-	cpm_code_size_estimate = 0x1000	# Approx size of CPM data (to determine optimal offset). Must LARGER OR EQUAL to actual binary size
+	cpm_code_size_estimate = 0x1200	# Approx size of CPM data (to determine optimal offset). Must LARGER OR EQUAL to actual binary size
 	cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CPM as far up as possible
 	cpm_loc_data = 0xc000	# static variable data and gsinit-code will be put to this address in binary file. Monitor uses 0xd000 for its data
 	cpm_bin_filename = '%s/cpm.bin' % out_path
+	
+	ccp_code_size_estimate = 0x0c00
+	ccp_data_size_estimate = 0x0800
+	ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Must be known by BDOS in order to start up CCP!
+	ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
 	
 	cpm_data = compile(
 		# The .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
@@ -316,20 +300,34 @@ if __name__ == '__main__':
 		loc_data = cpm_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
 		
 		defines = {
-			'VGLDK_SERIES': 4000
+			'VGLDK_SERIES': vgldk_series,
+			
+			'SOFTUART_BAUD': 19200,
+			
+			# Paper tape is display by default. But it can be changed at compile time (in the future maybe at runtime using the "iobyte")
+			#'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape to SoftUART
+			#'BIOS_PAPER_TAPE_TO_MAME': 1,	# Redirect paper tape to MAME
+			
+			# BDOS file accesses are not handled in BDOS itself (yet).
+			'BDOS_USE_HOST': 1,	# Re-direct file accesses to a host (see bdos_host.h)
+			#'BDOS_HOST_TO_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines and let BIOS decide what to do
+			#'BDOS_HOST_TO_SOFTUART': 1,	# Re-direct to SoftUART (might be linked statically - you might want to use paper tape)
+			'BDOS_HOST_TO_MAME': 1,	# Re-direct to MAME
+			
+			'CCP_LOC_CODE': '0x%04X'%ccp_loc_code	# Tell BDOS where to find CCP
 		}
 	)
 	
 	#hexdump(cpm_data[:0x0120], 0x0000)
-	#hexdump(cpm_data[0x7000:0x8000], 0x7000)
+	#hexdump(cpm_data[cpm_loc_code:0x8000], cpm_loc_code)
 	
 	
 	## Compile CCP (as a simple program)
 	put('Compiling CCP...')
 	ccp_bin_filename = '%s/ccp.com' % out_path
-	transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
-	ccp_loc_code = 0x6000	# Must be known by BDOS in order to start up CCP!
-	ccp_loc_data = 0x4000	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
+	#transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
+	#ccp_loc_code = 0x6000	# Must be known by BDOS in order to start up CCP!
+	#ccp_loc_data = 0x4000	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
 	
 	ccp_data = compile(
 		# The .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
@@ -362,7 +360,7 @@ if __name__ == '__main__':
 	#hexdump(ccp_data, ccp_loc_code)
 	
 	## Merge CCP binary into CP/M image
-	put('Merging CCP binary (%d bytes) into CP/M image at 0x%04X...' % (ccp_code_size, ccp_loc_code))
+	put('Merging CCP binary (%d bytes / 0x%04X) into CP/M image at 0x%04X-0x%04X...' % (ccp_code_size, ccp_code_size, ccp_loc_code, ccp_loc_code+ccp_code_size))
 	#cpm_data[ccp_loc_code:ccp_loc_code+len(ccp_data)] = ccp_data[:]
 	cpm_data = cpm_data[:ccp_loc_code] + ccp_data + cpm_data[ccp_loc_code+ccp_code_size:]
 	
@@ -370,9 +368,19 @@ if __name__ == '__main__':
 	with open(cpm_bin_filename, 'wb') as h:
 		h.write(cpm_data)
 	
+	
+	## Simulate CCP in YAZE
+	os.system('cp %s %s/CCPRUN.COM' % (ccp_bin_filename, out_path))
+	cmd = './ccp_sim.sh'
+	put('>> %s' % cmd)
+	os.system(cmd)
+	
+	
+	"""
 	## Decompile using z80dasm
-	#cmd = 'z80dasm --address --labels --source --origin=0000h %s' % cpm_bin_filename
-	#os.system(cmd)
+	cmd = 'z80dasm --address --labels --source --origin=0000h %s' % cpm_bin_filename
+	os.system(cmd)
+	"""
 	
 	### Debugging
 	
@@ -453,12 +461,46 @@ if __name__ == '__main__':
 	
 	
 	## Emulate
+	EMUSYS = OUTPUT_SYS	# 'gl4000'
+	CART_FILE = cpm_bin_filename	#'out/ccp.com'
+	
+	"""
+	# Run MAME manually
 	MAMECMD = '/z/data/_code/_c/mame.git/mame64'
 	#MAMECMD = '/z/data/_code/_c/mame.git/mamehtk64'	# Writable ROM version (needed for CP/M)
-	EMUSYS = OUTPUT_SYS	#''gl4000'
-	CART_FILE = 'out/ccp.com'
-	cmd = '%s -nodebug -rompath "%s" %s -cart "%s" -window -nomax -nofilter -sleep -volume -24 -skip_gameinfo -speed 2.00 -nomouse' % (MAMECMD, ROM_DIR, EMUSYS, CART_FILE)
+	cmd = MAMECMD
+	cmd += ' -nodebug'
+	cmd += ' -rompath "%s"' % ROM_DIR
+	cmd += ' %s' % EMUSYS
+	cmd += ' -cart "%s"' % CART_FILE
+	cmd += ' -window'
+	cmd += ' -nomax'
+	cmd += ' -nofilter'
+	cmd += ' -sleep'
+	cmd += ' -volume -24'
+	cmd += ' -skip_gameinfo'
+	cmd += ' -speed 2.00'
+	cmd += ' -nomouse'
 	put('"%s"...' % cmd)
 	os.system(cmd)
+	"""
+	
+	# Use BDDOS_HOST to start MAME
+	import bdos_host
+	
+	#bdos_host.SHOW_TRAFFIC = True	# Debug traffic
+	
+	#comp = bdos_host.Host_Serial(port=port, baud=baud)
+	comp = bdos_host.Host_MAME(rompath=ROM_DIR, emusys=EMUSYS, cart_file=CART_FILE)
+	
+	comp.open()
+	
+	if not comp.is_open:
+		put('Connection could not be opened. Aborting.')
+		sys.exit(4)
+	
+	#put('Loading binary file "%s"...' % (bin_filename))
+	#comp.upload(bin_filename)
+	comp.run()
 	
 	

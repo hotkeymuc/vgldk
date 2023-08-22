@@ -8,8 +8,8 @@ NAME=ccp
 
 # Must have a different name than "CCP"...
 NAME_YAZE=CCPRUN
-#FILE_ARGS=""
-FILE_ARGS=" DIR"
+FILE_ARGS=""
+#FILE_ARGS=" DIR"
 #FILE_ARGS=" DUMP 0000"
 FILE_COM=${NAME}.com
 FILE_COM_YAZE=${NAME_YAZE}.COM

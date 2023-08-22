@@ -13,6 +13,15 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 //#define BDOS_HOST_TO_SOFTUART	// Re-direct to SoftUART (if included in BDOS source)
 //#define BDOS_HOST_TO_MAME	// Re-direct to MAME (if included in BDOS source)
 
+#define BDOS_HOST_MAX_DATA 128
+#define BDOS_HOST_DMA_MAX_DATA 128
+
+#include "bdos.h"	// Need some numbers and functions
+
+#include "fcb.h"
+
+#include <stringmin.h>	// memcpy, memset, strlen
+
 #ifdef BDOS_HOST_TO_PAPER_TAPE
 	void papertape_send(const byte *data, byte len) {
 		byte i;
@@ -38,8 +47,42 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 #ifdef BDOS_HOST_TO_MAME
 	#include <driver/mame.h>
 	
-	#define host_send mame_put
-	#define host_receive mame_getchar
+	void mame_send(const byte *data, byte len) {
+		byte i;
+		mame_putchar(len);
+		for (i = 0; i < len; i++) {
+			mame_putchar(*data++);
+		}
+	}
+	
+	int mame_receive(byte *data) {
+		byte l;
+		byte i;
+		//byte c;
+		
+		// Skip padding 0 bytes
+		//bdos_printf("RX=");
+		do {
+			l = mame_getchar();
+		} while (l == 0);
+		//bdos_printf_x2(l);
+		//bdos_printf("..."); //bdos_getchar();
+		
+		for (i = 0; i < l; i++) {
+			//bdos_printf_x2(i);
+			//bdos_putchar('.');
+			
+			*data++ = mame_getchar();
+			
+			//c = mame_getchar();
+			//bdos_printf_x2(c);
+			//*data++ = c;
+		}
+		return l;
+	}
+	
+	#define host_send mame_send
+	#define host_receive mame_receive
 #endif
 
 #ifdef BDOS_HOST_TO_SOFTUART
@@ -72,7 +115,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		serial_putchar('0' + ((num / 10) % 10));
 		serial_putchar('0' + (num % 10));
 	}
-
+	
 	void serial_put_hexdigit(byte d)  {
 		if (d > 9) serial_putchar('A' - 9 + d);
 		else serial_putchar('0' + d);
@@ -82,7 +125,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		serial_put_hexdigit(num & 0x0f);
 	}
 	*/
-
+	
 	int serial_getchar2() {
 		// Get char, return -1 on timeout
 		int c;
@@ -98,7 +141,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		}
 		return c;
 	}
-
+	
 	int serial_gets2(byte *serial_get_buf) {
 		// Receive with timeout. Returns -1 on timeout or length
 		int c;
@@ -139,7 +182,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		// Return buf (like stdlib gets())
 		return l;
 	}
-
+	
 	int serial_gethex2() {
 		// Receive two digits of hex, return -1 on timeout
 		//byte r;
@@ -161,7 +204,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		
 		return (parse_hexDigit(c) << 4) + parse_hexDigit(c2);
 	}
-
+	
 	void serial_sendSafe(const byte *data, byte ldata) {
 		byte line[HOST_SERIAL_MAX_LINE];
 		const byte *pdata;
@@ -250,7 +293,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		}
 		serial_debug("OK\n");
 	}
-
+	
 	int serial_receiveSafe(byte *data) {
 		char line[HOST_SERIAL_MAX_LINE];
 		byte l;
@@ -355,7 +398,6 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		}
 		
 	}
-
 	
 	#define host_send serial_sendSafe
 	#define host_receive serial_receiveSafe
@@ -447,10 +489,10 @@ void host_sendfcb(byte num, struct FCB *fcb) {
 	
 	// Show on screen
 	//printf_d("F", num); printf(fcb2name(fcb));
-	
+	//bdos_printf("F"); bdos_printf_x2(num);
 	
 	// Dump to serial
-	pdata = data;
+	pdata = &data[0];
 	
 	*pdata++ = 'F';
 	*pdata++ = num;
@@ -463,62 +505,77 @@ void host_sendfcb(byte num, struct FCB *fcb) {
 		*pdata++ = *pfcb++;
 	}
 	
-	host_send(data, 1+1+2+36);
+	host_send(&data[0], 1+1+2+36);
 	
-	//@TODO: Handle answer from companion
+	// Use host_receivefcb() to receive result and altered FCB
 }
 
 
 byte host_receivefcb(struct FCB *fcb) {
-	byte data[1 + 36 + 16];
+	byte data[1 + 36 + 16];	// Leave some extra to be sure
 	byte l;
 	byte r;
 	
-	// Receive result only (make FCB alterations manually)
-	//r = host_receivebyte();
-	
-	// Receive result and FCB
-	do {
+	// Receive result and FCB as one data frame
+	// do {
 		l = host_receive(data);
-	} while(l == 0);
+	// } while(l == 0);
+	
+	//@TODO: L must be 36 for a proper FCB (or 32 for dir listing). Return error if not.
+	if (l > (1+36)) {
+		bdos_puts("FCB>36!");
+		return 0xff;
+	}
 	
 	// Get result
-	r = data[0];
+	r = data[0];	// Result value
 	
 	if (r == 0xff) {
 		//@TODO: Error codes!?
 		//printf("FCB FUN ERR!\n");
 	} else {
 		// Copy the received FCB over
-		memcpy((byte *)fcb, (byte *)&data[1], 36);
+		memcpy((byte *)fcb, (byte *)&data[1], l);	// data[0] = result value, data[1...] = actual FCB data
 	}
 	
 	return r;
 }
 
 word host_receivedma() {
-	byte data[255];
+	byte data[BDOS_HOST_DMA_MAX_DATA + 1];	// 128
 	int l;
 	byte *p;
 	word ltotal;
 	
 	p = bios_dma;
 	ltotal = 0;
-	l = 1;
-	while(l > 0) {
-		l = host_receive(data);
-		if (l > 0) {
-			memcpy(p, data, l);
+	l = 16;
+	// Using 1 dummy byte so we never send empty frames
+	while((l > 1) && (ltotal < BDOS_HOST_DMA_MAX_DATA)) {
+		//bdos_printf("rx=");
+		l = host_receive(&data[0]);
+		//bdos_printf_x2(l); bdos_printf(".");
+		
+		if ((l == 1) && (data[0] == 0xAA)) {
+			//bdos_printf("EOF");
+			break;
+		}
+		
+		if (l > 1) {
+			l -= 1;	// Skip dummy byte
+			memcpy(p, &data[1], l);
 			p += l;
+			ltotal += l;
 		}
 	}
+	//ltotal = (word)p - (word)bios_dma;
+	//bdos_printf("DMA L="); bdos_printf_x2(ltotal);
 	
-	ltotal = p - bios_dma;
 	return ltotal;
 }
 
 byte host_receivebyte() {
-	byte data[MAX_DATA];
+	byte data[BDOS_HOST_MAX_DATA];	// 1 is enough, but....
 	int l;
 	
 	l = 0;

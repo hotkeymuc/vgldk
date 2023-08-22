@@ -49,13 +49,27 @@ In CP/M 3 and later, the rest also follows.
 //#include <stdio.h>	// for puts() putchar() gets() getchar()
 #include <stdiomin.h>	// for puts() putchar() gets() getchar()
 
+//#include <hex.h>	// for printf_x2/x4
+
+#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
+	#include <driver/softuart.h>
+#endif
+#ifdef BIOS_PAPER_TAPE_TO_MAME
+	#include <driver/mame.h>
+#endif
+
+void bios();	// Forward declaration to function table (located at the end of this file)
+
+
 // Stringmin
+//@TODO: Use <stringmin.h>
 void bios_memset(byte *addr, byte b, word count) {
 	while(count > 0) {
 		*addr++ = b;
 		count--;
 	}
 }
+
 /*
 // Pause-after-one-page callback
 // Can be installed after lcd_init() by setting "vgl_scroll_cb = &bios_scroll_cb;"
@@ -79,8 +93,6 @@ void bios_scroll_cb() {
 }
 */
 
-
-void bios();	// Forward declaration to function table (located at the end of this file)
 
 // Initial function, invoked by CPM_CRT0.s on init
 void bios_boot() __naked {
@@ -110,6 +122,7 @@ void bios_boot() __naked {
 	
 	// Init VGL hardware
 	lcd_init();
+	keyboard_init();
 	sound_off();
 	
 	// Add "wait" while scrolling callback
@@ -122,6 +135,19 @@ void bios_boot() __naked {
 	puts(CPM_VERSION);
 	
 	//sound_note(12*4, 250);
+	
+	// Show the tape config
+	//#if BIOS_PAPER_TAPE == SOFTUART
+	#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
+		puts("Tape = SoftUART");
+	#else
+		//#elif BIOS_PAPER_TAPE == MAME
+		#ifdef BIOS_PAPER_TAPE_TO_MAME
+			puts("Tape = MAME");
+		#else
+			puts("Tape = LCD");
+		#endif
+	#endif
 	
 	//bios_wboot();
 	__asm
@@ -207,27 +233,53 @@ void bios_list(byte c) {
 	// Write the character in C to the printer. If the printer isn't ready, wait until it is.
 	
 	//@TODO: Handle bios_iobyte, bits 6,7: 00=TTY, 01=CRT, 10=LPT, 11=UL1
-	//@TODO: Actually send to VTech printer periphery!
-	//vgl_printer_putchar(c);
-	putchar(c);
+	#ifdef BIOS_USE_PRINTER
+		// Actually send to VTech printer periphery
+		vgl_printer_putchar(c);
+	#else
+		putchar(c);
+	#endif
 }
+
 
 void bios_punch(byte c) {
 	// Write the character in C to the "paper tape punch" - or whatever the current auxiliary device is. If the device isn't ready, wait until it is.
 	
 	//@TODO: Handle bios_iobyte, bits 4,5: 00=TTY, 01=PTP, 10=UP1, 11=UP2
-	//@TODO: Send to SoftUART!
-	//softuart_sendByte(c);
-	putchar(c);
+	
+	//printf("punch"); printf_x2(c);
+	
+	#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
+		// Send to SoftUART
+		softuart_sendByte(c);
+	#else
+		#ifdef BIOS_PAPER_TAPE_TO_MAME
+			mame_putchar(c);
+		#else
+			putchar(c);
+		#endif
+	#endif
 }
 
 byte bios_reader() {
 	// Read a character from the "paper tape reader" - or whatever the current auxiliary device is. If the device isn't ready, wait until it is. The character will be returned in A. If this device isn't implemented, return character 26 (^Z).
+	byte c;
 	
 	//@TODO: Handle bios_iobyte, bits 2,3: 00=TTY, 01=PTR, 10=UR1, 11=UR2
-	//@TODO: Read from SoftUART!
-	//softuart_receiveByte();
-	return getchar();
+	
+	#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
+		// Read from SoftUART!
+		c = softuart_receiveByte();
+	#else
+		#ifdef BIOS_PAPER_TAPE_TO_MAME
+			c = mame_getchar();
+		#else
+			c = getchar();
+		#endif
+	#endif
+	
+	bdos_printf_x2(c);
+	return c;
 }
 
 void bios_home() {
@@ -237,7 +289,7 @@ void bios_home() {
 }
 
 DPH *bios_seldsk(byte n) {
-	// Select the disc drive in register C (0=A:, 1=B: ...).
+	// Select the disc drive in register C (0=A:, 1=B: ... 15=P:).
 	// Called with E=0 or 0FFFFh.
 	// SELDSK returns the address of a Disc Parameter Header in HL.
 	// The exact format of a DPH varies between CP/M versions;
@@ -259,6 +311,14 @@ void bios_setsec(word s) {
 
 void bios_setdma(byte *a) {
 	// The next disc operation will read its data from (or write its data to) the address given in BC.
+	/*
+	printf("bios_setdma=");
+	printf_x4((word)a);
+	putchar('0' + (((word)a) >> 12));
+	putchar('0' + ((((word)a) >> 8) & 0x0f));
+	putchar('0' + ((((word)a) >> 4) & 0x0f));
+	putchar('0' + (((word)a) & 0x0f       ));
+	*/
 	bios_dma = a;
 }
 

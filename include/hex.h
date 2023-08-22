@@ -111,94 +111,95 @@ word gethex(byte digits) {
 */
 
 #ifdef HEX_USE_DUMP
-// Some memory dump helpers
-#ifndef HEX_DUMP_WIDTH
-	#define HEX_DUMP_WIDTH 4
-#endif
-#ifndef HEX_DUMP_EOL
-	#define HEX_DUMP_EOL "\r\n"
-#endif
-//#define HEX_DUMP_INTRA_HEX " "
-
-void dump(word a, byte len) {
-	byte i;
-	byte b;
-	byte *o;
-	byte l;
-	byte lLine;
+	// Some memory dump helpers
+	#ifndef HEX_DUMP_WIDTH
+		#define HEX_DUMP_WIDTH 4
+	#endif
+	#ifndef HEX_DUMP_EOL
+		#define HEX_DUMP_EOL "\r\n"
+	#endif
+	//#define HEX_DUMP_INTRA_HEX " "
 	
-	//clear();
-	//12345678901234567890
-	//AAAAhh hh hh hh ....
-	//AAAA hh hh hh hh....
-	//AAAA hhhhhhhh ....
-	
-	l = 0;
-	while (l < len) {
-		//printf("%04X|", a);
-		printf_x4(a); putchar('|');
+	void dump(word a, byte len) {
+		byte i;
+		byte b;
+		byte *o;
+		byte l;
+		byte lLine;
 		
-		lLine = l;
-		o = (byte *)a;
-		for (i = 0; i < HEX_DUMP_WIDTH; i++) {
-			if (l < len) {
-				b = *o;
-				//printf("%02X", b);
-				printf_x2(b);
-			} else {
-				printf("  ");
+		//clear();
+		//12345678901234567890
+		//AAAAhh hh hh hh ....
+		//AAAA hh hh hh hh....
+		//AAAA hhhhhhhh ....
+		
+		l = 0;
+		while (l < len) {
+			//printf("%04X|", a);
+			printf_x4(a); putchar('|');
+			
+			lLine = l;
+			o = (byte *)a;
+			for (i = 0; i < HEX_DUMP_WIDTH; i++) {
+				if (l < len) {
+					b = *o;
+					//printf("%02X", b);
+					printf_x2(b);
+				} else {
+					printf("  ");
+				}
+				#ifdef HEX_DUMP_INTRA_HEX
+					printf(HEX_DUMP_INTRA_HEX);
+				#endif
+				l++;
+				o++;
 			}
-			#ifdef HEX_DUMP_INTRA_HEX
-				printf(HEX_DUMP_INTRA_HEX);
-			#endif
-			l++;
-			o++;
+			putchar('|');
+			l = lLine;
+			o = (byte *)a;
+			for (i = 0; i < HEX_DUMP_WIDTH; i++) {
+				if (l < len) {
+					b = *o;
+					if (b < 0x20)	putchar('.');
+					else			putchar(b);
+				} else putchar(' ');
+				l++;
+				o++;
+			}
+			a += HEX_DUMP_WIDTH;
+			printf(HEX_DUMP_EOL);	//("\n");
 		}
-		putchar('|');
-		l = lLine;
+		
+		/*
+		// AAAAbbbbbbbbbbbbbbbb
+		// hh hh hh hh hh hh hh
+		//  hh hh hh hh hh hh h
+		// h hh hh
+		printf("%04X", a);
 		o = (byte *)a;
-		for (i = 0; i < HEX_DUMP_WIDTH; i++) {
-			if (l < len) {
-				b = *o;
-				if (b < 0x20)	putchar('.');
-				else			putchar(b);
-			} else putchar(' ');
-			l++;
+		for(i = 0; i < len; i++) {
+			b = *o;
+			//printf("%02X", b);
+			if (b < 0x20)
+				putchar('.');
+			else
+				putchar(b);
 			o++;
 		}
-		a += HEX_DUMP_WIDTH;
-		printf(HEX_DUMP_EOL);	//("\n");
+		
+		
+		if (len != 16) printf("\n");
+		
+		o = (byte *)a;
+		for(i = 0; i < len; i++) {
+			b = *o;
+			//printf("%02X ", b);
+			printf("%02X", b);
+			o++;
+		}
+		printf("\n");
+		*/
 	}
-	
-	/*
-	// AAAAbbbbbbbbbbbbbbbb
-	// hh hh hh hh hh hh hh
-	//  hh hh hh hh hh hh h
-	// h hh hh
-	printf("%04X", a);
-	o = (byte *)a;
-	for(i = 0; i < len; i++) {
-		b = *o;
-		//printf("%02X", b);
-		if (b < 0x20)
-			putchar('.');
-		else
-			putchar(b);
-		o++;
-	}
-	
-	
-	if (len != 16) printf("\n");
-	
-	o = (byte *)a;
-	for(i = 0; i < len; i++) {
-		b = *o;
-		//printf("%02X ", b);
-		printf("%02X", b);
-		o++;
-	}
-	printf("\n");
-	*/
-}
 #endif // USE_HEX_DUMP
+
 #endif //__HEX_H
