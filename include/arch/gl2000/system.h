@@ -42,7 +42,9 @@ for use with SDCC compiler
 
 void vgldk_init() {
 	lcd_init();
+	keyboard_init();
 	vgl_sound_off();
+	
 	lcd_clear();
 	
 	//main();

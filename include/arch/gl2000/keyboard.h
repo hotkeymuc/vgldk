@@ -191,4 +191,9 @@ char keyboard_getchar() {
 	return c;
 }
 
+
+void keyboard_init() {
+	keyboard_getchar_last = 0;
+}
+
 #endif // __KEYBOARD_H
