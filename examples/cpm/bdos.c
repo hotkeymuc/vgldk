@@ -403,12 +403,44 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 	// Called by bios_wboot()
 	
 	// Show BDOS banner (BIOS shows CP/M banner)
-	//bdos_printf("BDOS");
+	#ifdef BDOS_SHOW_BANNER
+		bdos_printf("BDOS: ");
+	#endif
 	
+	#ifdef BDOS_WAIT_FOR_RAM
+		// Wait until RAM is accessible (writable)
+		
+		byte *check_addr;
+		byte check_old;
+		byte check_new;
+		byte check_actual;
+		
+		// Address to perform write check
+		check_addr = (byte *)0x0100
+		
+		bdos_printf("RAM check...");
+		do {
+			// Get old value
+			check_old = *check_addr;
+			
+			// Generate new value
+			check_new = check_old ^ 0xff;
+			
+			// Write the new value
+			*check_addr = check_new;
+			
+			// Check if it changed
+			check_actual = *check_addr;
+		
+		} while (check_actual != check_new)
+		bdos_puts("OK");
+	#endif
 	
-	// Restore lowstorage for cold-boot (lowest 0x5c bytes, the rest at 0x5c... is def_fcb, bios_dma and transient)
-	//bdos_memcpy((byte *)0x0000, &lowstorage_data[0], 0x5c);
-	bdos_memcpy((byte *)lowstorage_origin, &lowstorage_data[0], lowstorage_size);
+	#ifdef BDOS_RESTORE_LOWSTORAGE
+		// Restore lowstorage for next cold-boot (lowest 0x5c bytes, the rest at 0x5c... is def_fcb, bios_dma and transient)
+		//bdos_memcpy((byte *)0x0000, &lowstorage_data[0], 0x5c);
+		bdos_memcpy((byte *)lowstorage_origin, &lowstorage_data[0], lowstorage_size);
+	#endif
 	
 	// Set the cold boot vector (if not known at compile time)
 	*((byte *)(0x0059)) = 0xc3;	// JMP ...

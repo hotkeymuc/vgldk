@@ -10,9 +10,13 @@
 */
 
 // BDOS Configuration
+//#define BDOS_SHOW_BANNER	// Show "BDOS" on boot (helpful for debugging)
 //#define BDOS_SAVE_ALL_REGISTERS	// Make a copy of all registers on BDOS invocation
 //#define BDOS_TRACE_CALLS	// Send stack traces on each call to host for in-depth analysis
 //#define BDOS_TRAP	// Add trap functions
+
+//#define BODS_WAIT_FOR_RAM	// Wait until RAM is writable before proceeding
+//#define BDOS_RESTORE_LOWSTORAGE	// Restore the lower memory addresses for next cold-start
 
 // Compatibility patch: Make the BDOS vector at 0x0005 a jump to the top of user-usable RAM. This allows BDOS to live anywhere in address space, while still marking the end of usable transient area.
 //#define BDOS_PATCHED_ENTRY_ADDRESS (0x7fff - 2)	// Address of the "virtual BDOS entry", i.e. the limit of usable transient area, after which BDOS/CPM/CCP/ROM etc. start.

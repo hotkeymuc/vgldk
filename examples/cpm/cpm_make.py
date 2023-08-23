@@ -320,6 +320,10 @@ if __name__ == '__main__':
 			#'BIOS_SHOW_PAPER_TAPE_MAPPING': 1,	# Print the configured paper tape configuration on boot
 			
 			## Configure BDOS
+			'BDOS_SHOW_BANNER': 1,	# Show "BDOS" on boot (helpful for debugging)
+			'BODS_WAIT_FOR_RAM': 1,	# Wait until RAM is writable before proceeding
+			'BDOS_RESTORE_LOWSTORAGE': 1,	# Restore the lower memory addresses for next cold-start
+			
 			'BDOS_PATCHED_ENTRY_ADDRESS': (0x8000 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
 			'BDOS_AUTOSTART_CCP': 1,	# Start CCP wihtout asking
 			
