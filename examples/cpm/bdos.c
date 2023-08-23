@@ -375,9 +375,26 @@ void bdos_memset(byte *addr, byte b, word count) {
 	}
 #endif
 
+// CCP start-up
+void bdos_start_ccp() {
+	
+	//@TODO: Load CCP from a file! (Using BDOS functions fopen, fread, fclose...)
+	
+	// Clear DMA area (contains CCP command line arguments)
+	// You could also provide some start-up arguments (will be run by CCP)
+	bdos_memset((byte *)0x0080, 0, 128);
+	//*((byte *)0x0080) = 0;	// Clear CCP argl (dma area)
+	//*((byte *)0x0081) = 0;	// Clear CCP args (dma area+1)
+	
+	// Invoke CCP entry point (must match LOC_CODE of ccp.c compilation!)
+	//bdos_printf_x4(CCP_LOC_CODE); bdos_printf("...");
+	__asm
+		jp CCP_LOC_CODE
+	__endasm;
+}
 
-// BDOS functions
 
+// Well-known BDOS functions
 void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 	
 	// Called by bios_wboot()
@@ -385,82 +402,64 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 	// Show BDOS banner (BIOS shows CP/M banner)
 	//bdos_printf("BDOS");
 	
-	//bios_setdma(0x0080);	// Is already done at bios_wboot()
+	// Restore BDOS vector at 0x0005 (if corrupted / fresh boot)
+	*((byte *)(0x0005)) = 0xc3;	// JMP ...
+	*((word *)(0x0006)) = (word)&bdos;	// to BDOS
 	
-	// Restore BDOS entry (if corrupted)
-	//*((word *)(0x0006)) = (word)&bdos_init;
+	// Configure state
+	bios_setdma((byte *)0x0080);	// Is already done at bios_wboot()
 	
 	bdos_delimiter = '$';
 	bdos_user = 1;	//@FIXME: This should be the upper bits of the bios_curdsk at 0x0004
 	
-	bdos_memset((byte *)bdos_fcb, 0x00, 36);	//sizeof(FCB));
+	bdos_memset((byte *)bdos_fcb, 0x00, 36);	//sizeof(FCB));	// Clear default fcb
 	bdos_fcb_num = 0;	// currently used FCB in DMA area (0...3)
 	
-	#ifdef BDOS_PATCH_JUMP_TO_TOP
-		// At the moment, the BODS entry point "bdos()" is not at the top of RAM / bottom of code segment.
-		// We need to patch the JP instruction at 0x0005 to point to the end of RAM.
-		// Reason: ZORK looks at the address at 0x0006 to determine where to put its own stuff below.
-		// So 0x0006 must point to the top of RAM, below the BDOS/BIOS/CCP code segment.
+	#ifdef BDOS_PATCHED_ENTRY_ADDRESS
+		// At the moment, the BODS entry point "bdos()" might not be at the top of RAM / bottom of code segment.
+		// It may actually be in a different memory segment or even in ROM (i.e. not writable at all).
+		
+		// So: We need to patch the JP instruction at 0x0005 to point to the end of RAM.
+		// Example: ZORK1.COM looks at the address at 0x0006 to determine RAM size and where to put its own data.
+		// So 0x0006 MUST point to the top of RAM, or at least below the BDOS/BIOS/CCP code segment.
 		
 		// Clone the original jump instruction from 0x0005 to the end of RAM
 		// It consists of three bytes: 0xC3 [lo] [hi]
-		memcpy((byte *)(BDOS_TOP_OF_RAM - 2), (byte *)0x0005, 3);	// TOP_OF_RAM - 2 = 0x7ffd
+		memcpy((byte *)BDOS_PATCHED_ENTRY_ADDRESS, (byte *)0x0005, 3);	// Copy original BDOS vector
 		
 		// Alter the pointer at 0x0006 to point to the cloned jump
 		// We use 0x0006, since the byte at 0x0005 is 0xc3 (opcode for "JP") and the actual address is at 0x0006 and 0x0007
-		*(word *)0x0006 = (BDOS_TOP_OF_RAM - 3);
+		*(word *)0x0006 = BDOS_PATCHED_ENTRY_ADDRESS;
 	#endif
 	
-	// Install scroll callback to pause after one page of text
-	// ! Must be handled by BIOS - it "knows" the LCD driver.
-	//bios_scroll_counter = LCD_ROWS;
-	//lcd_scroll_cb = &bios_scroll_cb;
 	
-	
-	// Load CCP to transient area and run it!
-	//@TODO: Load from file using BDOS functions!
-	while(1) {
-		//bdos_printf("Load CCP [Y/N]?");
-		bdos_printf("Load CCP?");
-		char c = bdos_getchar();
-		
-		if (c == 'N') {
-			bdos_printf("cart...");
-			__asm
-				jp 0x8000
-			__endasm;
-		}
-		
-		if (c == 'Y') {
-			// Assuming CCP is included in current RAM image
-			//word ccp_loc_code = 0x6000;
-			//bdos_printf("0x6000...");
-			bdos_printf_x4(CCP_LOC_CODE);
-			bdos_printf("...");
+	// Load CCP to transient area and run it
+	#ifdef BDOS_AUTOSTART_CCP
+		bdos_start_ccp();
+	#else
+		// Allow NOT starting CCP, e.g. when debugging using serial monitor.
+		while(1) {
+			//bdos_printf("Load CCP [Y/N]?");
+			bdos_printf("Load CCP?");
+			char c = bdos_getchar();
 			
-			bdos_memset((byte *)0x0080, 0, 128);	// Clear DMA area (CCP command line arguments)
-			//*((byte *)0x0080) = 0;	// Clear CCP argl (dma area)
-			//*((byte *)0x0081) = 0;	// Clear CCP args (dma area+1)
+			if (c == 'N') {
+				// Go "back" to cartridge ROM
+				bdos_printf("cart...");
+				__asm
+					jp 0x8000
+				__endasm;
+			}
 			
-			// Invoke CCP entry point (must match LOC_CODE of ccp compilation!)
-			__asm
-				;push af
-				;push hl
-				
-				;jp 0x6000
-				;call 0x6000
-				jp CCP_LOC_CODE
-				
-				;pop hl
-				;pop af
-				
-			__endasm;
+			if (c == 'Y') {
+				bdos_start_ccp();
+			}
+			
+			// Else
+			bdos_printf_x2(c);
+			bdos_putchar('?');
 		}
-		
-		// Else
-		bdos_printf_x2(c);
-		bdos_putchar('?');
-	}
+	#endif
 }
 
 void bdos_c_read() __naked {	// BDOS_FUNC_C_READ:	// 1: Console input

@@ -12,10 +12,12 @@
 #define BIOS_STACK 0xDFF0	// BIOS (re)sets stack pointer there
 
 //#define BIOS_SCROLL_WAIT	// Wait after 1 page of text
+//#define BIOS_SHOW_BANNER	// Show CP/M banner and version on boot
 
 //#define BIOS_USE_PRINTER	// Include printer driver and redirect printer "list" to printer.
 //#define BIOS_PAPER_TAPE_TO_SOFTUART	// Redirect paper tape functions "punch" and "reader" to SoftUART
 //#define BIOS_PAPER_TAPE_TO_MAME	// Redirect paper tape functions "punch" and "reader" to MAME-Host
+//#define BIOS_SHOW_PAPER_TAPE_MAPPING	// Print the configured paper tape configuration on boot
 
 
 // BIOS function numbers

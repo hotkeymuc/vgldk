@@ -12,9 +12,9 @@
 	stack .equ 0xdff0	; Stack top (GL4000 bios uses 0xdff0)
 	
 	; Global C functions
-	.globl _main	; cpm.c:main()
+	.globl _main	; cpm.c:main() = jumps to _bios_boot
 	.globl _bint	; bint.c:bint()
-	.globl _bios_boot	; bios.c:bios_boot()
+	.globl _bios_boot	; bios.c:bios_boot() = initializes VGL hardware and continues to bios_wboot(), bdos_init() and finally ccp()
 	.globl _bdos	; bdos.c:bdos()
 	
 
@@ -195,14 +195,16 @@ cart_code4000:
 	;; First executed instruction on GL2000/4000 (usually a jump)
 	;di
 	;im 1
-	jp	init	; Jump to CP/M bootstrap code
+	;jp	init	; Jump to CP/M bootstrap code
+	jp _bios_boot	; CP/M entry point
 
 .org 0x8010
 cart_code1000:
 	;; First executed instruction on PC1000 (usually a jump)
 	;di
 	;im 1
-	jp	init	; Jump to CP/M bootstrap code
+	;jp	init	; Jump to CP/M bootstrap code
+	jp _bios_boot	; CP/M entry point
 
 cart_end:
 ;.asciz '[cart_end]'

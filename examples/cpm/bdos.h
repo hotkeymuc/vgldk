@@ -14,10 +14,11 @@
 //#define BDOS_TRACE_CALLS	// Send stack traces on each call to host for in-depth analysis
 //#define BDOS_TRAP	// Add trap functions
 
-//#define BDOS_PATCH_JUMP_TO_TOP	// Compatibility patch: Make 0x0005 a jump to the top of user-usable RAM. Use if you can not guarantee bdos() to be first bytes of _CODE area
-//#define BDOS_TOP_OF_RAM 0x7fff	// Address of the highest RAM byte after which BDOS/CPM/CCP/ROM etc. start. Used in "bdos_init()"
+// Compatibility patch: Make the BDOS vector at 0x0005 a jump to the top of user-usable RAM. This allows BDOS to live anywhere in address space, while still marking the end of usable transient area.
+//#define BDOS_PATCHED_ENTRY_ADDRESS (0x7fff - 2)	// Address of the "virtual BDOS entry", i.e. the limit of usable transient area, after which BDOS/CPM/CCP/ROM etc. start.
+//#define BDOS_AUTOSTART_CCP	// Start CCP at boot without asking
 
-//#define BDOS_USE_HOST	// Re-direct file operations to a host computer (which acts like an external drive)
+//#define BDOS_USE_HOST	// Re-direct file operations to a host computer (which acts like an external drive). See bdos_host.h for more config!
 
 #ifndef CCP_LOC_CODE
 	#define CCP_LOC_CODE	0x6000	// Entry address of CCP binary

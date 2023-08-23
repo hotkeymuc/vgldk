@@ -270,15 +270,19 @@ if __name__ == '__main__':
 	put('Compiling CP/M (CRT0, BINT, BIOS, BDOS)...')
 	transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
 	
-	cpm_code_size_estimate = 0x1200	# Approx size of CPM data (to determine optimal offset). Must LARGER OR EQUAL to actual binary size
-	cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CPM as far up as possible
-	cpm_loc_data = 0xc000	# static variable data and gsinit-code will be put to this address in binary file. Monitor uses 0xd000 for its data
+	cpm_code_size_estimate = 0x1200	# Approx size of CPM code data (to determine optimal offset). Must LARGER OR EQUAL to actual binary size
+	#cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CPM as far up as possible in lower RAM bank
+	cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CPM as far up as possible in cartridge
+	cpm_loc_data = 0xc000	# Use stock system RAM. Static variable data and gsinit-code will be put to this address in binary file. Monitor uses 0xd000 for its data
 	cpm_bin_filename = '%s/cpm.bin' % out_path
+	cpm_rom_filename = '%s/cpm_rom.bin' % out_path
+	cpm_cart_filename = '%s/cpm_cart.bin' % out_path
 	
-	ccp_code_size_estimate = 0x0f00
-	ccp_data_size_estimate = 0x0800
-	ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Must be known by BDOS in order to start up CCP!
-	ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
+	ccp_code_size_estimate = 0x0d00	# Approx size of CCP code data (to determine optimal offset). Must LARGER OR EQUAL to actual binary size
+	ccp_data_size_estimate = 0x0600	# Don't know actually...
+	ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
+	#ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
+	ccp_loc_data = 0xc800	# Use stock system RAM, but don't collide with other modules
 	
 	cpm_data = compile(
 		# The .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
@@ -300,22 +304,31 @@ if __name__ == '__main__':
 		loc_data = cpm_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
 		
 		defines = {
+			## Configure hardware
 			'VGLDK_SERIES': vgldk_series,
-			
 			'SOFTUART_BAUD': 19200,
 			
-			#'BIOS_SCROLL_WAIT': 1,	# Wait after 1 page of text
+			## Configure BIOS
+			'BIOS_SCROLL_WAIT': 1,	# Wait after 1 page of text
+			'BIOS_SHOW_BANNER': 1,	# Show CP/M banner and version on boot
 			
 			# Paper tape is display by default. But it can be changed at compile time (in the future maybe at runtime using the "iobyte")
 			#'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape to SoftUART
 			#'BIOS_PAPER_TAPE_TO_MAME': 1,	# Redirect paper tape to MAME
+			#'BIOS_SHOW_PAPER_TAPE_MAPPING': 1,	# Print the configured paper tape configuration on boot
 			
-			# BDOS file accesses are not handled in BDOS itself (yet).
+			## Configure BDOS
+			'BDOS_PATCHED_ENTRY_ADDRESS': (0x8000 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
+			'BDOS_AUTOSTART_CCP': 1,	# Start CCP wihtout asking
+			
+			## BDOS file accesses are not handled in BDOS itself (yet).
 			'BDOS_USE_HOST': 1,	# Re-direct file accesses to a host (see bdos_host.h)
 			#'BDOS_HOST_TO_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines and let BIOS decide what to do
 			#'BDOS_HOST_TO_SOFTUART': 1,	# Re-direct to SoftUART (might be linked statically - you might want to use paper tape)
 			'BDOS_HOST_TO_MAME': 1,	# Re-direct to MAME
 			
+			
+			## Configure CCP
 			'CCP_LOC_CODE': '0x%04X'%ccp_loc_code	# Tell BDOS where to find CCP
 		}
 	)
@@ -325,7 +338,7 @@ if __name__ == '__main__':
 	
 	
 	## Compile CCP (as a simple program)
-	put('Compiling CCP...')
+	put('Compiling CCP for entry at 0x%04X...' % ccp_loc_code)
 	ccp_bin_filename = '%s/ccp.com' % out_path
 	#transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
 	#ccp_loc_code = 0x6000	# Must be known by BDOS in order to start up CCP!
@@ -351,22 +364,26 @@ if __name__ == '__main__':
 		loc_data = ccp_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
 		
 		defines = {
-			'VGLDK_SERIES': 4000
+			#'VGLDK_SERIES': vgldk_series	#@FIXME: CP/M binaries should be completely architecture agnostic!
 		}
 	)
 	
-	# Extract CCP code area
+	## Extract CCP code area as stand-alone CP/M .COM binary (starting at transient area 0x100...)
 	# Beware of file offsets! File offset 0x5F00 corresponds to memory 0x6000, because only the transient area is included in the .com file!
 	ccp_data = ccp_data[ccp_loc_code - transient:]	# Note! The binary data does not start at memory location 0x0000, but 0x100 (CP/M program transient area!)
 	ccp_code_size = len(ccp_data)
+	if ccp_code_size > ccp_code_size_estimate:
+		put('Compiled CCP code size (%d bytes / 0x%04X) is larger than estimated size "ccp_code_size_estimate" (%d bytes / 0x%04X). Code blocks will likely collide/overlap. Please adjust!' % (ccp_code_size,ccp_code_size, ccp_code_size_estimate,ccp_code_size_estimate))
+		sys.exit(1)
 	#hexdump(ccp_data, ccp_loc_code)
+	
 	
 	## Merge CCP binary into CP/M image
 	put('Merging CCP binary (%d bytes / 0x%04X) into CP/M image at 0x%04X-0x%04X...' % (ccp_code_size, ccp_code_size, ccp_loc_code, ccp_loc_code+ccp_code_size))
 	#cpm_data[ccp_loc_code:ccp_loc_code+len(ccp_data)] = ccp_data[:]
 	cpm_data = cpm_data[:ccp_loc_code] + ccp_data + cpm_data[ccp_loc_code+ccp_code_size:]
 	
-	# Write merged output CPM binary
+	# Write merged output CCP CP/M .COM binary
 	with open(cpm_bin_filename, 'wb') as h:
 		h.write(cpm_data)
 	
@@ -413,6 +430,13 @@ if __name__ == '__main__':
 		#sys.exit(1)
 	#
 	
+	## Write separate system ROM and cart ROM files
+	with open(cpm_rom_filename, 'wb') as h:
+		h.write(cpm_data[:0x8000])
+	with open(cpm_cart_filename, 'wb') as h:
+		h.write(cpm_data[0x8000:])
+	
+	
 	## Upload to hardware running serial MONITOR
 	#put('Uploading CP/M image...')
 	#cpm_upload(cpm_data)
@@ -458,13 +482,19 @@ if __name__ == '__main__':
 			h.write(b'File created by %b on %b.' % (bytes(__file__, 'ascii'), bytes(str(now), 'ascii')))
 		
 		# Write properly named system ROM (must match machine specific name)
-		with z.open(OUTPUT_FILE_SYSROM, 'w') as h:
-			h.write(cpm_data)
+		with z.open(OUTPUT_FILE_SYSROM, 'w') as h_sysrom:
+			#h_sysrom.write(cpm_data)	# Write the whole address space to sysrom
+			
+			# Copy rom area only
+			with open(cpm_rom_filename, 'rb') as h_rom:
+				h_sysrom.write(h_rom.read())
+			
+		
 	
 	
 	## Emulate
 	EMUSYS = OUTPUT_SYS	# 'gl4000'
-	CART_FILE = cpm_bin_filename	#'out/ccp.com'
+	#CART_FILE = ccp_bin_filename	#'out/ccp.com'
 	
 	"""
 	# Run MAME manually
@@ -473,8 +503,8 @@ if __name__ == '__main__':
 	cmd = MAMECMD
 	cmd += ' -nodebug'
 	cmd += ' -rompath "%s"' % ROM_DIR
-	cmd += ' %s' % EMUSYS
-	cmd += ' -cart "%s"' % CART_FILE
+	cmd += ' %s' % OUTPUT_SYS
+	cmd += ' -cart "%s"' % cpm_cart_filename
 	cmd += ' -window'
 	cmd += ' -nomax'
 	cmd += ' -nofilter'
@@ -511,7 +541,7 @@ if __name__ == '__main__':
 		'programs/ZORK123',
 	]
 	#comp = bdos_host.Host_Serial(port=port, baud=baud, paths=paths)
-	comp = bdos_host.Host_MAME(rompath=ROM_DIR, emusys=EMUSYS, cart_file=CART_FILE, paths=paths)
+	comp = bdos_host.Host_MAME(rompath=ROM_DIR, emusys=OUTPUT_SYS, cart_file=cpm_cart_filename, paths=paths)
 	
 	comp.open()
 	

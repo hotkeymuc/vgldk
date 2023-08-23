@@ -5,10 +5,10 @@
 	VGLDK CP/M
 	==========
 	
-	2019-11-09 - 2023-08-15 Bernhard "HotKey" Slawik
+	2019-11-09 - 2023-08-23 Bernhard "HotKey" Slawik
 */
 
 #define CPM_TITLE "32K VGL CP/M 2.0"
-#define CPM_VERSION "2023-08-15 HotKey"
+#define CPM_VERSION "2023-08-23 HotKey"
 
 #endif // __CPM_H

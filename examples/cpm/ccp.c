@@ -508,9 +508,9 @@ byte ccp_load(char *filename) {
 	byte r;
 	byte *a;
 	
-	printf("Open \"");
-	printf(filename);
-	printf("\"...");
+	//printf("Open \"");
+	//printf(filename);
+	//printf("\"...");
 	//putchar('?');getchar();
 	
 	r = ccp_fopen(filename);
@@ -519,11 +519,14 @@ byte ccp_load(char *filename) {
 		ccp_print_error(r);
 		return r;
 	}
-	ccp_print_ok();
+	//ccp_print_ok();
 	//putchar('?');getchar();
 	
 	// Load data from file
-	printf("Load...");
+	//printf("Load...");
+	printf(filename);
+	printf("...");
+	
 	a = (byte *)0x0100;	// cpm_transient
 	do {
 		//printf(".");	// Progress
@@ -545,9 +548,15 @@ byte ccp_load(char *filename) {
 	ccp_fclose();
 	
 	// Run file
+	/*
 	printf("Run?");
-	if (getchar() == 'Y')
+	if (getchar() == 'Y') {
+		puts("");	// New line
 		ccp_run();
+	}
+	*/
+	ccp_run();
+	
 	
 	return 0x00;
 	

@@ -131,25 +131,30 @@ void bios_boot() __naked {
 		lcd_scroll_cb = &bios_scroll_cb;
 	#endif
 	
-	// Show banner
-	puts(CPM_TITLE);
-	puts(CPM_VERSION);
+	#ifdef BIOS_SHOW_BANNER
+		// Show banner
+		puts(CPM_TITLE);
+		puts(CPM_VERSION);
+	#endif
 	
 	//sound_note(12*4, 250);
 	
 	// Show the tape config
-	//#if BIOS_PAPER_TAPE == SOFTUART
-	#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
-		puts("Tape = SoftUART");
-	#else
-		//#elif BIOS_PAPER_TAPE == MAME
-		#ifdef BIOS_PAPER_TAPE_TO_MAME
-			puts("Tape = MAME");
+	#ifdef BIOS_SHOW_PAPER_TAPE_MAPPING
+		//#if BIOS_PAPER_TAPE == SOFTUART
+		#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
+			puts("Tape = SoftUART");
 		#else
-			puts("Tape = LCD");
+			//#elif BIOS_PAPER_TAPE == MAME
+			#ifdef BIOS_PAPER_TAPE_TO_MAME
+				puts("Tape = MAME");
+			#else
+				puts("Tape = LCD");
+			#endif
 		#endif
 	#endif
 	
+	// continue with "warm boot"
 	//bios_wboot();
 	__asm
 		jp _bios_wboot
