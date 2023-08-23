@@ -463,7 +463,7 @@ if __name__ == '__main__':
 	
 	# Re-write .h file
 	with open(lowstorage_h_file, 'w') as h:
-		h.write(s)
+		h.write(lowstorage_h)
 	
 	
 	## Upload to hardware running serial MONITOR
