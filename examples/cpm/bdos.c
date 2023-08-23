@@ -416,7 +416,7 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 		byte check_actual;
 		
 		// Address to perform write check
-		check_addr = (byte *)0x0100
+		check_addr = (byte *)0x0100;
 		
 		bdos_printf("RAM check...");
 		do {
@@ -432,7 +432,8 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 			// Check if it changed
 			check_actual = *check_addr;
 		
-		} while (check_actual != check_new)
+		} while (check_actual != check_new);
+		
 		bdos_puts("OK");
 	#endif
 	
