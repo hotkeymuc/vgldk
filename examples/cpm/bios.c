@@ -70,7 +70,7 @@ void bios_memset(byte *addr, byte b, word count) {
 	}
 }
 
-/*
+#ifdef BIOS_SCROLL_WAIT
 // Pause-after-one-page callback
 // Can be installed after lcd_init() by setting "vgl_scroll_cb = &bios_scroll_cb;"
 byte bios_scroll_counter;
@@ -91,7 +91,7 @@ void bios_scroll_cb() {
 		bios_scroll_counter++;
 	}
 }
-*/
+#endif
 
 
 // Initial function, invoked by CPM_CRT0.s on init
@@ -125,10 +125,11 @@ void bios_boot() __naked {
 	keyboard_init();
 	sound_off();
 	
-	// Add "wait" while scrolling callback
-	//bios_scroll_counter = LCD_ROWS;
-	//lcd_scroll_cb = &bios_scroll_cb;
-	
+	#ifdef BIOS_SCROLL_WAIT
+		// Add "wait" while scrolling callback
+		bios_scroll_counter = LCD_ROWS;
+		lcd_scroll_cb = &bios_scroll_cb;
+	#endif
 	
 	// Show banner
 	puts(CPM_TITLE);

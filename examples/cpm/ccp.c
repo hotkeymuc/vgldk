@@ -99,6 +99,11 @@ char *fcb2name(struct FCB *fcb) {
 	#define HEX_DUMP_INTRA_HEX ""	//" "
 	#define HEX_DUMP_EOL "\r\n"
 	
+	// Optimized for running in YAZE emulation:
+	//#define HEX_DUMP_WIDTH 16
+	//#define HEX_DUMP_INTRA_HEX " "
+	//#define HEX_DUMP_EOL "\r\n"
+	
 	//	void dump(byte *a) {
 	//		word ai;
 	//		byte i;
@@ -233,14 +238,15 @@ void port_out(byte p, byte v)  {
 
 
 void ccp_run() __naked {
-	// Try running a program
+	
+	// Jump into transient area to run a program
 	//printf("Running...");
 	__asm
 		;jp 0x0100
 		call 0x0100
 	__endasm;
 	
-	// Will not exit, but rather invoke BIOS warm boot
+	// Programs will usually not exit, but rather invoke BIOS warm boot
 	ccp_print_ok();
 }
 
@@ -253,30 +259,15 @@ void ccp_dir() {
 	word count;
 	struct FCB *dir_fcb;
 	
-	
+	// Prepare request FCB
 	//def_fcb.dr = bios_curdsk;	// current drive or '?' for meta info (disc labels, date stamps)
 	def_fcb.dr = '?';	// '?' for meta info (disc labels, date stamps)
-	
-	def_fcb.f[0] = '?';
-	def_fcb.f[1] = '?';
-	def_fcb.f[2] = '?';
-	def_fcb.f[3] = '?';
-	def_fcb.f[4] = '?';
-	def_fcb.f[5] = '?';
-	def_fcb.f[6] = '?';
-	def_fcb.f[7] = '?';
-	
-	def_fcb.t[0] = '?';
-	def_fcb.t[1] = '?';
-	def_fcb.t[2] = '?';
-	//memset(&def_fcb.f[0], 0x20, 8 + 3);	// Blank filename
-	//def_fcb.f = "        ";
-	//def_fcb.t = "   ";
+	memset(&def_fcb.f[0], '?', 8+3);	// Wildcard
 	
 	def_fcb.ex = 0;	// default
 	//def_fcb.ex = '?';	// ? = All suitable extents
 	
-	//printf("sfirst...");
+	// Search first
 	//@TODO: Move to program.h:bdos_f_sfirst(fcb)
 	__asm
 		push af
@@ -297,7 +288,7 @@ void ccp_dir() {
 	__endasm;
 	
 	
-	//printf("loop...");
+	// Loop until return value != 0xff
 	count = 0;
 	while (ccp_ret_a != 0xff) {
 		
@@ -340,7 +331,7 @@ void ccp_dir() {
 			count += 1;
 		}
 		
-		
+		// Search next
 		//@TODO: Move to program.h:bdos_f_snext(fcb)
 		__asm
 			;push af
@@ -362,11 +353,13 @@ void ccp_dir() {
 		__endasm;
 	}
 	
+	printf("Total 0x");
 	printf_x2(count);
 	printf(" entries\n");
 	
 }
 
+//@TODO: Move to program.h
 byte ccp_fopen(char *filename) {
 	byte i;
 	char c;
@@ -376,6 +369,7 @@ byte ccp_fopen(char *filename) {
 	//def_fcb.dr = bios_curdsk;	// Default drive (setting it to bios_curdsk will throw "invalid drive" in yaze)
 	def_fcb.dr = 0;	// this works in YAZE
 	
+	// Convert filename
 	pc = filename;
 	for(i = 0; i < 8; i++) {
 		c = *pc;
@@ -395,7 +389,7 @@ byte ccp_fopen(char *filename) {
 	}
 	while (i < 3) def_fcb.t[i++] = 0x20;
 	
-	// Prep fcb.ex
+	// Prepare FCB
 	def_fcb.ex = 0;
 	def_fcb.s1 = 0;
 	def_fcb.s2 = 0;
@@ -431,6 +425,8 @@ byte ccp_fopen(char *filename) {
 	
 	return ccp_ret_a;
 }
+
+//@TODO: Move to program.h
 byte ccp_fclose() {
 	__asm
 		push af
@@ -453,6 +449,61 @@ byte ccp_fclose() {
 	return ccp_ret_a;
 }
 
+//@TODO: Move to program.h
+byte ccp_fread() {	// Read next record (from def_fcb to ccp_dma/bios_dma)
+	
+	__asm
+		push af
+		push bc
+		push de
+		push hl
+		
+		ld c, #20	; 20 = BDOS_FUNC_F_READ
+		ld d, #>_def_fcb	; Address of FCB (high)
+		ld e, #<_def_fcb	; Address of FCB (low)
+		call 5
+		
+		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
+		ld (_ccp_ret_a), a
+		
+		pop hl
+		pop de
+		pop bc
+		pop af
+	__endasm;
+	
+	return ccp_ret_a;
+}
+
+byte ccp_freadrand(byte r0, byte r1, byte r2) {
+	def_fcb.r0 = r0;
+	def_fcb.r1 = r1;
+	def_fcb.r2 = r2;
+	
+	__asm
+		push af
+		push bc
+		push de
+		push hl
+		
+		ld c, #33	; 33 = BDOS_FUNC_F_READRAND
+		ld d, #>_def_fcb	; Address of FCB (high)
+		ld e, #<_def_fcb	; Address of FCB (low)
+		call 5
+		
+		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
+		ld (_ccp_ret_a), a
+		
+		pop hl
+		pop de
+		pop bc
+		pop af
+	__endasm;
+	
+	return ccp_ret_a;
+}
+
+
 byte ccp_load(char *filename) {
 	byte r;
 	byte *a;
@@ -468,7 +519,6 @@ byte ccp_load(char *filename) {
 		ccp_print_error(r);
 		return r;
 	}
-	
 	ccp_print_ok();
 	//putchar('?');getchar();
 	
@@ -476,37 +526,19 @@ byte ccp_load(char *filename) {
 	printf("Load...");
 	a = (byte *)0x0100;	// cpm_transient
 	do {
-		
 		//printf(".");	// Progress
-		__asm
-			push af
-			push bc
-			push de
-			push hl
-			
-			ld c, #20	; 20 = BDOS_FUNC_F_READ
-			ld d, #>_def_fcb	; Address of FCB (high)
-			ld e, #<_def_fcb	; Address of FCB (low)
-			call 5
-			
-			ld (_ccp_ret_a), a
-			
-			pop hl
-			pop de
-			pop bc
-			pop af
-		__endasm;
-		//printf_x2(ccp_ret_a);
 		
+		// Read next record
+		r = ccp_fread();
 		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
-		if (ccp_ret_a != 0)
+		if (r != 0)
 			break;
 		
+		// Copy from ccp_dma to destination
 		memcpy(a, ccp_dma, 128);
 		a += 128;
 		
-	} while(ccp_ret_a == 0x00);
-	
+	} while(r == 0x00);
 	ccp_print_ok();
 	
 	// Close file
@@ -562,17 +594,16 @@ void handle(char *input) {
 	if ((input_l == 2) && (input[1] == ':')) {
 		ccp_reg_e = input[0] - 'A';
 		
-		// Upper case
+		// Ensure upper case
 		if (ccp_reg_e >= 32) ccp_reg_e -= 32;
+		
+		// Check range
 		if (ccp_reg_e > 25) {
 			printf("INV\r\n");
 			return;
 		}
 		
-		//printf("Changing to drive ");
-		//putchar(ccp_reg_e + 'A');
-		//printf(":...\r\n");
-		
+		//printf("Changing to drive "); putchar('A' + ccp_reg_e); printf(":...\r\n");
 		__asm
 			push af
 			push bc
@@ -833,13 +864,46 @@ void handle(char *input) {
 	}
 }
 
-
+/*
+void test_zork() {
+	byte i;
+	byte r;
+	
+	printf("Opening...");
+	r = ccp_fopen("ZORK1.DAT");
+	printf_x2(r);
+	ccp_print_ok();
+	
+	dump((word)&def_fcb, 36);
+	//dump((word)&ccp_dma[0], 128);
+	
+	printf("ReadRand...");
+	r = ccp_freadrand(0,0,0);
+	printf_x2(r);
+	ccp_print_ok();
+	
+	for(i = 0; i < 6; i++) {
+		printf("Reading...");
+		printf_x2(r);
+		r = ccp_fread();
+		printf_x2(r);
+		ccp_print_ok();
+		
+		dump((word)&def_fcb, 36);
+		//dump((word)&ccp_dma[0], 128);
+	}
+}
+*/
 
 void ccp() __naked {
 	
 	//putchar('!');
-	puts("CCP");
+	//puts("CCP");
 	//printf("CCP!"); getchar();
+	
+	
+	//test_zork();	// Test ZORK1 compatibility
+	
 	memset(&ccp_input[0], 0, CCP_MAX_INPUT);	// Zero out the input buffer
 	
 	if (ccp_argl > 0) {
@@ -872,7 +936,7 @@ void ccp() __naked {
 		putchar('A' + bios_curdsk);
 		putchar('>');
 		
-		// Zero out the buffer
+		// Zero out the input buffer
 		memset(&ccp_input[0], 0x00, CCP_MAX_INPUT);
 	
 		//arg[0] = CCP_MAX_INPUT;

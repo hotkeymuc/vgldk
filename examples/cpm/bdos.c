@@ -540,8 +540,61 @@ void bdos_l_write(char c) __naked {	// BDOS_FUNC_L_WRITE:	// 5: List output
 
 void bdos_c_rawio(char c, char e) __naked {	//BDOS_FUNC_C_RAWIO:	// 6: Direct console I/O
 	// Entered with C=6, E=code. Returned values (in A) vary.
-	(void)c;(void)e;	// Silence the compiler about unused argument
+	(void)c;
+	(void)e;
+	
+	__asm
+		ld a, e
+		cp a, #0xff
+		jr z, 0$
+		
+		ld a, e
+		cp a, #0xfe	; 0xfe = [CP/M3, NovaDOS, Z80DOS, DOS+] Return console input status. Zero if no character is waiting, nonzero otherwise.
+		jp z, _bios_const
+		
+		ld a, e
+		cp a, #0xfd
+		jr z, 2$
+		
+		ld a, e
+		cp a, #0xfc
+		jr z, 3$
+		
+		; Else: CONOUT
+		push de
+		call _bios_conout
+		pop de
+		ret
+		
+	0$:	; 0xff = Return a character without echoing if one is waiting; zero if none is available. In MP/M 1, this works like E=0FDh below and waits for a character.
+		
+		call _bios_const	; Get key state
+		ld a, l	; Get return from L
+		
+		cp a, #0xff	; 0xff = key is pressed
+		jr nz, 1$
+		
+		call _bios_conin	; Jump to CONIN
+		ld a, l
+		ret
+		
+	1$:
+		; No new key. Return 0
+		ld l, #0
+		ret
+	
+	2$:	; 0xfd = [CP/M3, DOS+] Wait until a character is ready, return it without echoing.
+		jp _bios_conin	; // Do NOT echo it!
+		
+	3$:	; 0xfc = [DOS+] One-character lookahead - return the next character waiting but leave it in the buffer.
+		ld l, #0
+		ret
+		
+	__endasm;
+	
+	
 	/*
+	(void)c;(void)e;	// Silence the compiler about unused argument
 	switch(bdos_param_e) {
 		case 0xff:
 			// Return a character without echoing if one is waiting; zero if none is available. In MP/M 1, this works like E=0FDh below and waits for a character.
@@ -577,18 +630,6 @@ void bdos_c_rawio(char c, char e) __naked {	//BDOS_FUNC_C_RAWIO:	// 6: Direct co
 			bios_conout(bdos_param_e);
 	}
 	*/
-	
-	
-	//bdos_puts("bdos_c_rawio n/a!");
-	bdos_printf("rawio!"); bdos_getchar();
-	
-	//@TODO: Implement switch(e)
-	__asm
-		push de	; Push parameter E (dont care about D). E will be the most recent stack argument, thats all that matters.
-		call _bios_conout
-		pop de	; Pop the parameter(s). We pushed D and E, so we must pop both.
-		ret
-	__endasm;
 }
 
 void bdos_get_iobyte() __naked {	// BDOS_FUNC_GET_IOBYTE:	// 7: Get I/O Byte
@@ -774,7 +815,7 @@ byte bdos_f_open_(struct FCB *fcb) {
 		r = host_receivefcb(fcb);
 		
 		if (r != 0xff) {
-			fcb->s2 |= 0x80;	// Make it "0x80" even if not found
+			//fcb->s2 |= 0x80;	// Mark open?
 			
 			/*
 			//bdos_file_ofs = 0;
@@ -1022,8 +1063,8 @@ byte bdos_f_read_(struct FCB *fcb) {
 		rn = (word)fcb->cr + ((word)fcb->ex * 128) + ((word)(fcb->s2 & 1) * 16384);
 		rn++;
 		ex = rn >> 7;	//	/ 128;
-		fcb->cr = rn % 128;
-		fcb->ex = ex % 32;
+		fcb->cr = rn & 0x7f;	// % 128;
+		fcb->ex = ex & 0x1f;	// % 32;
 		fcb->s2 = (0x80 | (ex >> 5));
 		
 		//bdos_puts("readOK");
@@ -1232,28 +1273,29 @@ byte bdos_f_readrand_(struct FCB *fcb) {
 	/*
 	rn = (word)fcb->r0 + ((word)fcb->r1 * 256);	// + r2 * 65536
 	ex = rn >> 7;	// / 128;
-	fcb->cr = rn % 128;
-	fcb->ex = ex % 32;
-	fcb->s2 = (0x80 | (ex / 32));
+	fcb->cr = rn & 0x7f;	// % 128;
+	fcb->ex = ex & 0x1f;	// % 32;
+	fcb->s2 = (0x80 | (ex >> 5));	// / 32));
 	*/
+	
 	fcb->cr = fcb->r0 & 0x7f;	// bits 0...6 of r0
 	fcb->ex = ((fcb->r0 & 0x80) >> 7) | ((fcb->r1 & 0x0f) << 1);	// bit 7 of r0 + bits 0...3 of r1
-	fcb->s2 = 0x80 | ((fcb->r1 >> 4) & 0x0f);	// bits 4...7 of r1
+	fcb->s2 = ((fcb->r1 >> 4) & 0x0f);	// bits 4...7 of r1
 	
-	/*
-	// Proceed with sequencial read
-	r = bdos_f_read_(fcb);
-	return r;
-	*/
+	
+	// Proceed with regular sequential read
+	//return bdos_f_read_(fcb);
+	
+	
 	
 	#ifdef BDOS_USE_HOST
 		word l;
-		word rn;
-		word ex;
+		//word rn;
+		//word ex;
 	
 		//host_sendfcb(bdos_param_c, fcb);
-		//host_sendfcb(BDOS_FUNC_F_READ, fcb);
-		host_sendfcb(BDOS_FUNC_F_READRAND, fcb);
+		host_sendfcb(BDOS_FUNC_F_READ, fcb);
+		//host_sendfcb(BDOS_FUNC_F_READRAND, fcb);
 		
 		// Receive data
 		l = host_receivedma();
@@ -1268,12 +1310,15 @@ byte bdos_f_readrand_(struct FCB *fcb) {
 			bdos_memset(bios_dma + l, 0x1a, 128 - l);
 		}
 		
+		// Do not increment current record on readrand
+		/*
 		rn = (word)fcb->cr + ((word)fcb->ex * 128) + ((word)(fcb->s2 & 1) * 16384);
 		rn++;
 		ex = rn >> 7;	//	/ 128;
 		fcb->cr = rn % 128;
 		fcb->ex = ex % 32;
 		fcb->s2 = (0x80 | (ex / 32));
+		*/
 		
 		//bdos_puts("readOK");
 		return 0x00;
@@ -1283,6 +1328,7 @@ byte bdos_f_readrand_(struct FCB *fcb) {
 		(void)fcb;
 		return 6;	// 1 = EOF
 	#endif
+	
 	
 }
 byte bdos_f_readrand(struct FCB *fcb) __naked {	// BDOS_FUNC_F_READRAND:	// 33: Read random

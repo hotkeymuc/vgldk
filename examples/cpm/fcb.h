@@ -8,10 +8,6 @@
 */
 
 /*
-	Each file consist of:
-		* segments: size=16KB ("logical extents")
-		* records: size=128 bytes, count=65536
-		
 CR = current record,   ie (file pointer % 16384)  / 128
 EX = current extent,   ie (file pointer % 524288) / 16384
 S2 = extent high byte, ie (file pointer / 524288). The CP/M Plus source

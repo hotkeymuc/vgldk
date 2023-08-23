@@ -11,10 +11,12 @@
 //#define MAX_DATA 128
 #define BIOS_STACK 0xDFF0	// BIOS (re)sets stack pointer there
 
+//#define BIOS_SCROLL_WAIT	// Wait after 1 page of text
 
 //#define BIOS_USE_PRINTER	// Include printer driver and redirect printer "list" to printer.
 //#define BIOS_PAPER_TAPE_TO_SOFTUART	// Redirect paper tape functions "punch" and "reader" to SoftUART
 //#define BIOS_PAPER_TAPE_TO_MAME	// Redirect paper tape functions "punch" and "reader" to MAME-Host
+
 
 // BIOS function numbers
 // https://www.seasip.info/Cpm/bios.html

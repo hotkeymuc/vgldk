@@ -275,7 +275,7 @@ if __name__ == '__main__':
 	cpm_loc_data = 0xc000	# static variable data and gsinit-code will be put to this address in binary file. Monitor uses 0xd000 for its data
 	cpm_bin_filename = '%s/cpm.bin' % out_path
 	
-	ccp_code_size_estimate = 0x0c00
+	ccp_code_size_estimate = 0x0f00
 	ccp_data_size_estimate = 0x0800
 	ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Must be known by BDOS in order to start up CCP!
 	ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
@@ -303,6 +303,8 @@ if __name__ == '__main__':
 			'VGLDK_SERIES': vgldk_series,
 			
 			'SOFTUART_BAUD': 19200,
+			
+			#'BIOS_SCROLL_WAIT': 1,	# Wait after 1 page of text
 			
 			# Paper tape is display by default. But it can be changed at compile time (in the future maybe at runtime using the "iobyte")
 			#'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape to SoftUART
