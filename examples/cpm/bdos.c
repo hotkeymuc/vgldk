@@ -832,7 +832,7 @@ byte bdos_f_open_(struct FCB *fcb) {
 			*/
 			
 			// Mirror to DMA and return its 32-byte offset
-			//bdos_memcpy((byte *)0x0080, (byte *)fcb, 32);
+			bdos_memcpy((byte *)0x0080, (byte *)fcb, 36);
 			return 0;
 		}
 	#else

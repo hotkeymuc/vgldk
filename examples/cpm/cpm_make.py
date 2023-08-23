@@ -492,8 +492,26 @@ if __name__ == '__main__':
 	
 	#bdos_host.SHOW_TRAFFIC = True	# Debug traffic
 	
-	#comp = bdos_host.Host_Serial(port=port, baud=baud)
-	comp = bdos_host.Host_MAME(rompath=ROM_DIR, emusys=EMUSYS, cart_file=CART_FILE)
+	# Default local paths to serve as CP/M drives
+	paths = [
+		# first entry = A: = default
+		#'programs',
+		
+		#'programs/ASCOM22',
+		#'programs/BBCBASIC',
+		#'programs/CATCHUM',
+		#'programs/CBASIC2',
+		#'programs/LADDER',
+		#'programs/STDCPM22',
+		#'programs/TEX',
+		#'programs/TP300',
+		#'programs/VG04',
+		#'programs/WRDMASTR',
+		#'programs/WS30',
+		'programs/ZORK123',
+	]
+	#comp = bdos_host.Host_Serial(port=port, baud=baud, paths=paths)
+	comp = bdos_host.Host_MAME(rompath=ROM_DIR, emusys=EMUSYS, cart_file=CART_FILE, paths=paths)
 	
 	comp.open()
 	
