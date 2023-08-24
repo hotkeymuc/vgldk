@@ -1,32 +1,33 @@
 ![VGLDK Logo](/info/VGLDKLogo.svg)
-# VGLDK
+
 VTech Genius Leader Development Kit - an unofficial software development kit (SDK) for Z80 based VTech "Genius LEADER" learning computers (aka. "PreComputer", "YENO MisterX", "Genio" or "Compusavant").
 This project is in no way affiliated with the VTech company. This is a pure hobby project, everything is provided as-is.
 
 This project is still heavily *work in progress*, but quite usable. For some working proof-of-concept stuff, visit the [Hackaday project page](https://hackaday.io/project/166921-v-tech-genius-leader-precomputer-hacking) and get started using the zipped snapshots of "VGL CP/M" and other SDCC code examples.
 
+![CP/M running on GL4000](/info/CPM_on_GL4000_small.jpg)
 
 ## Target platforms
 	pc1000
-		VTech PreComputer 1000 [US/UK]
-		YENO Mister X [DE]
+		- VTech PreComputer 1000 [US/UK]
+		- YENO Mister X [DE]
 	gl2000
-		VTech PreComputer 2000 [US/UK]
-		VTech Genius LEADER 2000 [DE]
-		VTech Genius LEADER 2000 PLUS [DE]
-		VTech Genius LEADER 2000 Compact [DE]
-		VTech PreComputer THINK BOOK [UK]
-		YENO Mister X2 [DE]
+		- VTech PreComputer 2000 [US/UK]
+		- VTech Genius LEADER 2000 [DE]
+		- VTech Genius LEADER 2000 PLUS [DE]
+		- VTech Genius LEADER 2000 Compact [DE]
+		- VTech PreComputer THINK BOOK [UK]
+		- YENO Mister X2 [DE]
 	gl4000
-		VTech Genius LEADER 4000 Quadro [DE]
-		VTech Genius LEADER 4004 Quadro L [DE]
-		VTech PreComputer POWER PAD [UK]
+		- VTech Genius LEADER 4000 Quadro [DE]
+		- VTech Genius LEADER 4004 Quadro L [DE]
+		- VTech PreComputer POWER PAD [UK]
 	gl6000sl
-		VTech Genius LEADER 6000 SL [DE]
-		VTech Genius LEADER 7007 SL [DE]
-		VTech PC PRESTIGE [US]
-		VTech PC Navigator [US]
-		(YENO COMPUSAVANT [FR])
+		- VTech Genius LEADER 6000 SL [DE]
+		- VTech Genius LEADER 7007 SL [DE]
+		- VTech PC PRESTIGE [US]
+		- VTech PC Navigator [US]
+		- (YENO COMPUSAVANT [FR])
 
 Newer models ("CX" series, circa 1999 onward) use a completely different system architecture, namely a CompactRISC CR16B CPU. Refer to the [VCXDK](https://www.github.com/hotkeymuc/vcxdk) for those models.
 
