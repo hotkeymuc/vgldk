@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Note: cpm_make.py also does the same as this .sh file. (Because it is a good idea to re-compile CCP whenever CPM changes)
+# Note: Use cpm_make.py instead. It also does the same as this .sh file. (Because it is a good idea to re-compile CCP whenever CPM changes)
 
 NAME=ccp
 
