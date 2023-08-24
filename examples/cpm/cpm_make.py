@@ -55,11 +55,11 @@ How to start up CP/M:
 		* Boot the system from RAM cartridge into CP/M
 
 
-2023-08-10 Bernhard "HotKey" Slawik
+2023-08-23 Bernhard "HotKey" Slawik
 """
 
 # Have a look at these settings:
-VGLDK_SERIES = 4000	# System to compile CP/M for (e.g. 4000 for VTech Genius Leader 4000)
+VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
 COMPILE_CPM = True	# Compile BINT/BIOS/BDOS (main)
 COMPILE_CCP = True	# Compile CCP (command line processor)
 EMULATE_CCP_IN_YAZE = False	# Run the CCP in YAZE emulator to test cross-compatibility
@@ -71,18 +71,17 @@ EMULATE_IN_MAME = True	# Start MAME and switch to BDOS host mode
 
 
 # Default local paths to serve as CP/M drives using bdos_host.py
+# first entry = A: = default
 BDOS_MOUNTS = [
-	# first entry = A: = default
-	
 	#'programs',
 	#'programs/ASCOM22',
 	#'programs/BBCBASIC',	# Works!
 	#'programs/CATCHUM',
 	#'programs/CBASIC2',
 	#'programs/LADDER',
-	'programs/STDCPM22',
+	'programs/STDCPM22',	# good for testing...
 	#'programs/TEX',
-	#'programs/TP300',	# reboots...
+	#'programs/TP300',	#@FIXME: reboots when invoked
 	#'programs/VG04',
 	#'programs/WRDMASTR',
 	#'programs/WS30',
@@ -348,19 +347,24 @@ def cpm_make():
 		cpm_upload(cpm_data)
 	
 	
+	# MAME settings (used for system ROM generation and emulation)
+	MAME_ROMS_DIR = 'roms'	# Where to put the generates "fake" system ROM
+	MAME_SYS = 'gl%d' % vgldk_series	# MAME system name
+	
 	if GENERATE_MAME_ROM:
 		### Create MAME SYSROM for emulation
 		put('Creating MAME SYSROM...')
-		MAME_SYS = 'gl4000'	# MAME system name
-		MAME_ROMS_DIR = 'roms'	# Where to put the generates "fake" system ROM
-		OUTPUT_FILE_SYSROM = '27-5480-00'	# This filename is specific to each MAME system!
-		OUTPUT_FILE_SYSROMZIP = '%s/%s.zip' % (MAME_ROMS_DIR, MAME_SYS)
-		OUTPUT_FILE_INFO = '_this_is_cpm.txt'	# Little info file to mark it as "not a stock firmware"
+		if vgldk_series == 4000:
+			OUTPUT_FILE_SYSROM = '27-5480-00'	# This filename is specific to each MAME system!
+			OUTPUT_FILE_SYSROMZIP = '%s/%s.zip' % (MAME_ROMS_DIR, MAME_SYS)
+		else:
+			put('At the moment, only generation of gl4000 ROMs is implemented.')
+			sys.exit(1)
 		
 		with zipfile.ZipFile(OUTPUT_FILE_SYSROMZIP, 'w') as z:
 			
 			# Write dynamic info file
-			with z.open(OUTPUT_FILE_INFO, 'w') as h:
+			with z.open('_this_is_cpm.txt', 'w') as h:
 				h.write(b'This is a fake system image to emulate a bootstrapped CP/M SRAM mounted in system ROM area.\n')
 				
 				now = datetime.datetime.now()
@@ -376,7 +380,7 @@ def cpm_make():
 				#
 			#
 		#
-	
+	#
 	
 	if EMULATE_IN_MAME:
 		## Emulate in MAME, connect to bdos_host.py
@@ -418,27 +422,25 @@ def cpm_make():
 		#comp.upload(bin_filename)
 		comp.run()
 	#
-	
+#
 
 
-# Warpper around SDCC compiler
 def compile(
-		## Defaults...
 		crt_s_files = ['./crt0.s'],
 		crt_rel_file = 'out/crt0.rel',
 		source_files = ['./main.c'],	# CRT0 rel file is prepended automatically
 		output_hex_file = 'out/main.hex',
 		output_bin_file = 'out/main.bin',
 		lib_path = None,	#'../../lib'
-		include_path = None,	#'../../include',
+		include_path = '../../include',
 		loc_code = 0x8000,
 		loc_data = 0xc000,
-		defines = { 'VGLDK_SERIES': 4000 }
+		defines = { 'VGLDK_SERIES': VGLDK_SERIES }
 	):
+	"""Wrapper around the SDCC compiler"""
 	
 	"""
-	### Compile source file(s) using Z88DK, generate .bin file
-	
+	### Alternative: Compile source file(s) using Z88DK, generate .bin file
 	my_env = os.environ.copy()
 	my_env['PATH'] = os.environ['PATH'] + ';' + os.path.join(z88dk_path, 'bin')
 	my_env['OZFILES'] = z88dk_lib_path	# Normally these files reside inside the z88dk, but we can hijack them and use our minimal local version
@@ -524,17 +526,18 @@ def compile(
 		#put(subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env=env).stdout.read())
 		
 		#@FIXME: The .bin file also contains some data at the RAM area... (e.g. file offset 0xc000)
+		
+		## Analyze final .rel file (with binary references)
+		#process_rel_file(crt_rel_file, output_bin_file)
+		
+		## Show cartridge size statistics
+		#calcsize.analyze(output_bin_file)
+		
+		### Return pure binary data
+		with open(output_bin_file, 'rb') as h:
+			data = h.read()
+		return data
 	
-	## Analyze final .rel file (with binary references)
-	#process_rel_file(crt_rel_file, output_bin_file)
-	
-	## Show cartridge size statistics
-	#calcsize.analyze(output_bin_file)
-	
-	### Return pure binary data
-	with open(output_bin_file, 'rb') as h:
-		data = h.read()
-	return data
 
 
 def cpm_upload(data):
