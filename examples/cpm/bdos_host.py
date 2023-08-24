@@ -89,7 +89,7 @@ DATA_PATHS = [
 	#'programs/ASCOM22',
 	#'programs/BBCBASIC',
 	#'programs/CATCHUM',
-	'programs/CBASIC2',
+	#'programs/CBASIC2',
 	#'programs/LADDER',
 	#'programs/STDCPM22',
 	#'programs/TEX',
@@ -97,7 +97,7 @@ DATA_PATHS = [
 	#'programs/VG04',
 	#'programs/WRDMASTR',
 	#'programs/WS30',
-	#'programs/ZORK123',
+	'programs/ZORK123',
 	
 ]
 
@@ -613,7 +613,8 @@ class Host_MAME(Host):
 		
 	
 
-class Host_Serial(Host):
+class Host_Serial_Safe(Host):
+	"""Using serial protocol, with synch and checksum"""
 	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, *args, **kwargs):
 		Host.__init__(self, throttle=DMA_THROTTLE, *args, **kwargs)
 		
@@ -694,7 +695,7 @@ class Host_Serial(Host):
 		line = ''
 		while(self.running):
 			if (self.ser.in_waiting > 0):
-				l = self.readline()
+				l = self.serial_readline()
 				if l is not None:
 					self.serial_handle_frame(l)
 			else:
@@ -702,9 +703,6 @@ class Host_Serial(Host):
 				time.sleep(0.01)
 	
 	def reply_frame(self, data):
-		self.serial_reply_frame(self, data)
-	
-	def serial_reply_frame(self, data):
 		"Reply data inside a frame"
 		frame = []
 		l = len(data)
@@ -800,6 +798,104 @@ class Host_Serial(Host):
 		
 	
 
+class Host_Serial_Direct(Host):
+	"""Using just binary frames (error prone)"""
+	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, *args, **kwargs):
+		Host.__init__(self, throttle=DMA_THROTTLE, *args, **kwargs)
+		
+		# Serial state
+		self.port = port
+		self.baud = baud
+		self.ser = None
+	
+	def __del__(self):
+		self.serial_close()
+	
+	def open(self):
+		self.serial_open()
+	
+	def serial_open(self):
+		self.ser = None
+		port = self.port
+		put('Opening "%s"...' % port)
+		
+		try:
+			self.ser = serial.Serial(port=port, baudrate=self.baud, bytesize=8, parity='N', stopbits=1, timeout=3, xonxoff=0, rtscts=0)
+			put('Open!')
+			self.is_open = True
+			return True
+		except serial.serialutil.SerialException as e:
+			#except e:
+			put('Error opening serial device: %s' % str(e))
+			self.is_open = False
+			return False
+	
+	def serial_close(self):
+		self.running = False
+		time.sleep(0.2)
+		
+		if (self.ser is not None):
+			self.ser.close()
+			self.ser = None
+	
+	def serial_write(self, data):
+		if self.ser is None:
+			put('! Cannot send data, because serial is not open!')
+			return False
+		
+		if (SHOW_TRAFFIC): put('>>> "%s"' % str_hex(data.strip()))
+		self.ser.write(data)
+		#self.ser.flush()	#?
+	
+	def run(self):
+		self.serial_run()
+	
+	def serial_run(self):
+		"Main loop"
+		self.running = True
+		
+		put('Ready.')
+		line = ''
+		while(self.running):
+			if (self.ser.in_waiting > 0):
+				f = self.serial_read_frame()
+				if f is not None:
+					self.serial_handle_frame(f)
+			else:
+				# Idle
+				time.sleep(0.01)
+	
+	def reply_frame(self, data):
+		"Reply data inside a frame"
+		
+		
+		frame = [ len(data) ] + data
+		
+		# Prepend and pad with zero bytes (for synching, they get ignored as zero-length frames)
+		#frame = [ 0 ] * 8 + [ len(data) ] + data + [ 0 ] * 8
+		
+		# Pre-padding (to give some time and sync)
+		self.ser.write(bytes( [0] * 4 ))
+		
+		# Send without checksum check
+		self.ser.write(bytes(frame))
+		
+		# Post padding (to give some time)
+		self.ser.write(bytes( [0] * 4 ))
+		
+	
+	def serial_read_frame(self):
+		while (self.ser.in_waiting == 0): time.sleep(0.01)
+		l = self.ser.read(1)[0]
+		while (self.ser.in_waiting < l): time.sleep(0.01)
+		data = self.ser.read(l)
+		return list(data)	# Convert bytes to list
+	
+	def serial_handle_frame(self, f):
+		"Handle incoming raw data"
+		
+		self.handle_frame(f)
+	
 
 
 
@@ -833,8 +929,9 @@ if __name__ == '__main__':
 		elif opt in ('-i', '--input'):
 			bin_filename = arg
 	
-	#comp = Host_Serial(port=port, baud=baud)
-	comp = Host_MAME()
+	#comp = Host_Serial_Safe(port=port, baud=baud)
+	comp = Host_Serial_Direct(port=port, baud=baud)
+	#comp = Host_MAME()
 	
 	comp.open()
 	

@@ -34,7 +34,10 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 	int papertape_receive(byte *data) {
 		byte l;
 		byte i;
-		l = bios_reader();
+		// Wait for non-zero
+		do {
+			l = bios_reader();
+		} while (l == 0);
 		for (i = 0; i < l; i++) {
 			*data++ = bios_reader();
 		}
@@ -60,7 +63,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		byte i;
 		//byte c;
 		
-		// Skip padding 0 bytes
+		// Wait for non-zero
 		//bdos_printf("RX=");
 		do {
 			l = mame_getchar();
@@ -91,8 +94,91 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 	#define HOST_SERIAL_MAX_LINE 255	// Maximum length of one incoming line
 	#define HOST_SERIAL_TIMEOUT 8192
 	
+	// Compatibility for old "softserial"
+	#define serial_getchar softuart_receiveByte
+	#define serial_getchar_nonblocking softuart_receiveByte
+	#define serial_putchar softuart_sendByte
+	
+	void serial_put(byte *data, word l) {
+		for (word i = 0; i < l; i++) {
+			serial_putchar(*data++);
+		}
+	}
+	byte *serial_gets(byte *serial_get_buf) {
+		int c;
+		byte *b;
+		
+		b = serial_get_buf;
+		while(1) {
+			//c = serial_getchar();
+			c = serial_getchar_nonblocking();
+			if (c <= 0) continue;	// < 0 means "no data"
+			
+			// Check for end-of-line character(s)
+			if ((c == 0x0a) || (c == 0x0d)) break;
+			
+			// Store in given buffer
+			*b++ = c;
+		}
+		
+		// Terminate string
+		*b = 0;
+		
+		// Return length
+		//return (word)b - (word)serial_get_buf;
+		
+		// Return buf (like stdlib gets())
+		return serial_get_buf;
+	}
+	
 	//#define serial_debug(s)	printf(s)
 	#define serial_debug(s)	;
+	
+	#ifndef __HEX_H
+		//#include <hex.h>	// for hexDigit
+		/*
+		byte hexDigit(byte c) {
+			if (c < 10)
+				return ('0'+c);
+			return 'A' + (c-10);
+		}
+		*/
+		#define hexDigit bdos_hexDigit
+		
+		
+		byte parse_hexDigit(byte c) {
+			if (c > 'f') return 0;
+			
+			if (c < '0') return 0;
+			if (c <= '9') return (c - '0');
+			
+			if (c < 'A') return 0;
+			if (c <= 'F') return (10 + c - 'A');
+			
+			if (c < 'a') return 0;
+			return (10 + c - 'a');
+		}
+		
+		
+		word hextown(const char *s, byte n) {
+			byte i;
+			word r;
+			char c;
+			
+			r = 0;
+			for(i = 0; i < n; i++) {
+				c = *s++;
+				if (c < '0') break;	// Break at zero char and any other non-ascii
+				r = (r << 4) + (word)parse_hexDigit(c);
+			}
+			return r;
+		}
+		
+		byte hextob(const char *s) {
+			return (byte)hextown(s, 2);
+		}
+	#endif
+	
 	/*
 	void dump(byte *pb) {
 		byte i;
@@ -126,6 +212,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 	}
 	*/
 	
+	
 	int serial_getchar2() {
 		// Get char, return -1 on timeout
 		int c;
@@ -141,7 +228,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		}
 		return c;
 	}
-	
+	/*
 	int serial_gets2(byte *serial_get_buf) {
 		// Receive with timeout. Returns -1 on timeout or length
 		int c;
@@ -182,7 +269,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		// Return buf (like stdlib gets())
 		return l;
 	}
-	
+	*/
 	int serial_gethex2() {
 		// Receive two digits of hex, return -1 on timeout
 		//byte r;
@@ -204,6 +291,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		
 		return (parse_hexDigit(c) << 4) + parse_hexDigit(c2);
 	}
+	
 	
 	void serial_sendSafe(const byte *data, byte ldata) {
 		byte line[HOST_SERIAL_MAX_LINE];
@@ -256,23 +344,22 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		
 		while(1) {
 			serial_debug("TX");
-			__asm
-				di
-			__endasm;
+			//__asm
+			//	di
+			//__endasm;
 			
 			// Send synchronization
 			//serial_puts("UUUUUUUU");
 			serial_put(line, lline);
 			
-			
 			c = serial_gethex2();
 			
-			__asm
-				ei
-			__endasm;
+			//__asm
+			//	ei
+			//__endasm;
 			
 			if (c < 0) {
-				printf("T!\n");
+				bdos_printf("T!\n");
 				continue;
 			}
 			
@@ -283,12 +370,12 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 				//printf("OK\n");
 				break;
 			} else {
-				//printf("C!\n");
-				printf("C! g=");
-				printf_x2(checkgiven);
-				printf(",a=");
-				printf_x2(checkactual);
-				printf("!\n");
+				bdos_printf("C!\n");
+				//bdos_printf("C! g=");
+				//bdos_printf_x2(checkgiven);
+				//bdos_printf(",a=");
+				//bdos_printf_x2(checkactual);
+				//bdos_printf("!\n");
 			}
 		}
 		serial_debug("OK\n");
@@ -339,24 +426,24 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 			}
 			if (linel < 4) {
 				// Too small to have length and check
-				//printf("S!\n");
-				printf("S!");
-				printf_x2(linel);
-				printf("<4!\n");
+				bdos_printf("S!\n");
+				//bdos_printf("S!");
+				//bdos_printf_x2(linel);
+				//bdos_printf("<4!\n");
 				//continue;
 				return -1;
 			}
 			
 			// Get length
 			l = hextob(pline); pline += 2;
-			if (((2 + l*2 + 2) != linel) || (l > MAX_DATA)) {
+			if (((2 + l*2 + 2) != linel) || (l > BDOS_HOST_MAX_DATA)) {
 				// Error in length! Given length > actual length
-				//printf("L!\n");
-				printf("L! g=");
-				printf_x2(l);
-				printf(",a=");
-				printf_x2((linel-4) >> 1);
-				printf("!\n");
+				bdos_printf("L!\n");
+				//bdos_printf("L! g=");
+				//bdos_printf_x2(l);
+				//bdos_printf(",a=");
+				//bdos_printf_x2((linel-4) >> 1);
+				//bdos_printf("!\n");
 				//continue;
 				return -1;
 			}
@@ -375,11 +462,12 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 			
 			if (checkgiven != checkactual) {
 				// Checksums mismatch
-				printf("C! g=");
-				printf_x2(checkgiven);
-				printf(",a=");
-				printf_x2(checkactual);
-				printf("!\n");
+				bdos_printf("C!\n");
+				//bdos_printf("C! g=");
+				//bdos_printf_x2(checkgiven);
+				//bdos_printf(",a=");
+				//bdos_printf_x2(checkactual);
+				//bdos_printf("!\n");
 				//continue;
 				return -1;
 				
