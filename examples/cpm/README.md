@@ -60,6 +60,7 @@ Modified memory layout for CP/M:
  - bint.c/h: Interrupt handler
  - bios.c/h: Basic I/O
  - bdos.c/h: File handling
+ - bdos_host.h/py: Communication between CP/M and host computer (to serve files)
  - cpm.c/h: Main compilation target
  - cpm_make.py: **Python helper for building the whole project**
  - ccp.c/h: Command processor (stand-alone CP/M binary!)
