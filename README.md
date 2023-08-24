@@ -62,5 +62,6 @@ Newer models ("CX" series, circa 1999 onward) use a completely different system 
 * [VTech hardware development](https://www.thingiverse.com/thing:3108809)
 * [Alexandre Botzung dissecting the YENO COMPUSAVANT](https://alexandre.botzung.fr/fr/analyse-du-yeno-compusavant)
 * [VCXDK for newer VTech models](https://www.github.com/hotkeymuc/vcxdk)
+* [VTech on Fandom](https://vtech.fandom.com/wiki/VTech_Wiki)
 
-2020-09-07 Bernhard "HotKey" Slawik
+2023-08-23 Bernhard "HotKey" Slawik
