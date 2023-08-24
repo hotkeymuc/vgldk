@@ -7,24 +7,28 @@
 	
 	This is the "shell" of CP/M.
 	It is loaded as a standard program into the transient area.
-*/
-
-/*
-Command (Internal)	Function
-DIR <filespec>
-	Produces a list of files matching the <filespec>, if no filespec is entered, the result is the same as *.*, i.e., all files on the currently logged disk. The command accepts similar wildcards as DOS.
-	Note, CP/M 2.2 has no concept of directories, all files are in the "root" area of the disk. Other target disks can be selected, e.g., DIR C:*.* will list all files on drive C:
-	System files are not shown by the DIR command. (See STAT).
-ERA <filespec>
-	Deletes the file(s) specified by <filespec>. Wildcards are allowed.
-REN <new> = <old>
-	Renames the <old> filespec to the <new>. Wildcards are allowed.
-SAVE <pages> <file>
-	Saves a copy of memory to file. <pages> is the number of 256 byte pages starting at address 100(h) to save and <file> is the filename to save the data to.
-TYPE <filename>
-	Copies the named text file to the console (screen)
-USER <area>
-	The system has "user areas" numbered from 0 to 15. On start-up, the User area is set to "0". The DIR command displays files in the current user area and only programs in the current user area can be executed. The USER command is used to select another User area.
+	
+	Currently, it can just DIR and load a .COM file and run it.
+	VER and EXIT are also available, but that's pretty much it...
+	
+	
+@TODO: Implement stock functions:
+	DIR <filespec>
+		Produces a list of files matching the <filespec>, if no filespec is entered, the result is the same as *.*, i.e., all files on the currently logged disk. The command accepts similar wildcards as DOS.
+		Note, CP/M 2.2 has no concept of directories, all files are in the "root" area of the disk. Other target disks can be selected, e.g., DIR C:*.* will list all files on drive C:
+		System files are not shown by the DIR command. (See STAT).
+	ERA <filespec>
+		Deletes the file(s) specified by <filespec>. Wildcards are allowed.
+	REN <new> = <old>
+		Renames the <old> filespec to the <new>. Wildcards are allowed.
+	SAVE <pages> <file>
+		Saves a copy of memory to file. <pages> is the number of 256 byte pages starting at address 100(h) to save and <file> is the filename to save the data to.
+	TYPE <filename>
+		Copies the named text file to the console (screen)
+	USER <area>
+		The system has "user areas" numbered from 0 to 15. On start-up, the User area is set to "0". The DIR command displays files in the current user area and only programs in the current user area can be executed. The USER command is used to select another User area.
+	
+2023-08-13 Bernhard "HotKey" Slawik
 */
 
 // Entry point
