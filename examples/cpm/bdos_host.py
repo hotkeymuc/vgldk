@@ -52,7 +52,7 @@ MAX_DATA = 128	# for HEX serial: 128
 MAX_SEND = 120	# for HEX serial: < 128-header
 
 REPLY_THROTTLE = 0.05	# We need to wait a bit before sending a reply, because VGL does not have interrupt based serial and needs to be ready for data or it'll simply miss it
-DMA_THROTTLE = 0.1
+DMA_THROTTLE = 0.15	#0.1
 
 DEFAULT_DAT_FILENAME = None
 
@@ -396,6 +396,11 @@ class Host:
 				
 				put('Read data from file %s:"%s" at ofs=%d / %d' % (chr(ord('A') + fcb_dr), filename, ofs, l_all))
 				
+				if ofs > l_all:
+					put('!!! Invalid file offset! Out of bounds!')
+					self.reply_frame([0xff])
+					return
+				
 				data = []
 				
 				max_read = 128
@@ -418,10 +423,17 @@ class Host:
 				# Send in smaller chunks
 				#time.sleep(0.05)
 				o = 0
-				l2 = 32	# 32 works
-				#l2 = 64
+				
+				# MTU / Maximum transmission unit
+				#l2 = 16
+				#l2 = 32	# 32 works ok
+				#l2 = 48
+				l2 = 64	# 64 works kind-of...
+				#l2 = 96	# Too big (NAK)
 				while (l2 > 0):
-					if self.throttle is not None: time.sleep(self.throttle)
+					if self.throttle is not None:
+						time.sleep(self.throttle)
+					
 					put('Sending chunk o=%d / %d' % (o, len(data)))
 					d = data[o:o+l2]
 					l2 = len(d)
@@ -987,10 +999,10 @@ class Host_Serial_binary_safe(Host):
 		
 		while True:
 			#while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
-			time.sleep(0.02)
+			time.sleep(0.1)
 			
 			# Send frame
-			#self.ser.write(bytes( [0] * 16 ))	# Pre-padding to sync
+			self.ser.write(bytes( [0] * 8 ))	# Pre-padding to sync
 			self.ser.write(bytes(frame))
 			#self.ser.write(bytes( [0] * 16 ))	# Post-padding to flush
 			
@@ -1015,7 +1027,7 @@ class Host_Serial_binary_safe(Host):
 			#r = self.ser.read(1)[0]
 			
 			r = self.ser.read()
-			put('TX: received ACK/NACK [ %s ]' % (' '.join(['0x%02X'%b for b in r ])))
+			#put('TX: received ACK/NACK [ %s ]' % (' '.join(['0x%02X'%b for b in r ])))
 			r = r[-1]
 			
 			# Check for ACK
@@ -1030,9 +1042,11 @@ class Host_Serial_binary_safe(Host):
 			time.sleep(0.1)
 			#self.ser.write(bytes( [0] * 4 ))	# Flush
 			while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
-			put('TX: Re-transmitting...')
+			#put('TX: Re-transmitting...')
+			#time.sleep(0.1)
 		#
-		put('TX: OK, ACK received.')
+		
+		#put('TX: OK, ACK received.')
 		
 	
 	def serial_read_frame(self):
