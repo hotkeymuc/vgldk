@@ -16,9 +16,10 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 
 // Protocol to use for communication (frame level) - select ONE
 //#define BDOS_HOST_PROTOCOL_BINARY	// Send using 8bit binary data (e.g. for MAME driver or reliable serial)
+//#define BDOS_HOST_PROTOCOL_BINARY_SAFE	// Send using binary, but with checksum and retransmission (e.g. SoftUART)
 //#define BDOS_HOST_PROTOCOL_HEX	// Send using hex text (if communication is not binary-proof)
 
-#define BDOS_HOST_MAX_DATA 128	// To dismiss too large frames
+#define BDOS_HOST_MAX_DATA 144	//128	// To dismiss too large frames
 #define BDOS_HOST_DMA_MAX_DATA 128	// Buffer size for DMA data
 
 
@@ -80,10 +81,6 @@ void bdos_host_send_data(byte *data, word l) {
 			bdos_host_send_byte(*data++);
 		}
 		
-		//@TODO: Send Checksum
-		
-		//@TODO: Wait for ACK/NACK and retry
-		
 	}
 	
 	int bdos_host_receive_frame(byte *data) {
@@ -91,13 +88,18 @@ void bdos_host_send_data(byte *data, word l) {
 		byte i;
 		//byte c;
 		
-		// Wait for non-zero, receive length
+		// Wait for non-zero byte, receive length
 		//bdos_printf("RX=");
 		do {
 			l = bdos_host_receive_byte();
 		} while (l <= 0);
 		//bdos_printf_x2(l);
 		//bdos_printf("..."); //bdos_getchar();
+		
+		// No buffer-overflow, please!
+		if (l > BDOS_HOST_MAX_DATA) {
+			return -1;
+		}
 		
 		// Receive data
 		for (i = 0; i < l; i++) {
@@ -111,13 +113,102 @@ void bdos_host_send_data(byte *data, word l) {
 			*data++ = bdos_host_receive_byte();
 		}
 		
-		//@TODO: Receive checksum
+		return l;
+	}
+#endif
+
+#ifdef BDOS_HOST_PROTOCOL_BINARY_SAFE
+	// Send using binary data and checksum+retransmission
+	
+	void bdos_host_send_frame(const byte *data, byte len) {
+		byte i;
+		byte b;
+		byte check;
+		const byte *p;
+		int r;
 		
-		//@TODO: Send ACK/NACK and retry
+		do {	// Retransmission
+			check = 0x55;	// Initial checksum
+			
+			// Send length
+			bdos_host_send_byte(len);
+			
+			// Send data
+			p = data;
+			for (i = 0; i < len; i++) {
+				b = *p++;
+				bdos_host_send_byte(b);
+				check ^= b;	// XOR it
+			}
+			
+			// Send Checksum
+			bdos_host_send_byte(check);
+			
+			// Wait for ACK/NACK
+			r = -1;
+			while (r < 0) {
+				r = bdos_host_receive_byte();
+			}
+			
+		} while (r != 0xaa);	// Repeat until "AA" is received
+		
+	}
+	
+	int bdos_host_receive_frame(byte *data) {
+		int l;
+		byte c;
+		byte i;
+		byte *p;
+		byte check;
+		int check_received;
+		
+		do {	// Retransmission
+			
+			// Wait for non-zero byte, receive length
+			//bdos_printf("RX=");
+			do {
+				l = bdos_host_receive_byte();
+			} while (l <= 0);
+			//bdos_printf_x2(l);
+			//bdos_printf("..."); //bdos_getchar();
+			
+			// No buffer-overflow, please!
+			if (l > BDOS_HOST_MAX_DATA) {
+				bdos_printf("Rmax!");
+				// Flush
+			} else {
+				// Receive data
+				check = 0x55;	// Initial checksum
+				p = data;
+				for (i = 0; i < l; i++) {
+					//bdos_printf_x2(i);
+					//bdos_putchar('.');
+					c = bdos_host_receive_byte();
+					*p++ = c;
+					check ^= c;	// XOR onto checksum
+				}
+				
+				// Receive checksum
+				//do {
+				check_received = bdos_host_receive_byte();
+				//} while (check_received < 0);
+				
+				// Check
+				if ((byte)check_received == check) break;	// Match! Stop loop
+				
+				bdos_printf("RC!");
+			}
+			
+			// Checksum mismatch! Send NACK (anything but 0xAA)
+			bdos_host_send_byte(0x99);	// Send NACK
+			
+		} while (1);	//check_received != check);
+		
+		// OK! Send ACK
+		bdos_host_send_byte(0xAA);
 		
 		return l;
 	}
-	
 #endif
 
 
@@ -426,8 +517,10 @@ void bdos_host_send_data(byte *data, word l) {
 
 // Make sure one protocol is selected
 #ifndef BDOS_HOST_PROTOCOL_BINARY
-	#ifndef BDOS_HOST_PROTOCOL_HEX
-		#error One BDOS_HOST_PROTOCOL has to be selected (binary or hex)!
+	#ifndef BDOS_HOST_PROTOCOL_BINARY_SAFE
+		#ifndef BDOS_HOST_PROTOCOL_HEX
+			#error One BDOS_HOST_PROTOCOL has to be selected (binary, binary_safe or hex)!
+		#endif
 	#endif
 #endif
 
@@ -544,7 +637,8 @@ void host_sendfcb(byte num, struct FCB *fcb) {
 
 
 byte host_receivefcb(struct FCB *fcb) {
-	byte data[1 + 36 + 16];	// Leave some extra to be sure
+	//byte data[1 + 36 + 16];	// Leave some extra to be sure
+	byte data[BDOS_HOST_MAX_DATA + 4];
 	byte l;
 	byte r;
 	
@@ -556,6 +650,7 @@ byte host_receivefcb(struct FCB *fcb) {
 	//@TODO: L must be 36 for a proper FCB (or 32 for dir listing). Return error if not.
 	if (l > (1+36)) {
 		bdos_puts("FCB>36!");
+		//bdos_printf("FCB"); bdos_printf_x2(l); bdos_puts(">0x25!");
 		return 0xff;
 	}
 	
@@ -588,7 +683,7 @@ word host_receivedma() {
 		l = bdos_host_receive_frame(&data[0]);
 		//bdos_printf_x2(l); bdos_printf(".");
 		
-		if ((l == 1) && (data[0] == 0xAA)) {
+		if ((l == 1) && (data[0] == 0x1A)) {
 			//bdos_printf("EOF");
 			break;
 		}

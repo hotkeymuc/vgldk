@@ -422,17 +422,19 @@ class Host:
 				#l2 = 64
 				while (l2 > 0):
 					if self.throttle is not None: time.sleep(self.throttle)
+					put('Sending chunk o=%d / %d' % (o, len(data)))
 					d = data[o:o+l2]
 					l2 = len(d)
 					if (l2 == 0): break	# Only send zero-length frame on EOF
 					
-					self.reply_frame([0x55] + d)	# Prepend dummy byte, so we never send zero packages
+					self.reply_frame([0x20] + d)	# Prepend dummy byte, so we never send zero packages
 					o += l2
 					
 				#
 				if is_eof:
 					put('Sending EOF')
-					self.reply_frame([0xAA])
+					self.reply_frame([0x1A])
+				put('DMA sent.')
 			#
 		else:
 			put('Unknown realm 0x%02X / "%s"' % (realm, chr(realm)))
@@ -613,7 +615,7 @@ class Host_MAME(Host):
 		
 	
 
-class Host_Serial_Safe(Host):
+class Host_Serial_hex(Host):
 	"""Using serial protocol, with synch and checksum"""
 	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, *args, **kwargs):
 		Host.__init__(self, throttle=DMA_THROTTLE, *args, **kwargs)
@@ -798,7 +800,7 @@ class Host_Serial_Safe(Host):
 		
 	
 
-class Host_Serial_Direct(Host):
+class Host_Serial_binary(Host):
 	"""Using just binary frames (error prone)"""
 	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, *args, **kwargs):
 		Host.__init__(self, throttle=DMA_THROTTLE, *args, **kwargs)
@@ -898,6 +900,188 @@ class Host_Serial_Direct(Host):
 	
 
 
+class Host_Serial_binary_safe(Host):
+	"""Using just binary frames with checksum and retransmission"""
+	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, *args, **kwargs):
+		Host.__init__(self, throttle=DMA_THROTTLE, *args, **kwargs)
+		
+		# Serial state
+		self.port = port
+		self.baud = baud
+		self.ser = None
+	
+	def __del__(self):
+		self.serial_close()
+	
+	def open(self):
+		self.serial_open()
+	
+	def serial_open(self):
+		self.ser = None
+		port = self.port
+		put('Opening "%s"...' % port)
+		
+		try:
+			self.ser = serial.Serial(port=port, baudrate=self.baud, bytesize=8, parity='N', stopbits=1, timeout=3, xonxoff=0, rtscts=0)
+			put('Open!')
+			self.is_open = True
+			return True
+		except serial.serialutil.SerialException as e:
+			#except e:
+			put('Error opening serial device: %s' % str(e))
+			self.is_open = False
+			return False
+	
+	def serial_close(self):
+		self.running = False
+		time.sleep(0.2)
+		
+		if (self.ser is not None):
+			self.ser.close()
+			self.ser = None
+	
+	def serial_write(self, data):
+		if self.ser is None:
+			put('! Cannot send data, because serial is not open!')
+			return False
+		
+		if (SHOW_TRAFFIC): put('>>> "%s"' % str_hex(data.strip()))
+		self.ser.write(data)
+		#self.ser.flush()	#?
+	
+	def run(self):
+		self.serial_run()
+	
+	def serial_run(self):
+		"Main loop"
+		self.running = True
+		
+		put('Ready.')
+		line = ''
+		while(self.running):
+			if (self.ser.in_waiting > 0):
+				f = self.serial_read_frame()
+				if f is not None:
+					self.serial_handle_frame(f)
+			else:
+				# Idle
+				time.sleep(0.01)
+				
+				# Flush
+				#self.ser.write(bytes([ 0x00 ]))	# 0x00 is ignored as a frame start
+				
+	
+	def reply_frame(self, data):
+		"Reply data inside a frame"
+		
+		put('>>> %d bytes...' % len(data))
+		
+		# Calculate checksum
+		check = 0x55
+		for b in data:
+			check ^= b
+		
+		frame = [ len(data) ] + data + [ check ]
+		
+		#self.ser.write(bytes( [0] * 4 ))	# Pre-padding to sync
+		
+		while True:
+			#while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
+			time.sleep(0.02)
+			
+			# Send frame
+			#self.ser.write(bytes( [0] * 16 ))	# Pre-padding to sync
+			self.ser.write(bytes(frame))
+			#self.ser.write(bytes( [0] * 16 ))	# Post-padding to flush
+			
+			# Wait for ACK/NACK
+			#put('Waiting for ACK...')
+			timeout = 50
+			while (self.ser.in_waiting == 0) and (timeout > 0):
+				time.sleep(0.01)
+				#self.ser.write(bytes( [0] * 2 ))	# Flush
+				timeout -= 1
+			
+			# Check for timeout
+			if timeout <= 0:
+				put('TX: Timeout waiting for ACK/NACK! Re-transmitting...')
+				time.sleep(0.1)
+				continue
+				#put('TX: Timeout waiting for ACK/NACK! Stopping TX!')
+				#return
+			
+			#@FIXME: I have no clue why it always keeps sending 0x28!
+			#while r not in (0xaa, 0x99):
+			#r = self.ser.read(1)[0]
+			
+			r = self.ser.read()
+			put('TX: received ACK/NACK [ %s ]' % (' '.join(['0x%02X'%b for b in r ])))
+			r = r[-1]
+			
+			# Check for ACK
+			if r == 0xAA: break	# ACK received!
+			
+			#if r != 0x99:
+			#	put('TX: Invalid response!!!! Stopping TX...')
+			#	return
+			
+			# No ACK. Repeat!
+			put('TX: NACK received (0x%02X)!' % r)
+			time.sleep(0.1)
+			#self.ser.write(bytes( [0] * 4 ))	# Flush
+			while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
+			put('TX: Re-transmitting...')
+		#
+		put('TX: OK, ACK received.')
+		
+	
+	def serial_read_frame(self):
+		
+		while True:
+			# Receive length
+			while (self.ser.in_waiting == 0): time.sleep(0.01)
+			l = self.ser.read(1)[0]
+			
+			# Receive data
+			while (self.ser.in_waiting < l): time.sleep(0.01)
+			data = self.ser.read(l)
+			
+			# Receive checksum
+			while (self.ser.in_waiting == 0): time.sleep(0.01)
+			check_received = self.ser.read(1)[0]
+			
+			# Calculate checksum
+			check = 0x55
+			for b in data:
+				check ^= b
+			
+			# Check
+			if check_received == check: break	# Checksums OK!
+			
+			# Not OK: Send NACK
+			put('RX: Checksum mismatch rx=0x%02X != 0x%02X! Sending NACK...' % (check_received, check))
+			time.sleep(0.02)
+			#self.ser.write(bytes( [0] * 16 ))	# Pre-padding to sync
+			self.ser.write(bytes([ 0x99 ]))	# Anything but 0xAA
+			#self.ser.write(bytes( [0] * 16 ))	# Post-padding to flush
+		#
+		
+		# Send ACK
+		put('RX: OK, sending ACK')
+		time.sleep(0.02)
+		#self.ser.write(bytes( [0] * 4 ))	# Pre-padding to sync
+		self.ser.write(bytes([ 0xAA ]))
+		#self.ser.write(bytes( [0] * 16 ))	# Post-padding to flush
+		#time.sleep(0.05)	# Throttle
+		
+		return list(data)	# Convert bytes to list
+	
+	def serial_handle_frame(self, f):
+		"Handle incoming raw data"
+		
+		self.handle_frame(f)
+	
+
 
 def show_help():
 	put(__doc__)
@@ -929,8 +1113,9 @@ if __name__ == '__main__':
 		elif opt in ('-i', '--input'):
 			bin_filename = arg
 	
-	#comp = Host_Serial_Safe(port=port, baud=baud)
-	comp = Host_Serial_Direct(port=port, baud=baud)
+	#comp = Host_Serial_hex(port=port, baud=baud)
+	#comp = Host_Serial_binary(port=port, baud=baud)
+	comp = Host_Serial_binary_safe(port=port, baud=baud)
 	#comp = Host_MAME()
 	
 	comp.open()
