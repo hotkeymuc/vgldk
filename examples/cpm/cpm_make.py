@@ -79,13 +79,13 @@ BDOS_MOUNTS = [
 	#'programs/CATCHUM',
 	#'programs/CBASIC2',
 	#'programs/LADDER',
-	'programs/STDCPM22',	# good for testing...
+	#'programs/STDCPM22',	# good for testing
 	#'programs/TEX',
 	#'programs/TP300',	#@FIXME: reboots when invoked
 	#'programs/VG04',
 	#'programs/WRDMASTR',
 	#'programs/WS30',
-	#'programs/ZORK123',	# Works!
+	'programs/ZORK123',	# Works!
 ]
 
 
@@ -126,17 +126,26 @@ def cpm_make():
 	transient = 0x0100	# Start of CP/M transient area (defined as being at 0x0100. Do not change.)
 	
 	# Set-up CP/M layout
-	cpm_code_size_estimate = 0x1400	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
+	cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
+	cpm_code_size_estimate = 0x1380	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
 	#cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CP/M as far up as possible in lower RAM bank
-	cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CP/M as far up in cartridge space (0x8000-BFFF) as possible
+	#cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CP/M as far up in cartridge space (0x8000-BFFF) as possible
+	cpm_loc_code = 0x8000 + cart_eeprom_size - cpm_code_size_estimate	# Put CP/M as far up in cartridge EPROM (0x8000-BFFF) as possible
 	cpm_loc_data = 0xc000	# Use stock system RAM at 0xC000-0xDFFF. Static variable data and gsinit-code will be put to this offset in binary file. Monitor uses 0xd000 for its data
 	
 	# Set-up CCP layout
-	ccp_code_size_estimate = 0x0d00	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
+	ccp_code_size_estimate = 0x0c00	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
 	#ccp_data_size_estimate = 0x0600	# Don't know... Just a guess...
 	ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
 	#ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
 	ccp_loc_data = 0xc800	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
+	
+	
+	### Prepare
+	# Make sure the output directory exists
+	if not os.path.isdir(out_path):
+		put('Creating directory "%s" because it does not exist...' % out_path)
+		os.mkdir(out_path)
 	
 	
 	### Compile CP/M (CRT0, BIOS, BDOS, BINT)
@@ -178,7 +187,7 @@ def cpm_make():
 			
 			# Paper tape is directed to the LCD by default. This can be changed to SoftUART or MAME
 			#@TODO: Make this runtime-changable using the "iobyte"!
-			#'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape to SoftUART
+			'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape to SoftUART
 			#'BIOS_PAPER_TAPE_TO_MAME': 1,	# Redirect paper tape to MAME for debugging BDOS using the emulator
 			#'BIOS_SHOW_PAPER_TAPE_MAPPING': 1,	# Print the configured paper tape configuration on boot
 			
@@ -188,18 +197,42 @@ def cpm_make():
 			'BDOS_RESTORE_LOWSTORAGE': 1,	# Restore/fix the lower memory area on each start
 			
 			'BDOS_PATCHED_ENTRY_ADDRESS': (0x8000 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
-			'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
+			#'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
 			
-			## BDOS file accesses are not handled in BDOS itself (yet).
-			'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage
-			#'BDOS_HOST_TO_SOFTUART': 1,	# Re-direct file access directly to SoftUART (might be linked statically - you might want to use paper tape)
-			'BDOS_HOST_TO_MAME': 1,	# Re-direct file access directly to MAME for debugging BDOS inside emulator.
-			#'BDOS_HOST_TO_PAPER_TAPE': 1,	# Re-direct file access to the BIOS paper tape routines and let BIOS decide what to do
+			## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
+			'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
+			#'BDOS_HOST_DEVICE_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
+			#'BDOS_HOST_DEVICE_SOFTUART': 1,	# Re-direct to SoftUART (for real hardware)
+			'BDOS_HOST_DEVICE_MAME': 1,	# Re-direct to MAME (for emulation)
+			
+			# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
+			'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using binary
+			#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
+			
 			
 			## Configure CCP
 			'CCP_LOC_CODE': '0x%04X'%ccp_loc_code	# Tell BDOS where to find CCP. Mandatory.
 		}
 	)
+	
+	# Check for overflow (code too big)
+	check_before = 8
+	check_after = 4
+	for a in range(cpm_loc_code + cpm_code_size_estimate - check_before, cpm_loc_code + cpm_code_size_estimate + check_after):
+		if cpm_data[a] != 0x00:
+			put('CPM seems quite big. It should fill 0x%04X - 0x%04X, but around the end (0x%04X) it is not empty. Please adjust memory layout, code estimate or reduce code size.' % (cpm_loc_code, cpm_loc_code+cpm_code_size_estimate, a))
+			# Try guessing how big it is...
+			guess_max = 0x800
+			for a2 in range(a, a + guess_max):
+				if cpm_data[a2] != 0: continue
+				sum = 0
+				for a3 in range(a2, a2+8):
+					sum += cpm_data[a3]
+				if sum == 0:
+					s = a2 - cpm_loc_code
+					put('I am guessing the CPM binary is %d bytes (0x%04X) in size, instead of the estimated %d bytes (0x%04X).' % (s, s, cpm_code_size_estimate, cpm_code_size_estimate))
+					break
+			sys.exit(5)
 	
 	#hexdump(cpm_data[:0x0120], 0x0000)
 	#hexdump(cpm_data[cpm_loc_code:0x8000], cpm_loc_code)
@@ -249,6 +282,13 @@ def cpm_make():
 		
 		### Merge CCP binary into CP/M image
 		put('Merging CCP binary (%d bytes / 0x%04X) into CP/M image at 0x%04X-0x%04X...' % (ccp_code_size, ccp_code_size, ccp_loc_code, ccp_loc_code+ccp_code_size))
+		
+		# Check if area is empty
+		for a in range(ccp_loc_code, ccp_loc_code+ccp_code_size):
+			if cpm_data[a] != 0x00:
+				put('Destination of CCP (0x%04X) is not empty! Please adjust memory layout or reduce code size.' % a)
+				sys.exit(5)
+			
 		#cpm_data[ccp_loc_code:ccp_loc_code+len(ccp_data)] = ccp_data[:]
 		cpm_data = cpm_data[:ccp_loc_code] + ccp_data + cpm_data[ccp_loc_code+ccp_code_size:]
 		
@@ -307,7 +347,7 @@ def cpm_make():
 	
 	# Upper code to cartridge ROM file
 	with open(cpm_cart_filename, 'wb') as h:
-		h.write(cpm_data[0x8000:])
+		h.write(cpm_data[0x8000:0x8000+cart_eeprom_size])
 	
 	
 	if GENERATE_LOWSTORAGE:
@@ -352,8 +392,8 @@ def cpm_make():
 	MAME_SYS = 'gl%d' % vgldk_series	# MAME system name
 	
 	if GENERATE_MAME_ROM:
-		### Create MAME SYSROM for emulation
-		put('Creating MAME SYSROM...')
+		### Create MAME sys ROM for emulation
+		put('Creating MAME sys ROM for emulation...')
 		if vgldk_series == 4000:
 			OUTPUT_FILE_SYSROM = '27-5480-00'	# This filename is specific to each MAME system!
 			OUTPUT_FILE_SYSROMZIP = '%s/%s.zip' % (MAME_ROMS_DIR, MAME_SYS)
@@ -361,6 +401,15 @@ def cpm_make():
 			put('At the moment, only generation of gl4000 ROMs is implemented.')
 			sys.exit(1)
 		
+		# Make sure ROMs directory exists
+		if not os.path.isdir(MAME_ROMS_DIR):
+			put('Creating directory "%s", because it does not exits, yet...' % MAME_ROMS_DIR)
+			os.mkdir(MAME_ROMS_DIR)
+			put('Don\'t forget to copy the required additional driver ROMs (e.g. hd44780_a00.zip) there, too!') 
+		
+		
+		# Generate the system ROM .zip file
+		put('Generating zip file "%s"...' % OUTPUT_FILE_SYSROMZIP)
 		with zipfile.ZipFile(OUTPUT_FILE_SYSROMZIP, 'w') as z:
 			
 			# Write dynamic info file
@@ -406,6 +455,7 @@ def cpm_make():
 		"""
 		
 		### Emulate using bdos_host.py (Start MAME and serve files to bdos_host)
+		put('Starting MAME in BDOS host mode...')
 		import bdos_host
 		
 		#bdos_host.SHOW_TRAFFIC = True	# Debug traffic

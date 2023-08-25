@@ -9,12 +9,19 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 2023-08-22 Bernhard "HotKey" Slawik
 */
 
-//#define BDOS_HOST_TO_PAPER_TAPE	// Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
-//#define BDOS_HOST_TO_SOFTUART	// Re-direct to SoftUART (if included in BDOS source)
-//#define BDOS_HOST_TO_MAME	// Re-direct to MAME (if included in BDOS source)
+// Hardware to use for communication (byte-level)
+//#define BDOS_HOST_DEVICE_PAPER_TAPE	// Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
+//#define BDOS_HOST_DEVICE_SOFTUART	// Re-direct to SoftUART (for real hardware)
+//#define BDOS_HOST_DEVICE_MAME	// Re-direct to MAME (for emulation)
+
+// Protocol to use for communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
+//#define BDOS_HOST_PROTOCOL_BINARY	// Send using binary
+//#define BDOS_HOST_PROTOCOL_HEX	// Send using hex text
+
 
 #define BDOS_HOST_MAX_DATA 128
 #define BDOS_HOST_DMA_MAX_DATA 128
+
 
 #include "bdos.h"	// Need some numbers and functions
 
@@ -22,96 +29,116 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 
 #include <stringmin.h>	// memcpy, memset, strlen
 
-#ifdef BDOS_HOST_TO_PAPER_TAPE
-	void papertape_send(const byte *data, byte len) {
-		byte i;
-		
-		bios_punch(len);
-		for (i = 0; i < len; i++) {
-			bios_punch(*data++);
-		}
-	}
-	int papertape_receive(byte *data) {
-		byte l;
-		byte i;
-		// Wait for non-zero
-		do {
-			l = bios_reader();
-		} while (l == 0);
-		for (i = 0; i < l; i++) {
-			*data++ = bios_reader();
-		}
-		return l;
-	}
-	#define host_send papertape_send
-	#define host_receive papertape_receive
+// Driver (byte level)
+#ifdef BDOS_HOST_DEVICE_PAPER_TAPE
+	// Use BIOS paper tape functions
+	#define bdos_host_send_byte	bios_punch
+	#define bdos_host_receive_byte	bios_reader
+#endif
+#ifdef BDOS_HOST_DEVICE_SOFTUART
+	// Use SoftUART functions
+	#include <driver/softuart.h>
+	#define bdos_host_send_byte	softuart_sendByte
+	#define bdos_host_receive_byte	softuart_receiveByte
+#endif
+#ifdef BDOS_HOST_DEVICE_MAME
+	// Use MAME functions
+	#include <driver/mame.h>
+	#define bdos_host_send_byte	mame_putchar
+	#define bdos_host_receive_byte	mame_getchar
 #endif
 
-#ifdef BDOS_HOST_TO_MAME
-	#include <driver/mame.h>
+// Make sure one driver is selected
+#ifndef BDOS_HOST_DEVICE_PAPER_TAPE
+	#ifndef BDOS_HOST_DEVICE_SOFTUART
+		#ifndef BDOS_HOST_DEVICE_MAME
+			#error One BDOS_HOST_DEVICE must be set (paper tape, SoftUART or MAME)!
+		#endif
+	#endif
+#endif
+
+// Helper for sending a whole "blob"
+void bdos_host_send_data(byte *data, word l) {
+	for (word i = 0; i < l; i++) {
+		bdos_host_send_byte(*data++);
+	}
+}
+
+
+
+// Protocol (frame level)
+#ifdef BDOS_HOST_PROTOCOL_BINARY
+	// Send using simple binary data
 	
-	void mame_send(const byte *data, byte len) {
+	void bdos_host_send_frame(const byte *data, byte len) {
 		byte i;
-		mame_putchar(len);
+		
+		// Send length
+		bdos_host_send_byte(len);
+		
+		// Send data
 		for (i = 0; i < len; i++) {
-			mame_putchar(*data++);
+			bdos_host_send_byte(*data++);
 		}
+		
+		//@TODO: Send Checksum
+		
+		//@TODO: Wait for ACK/NACK and retry
+		
 	}
 	
-	int mame_receive(byte *data) {
+	int bdos_host_receive_frame(byte *data) {
 		byte l;
 		byte i;
 		//byte c;
 		
-		// Wait for non-zero
+		// Wait for non-zero, receive length
 		//bdos_printf("RX=");
 		do {
-			l = mame_getchar();
+			l = bdos_host_receive_byte();
 		} while (l == 0);
 		//bdos_printf_x2(l);
 		//bdos_printf("..."); //bdos_getchar();
 		
+		// Receive data
 		for (i = 0; i < l; i++) {
 			//bdos_printf_x2(i);
 			//bdos_putchar('.');
 			
-			*data++ = mame_getchar();
+			*data++ = bdos_host_receive_byte();
 			
 			//c = mame_getchar();
 			//bdos_printf_x2(c);
 			//*data++ = c;
 		}
+		
+		//@TODO: Receive checksum
+		
+		//@TODO: Send ACK/NACK and retry
+		
 		return l;
 	}
 	
-	#define host_send mame_send
-	#define host_receive mame_receive
 #endif
 
-#ifdef BDOS_HOST_TO_SOFTUART
-	#include <driver/softuart.h>
+
+
+#ifdef BDOS_HOST_PROTOCOL_HEX
 	
-	#define HOST_SERIAL_MAX_LINE 255	// Maximum length of one incoming line
-	#define HOST_SERIAL_TIMEOUT 8192
+	#define BDOS_HOST_MAX_LINE 255	// Maximum length of one incoming line
+	#define BDOS_HOST_RECEIVE_TIMEOUT 8192	// Counter to determine timeouts
 	
-	// Compatibility for old "softserial"
-	#define serial_getchar softuart_receiveByte
-	#define serial_getchar_nonblocking softuart_receiveByte
-	#define serial_putchar softuart_sendByte
+	//#define bdos_host_debug(s)	printf(s)
+	#define bdos_host_debug(s)	;
 	
-	void serial_put(byte *data, word l) {
-		for (word i = 0; i < l; i++) {
-			serial_putchar(*data++);
-		}
-	}
-	byte *serial_gets(byte *serial_get_buf) {
+	// Receive one text line
+	byte *bdos_host_receive_line(byte *get_buf) {
 		int c;
 		byte *b;
 		
-		b = serial_get_buf;
+		b = get_buf;
 		while(1) {
-			//c = serial_getchar();
-			c = serial_getchar_nonblocking();
+			c = bdos_host_receive_byte();	// Non-blocking would be good
 			if (c <= 0) continue;	// < 0 means "no data"
 			
 			// Check for end-of-line character(s)
@@ -124,18 +151,14 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		// Terminate string
 		*b = 0;
 		
-		// Return length
-		//return (word)b - (word)serial_get_buf;
-		
-		// Return buf (like stdlib gets())
-		return serial_get_buf;
+		//return (word)b - (word)serial_get_buf;	// Return length
+		return get_buf;	// Return buf (like stdlib gets())
 	}
 	
-	//#define serial_debug(s)	printf(s)
-	#define serial_debug(s)	;
 	
+	// We need some HEX functions. Preferably from the already included "hex.h" (vgldk/includes/hex.h)
+	//#include <hex.h>	// for hexDigit, parse_hexDigit, hextown, hextob
 	#ifndef __HEX_H
-		//#include <hex.h>	// for hexDigit
 		/*
 		byte hexDigit(byte c) {
 			if (c < 10)
@@ -143,8 +166,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 			return 'A' + (c-10);
 		}
 		*/
-		#define hexDigit bdos_hexDigit
-		
+		#define hexDigit bdos_hexDigit	// Since this is part of BDOS we can re-use its version
 		
 		byte parse_hexDigit(byte c) {
 			if (c > 'f') return 0;
@@ -158,7 +180,6 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 			if (c < 'a') return 0;
 			return (10 + c - 'a');
 		}
-		
 		
 		word hextown(const char *s, byte n) {
 			byte i;
@@ -179,110 +200,35 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		}
 	#endif
 	
-	/*
-	void dump(byte *pb) {
-		byte i;
-		byte j;
-		//printf_x4((word)pb); putchar(' ');
-		
-		for(j = 0; j < 4; j++) {
-			printf_x2((word)pb & 0xff);
-			putchar(':');
-			for(i = 0; i < 8; i++) {
-				printf_x2(*pb++);
-			}
-			printf("\n");
-		}
-	}
-	*/
-	/*
-	void serial_put_d(byte num)  {
-		serial_putchar('0' + ((num / 100) % 10));
-		serial_putchar('0' + ((num / 10) % 10));
-		serial_putchar('0' + (num % 10));
-	}
-	
-	void serial_put_hexdigit(byte d)  {
-		if (d > 9) serial_putchar('A' - 9 + d);
-		else serial_putchar('0' + d);
-	}
-	void serial_put_hex(byte num)  {
-		serial_put_hexdigit(num >> 4);
-		serial_put_hexdigit(num & 0x0f);
-	}
-	*/
-	
-	
-	int serial_getchar2() {
+	int bdos_host_receive_byte_with_timeout() {
 		// Get char, return -1 on timeout
 		int c;
 		word timeout;
 		
-		timeout = HOST_SERIAL_TIMEOUT;
+		timeout = BDOS_HOST_RECEIVE_TIMEOUT;
 		
 		c = -1;
 		while (c <= 0) {
-			c = serial_getchar();
+			c = bdos_host_receive_byte();	// non-blocking
 			timeout --;
 			if (timeout == 0) return -1;
 		}
 		return c;
 	}
-	/*
-	int serial_gets2(byte *serial_get_buf) {
-		// Receive with timeout. Returns -1 on timeout or length
-		int c;
-		byte *b;
-		byte l;
-		word timeout;
-		
-		timeout = HOST_SERIAL_TIMEOUT;
-		
-		l = 0;
-		b = serial_get_buf;
-		while(1) {
-			c = serial_getchar();
-			
-			if (c < 0) {
-				// < 0 means "no data"
-				timeout --;
-				if (timeout == 0) return -1;
-				continue;
-			}
-			timeout = HOST_SERIAL_TIMEOUT;
-			
-			// Check for end-of-line character(s)
-			if ((c == 0x0a) || (c == 0x0d)) break;
-			
-			// Store in given buffer
-			*b++ = c;
-			l++;
-			
-		}
-		
-		// Terminate string
-		*b++ = 0;
-		
-		// Return length
-		//return (word)b - (word)serial_get_buf;
-		
-		// Return buf (like stdlib gets())
-		return l;
-	}
-	*/
-	int serial_gethex2() {
+	
+	int bdos_host_receive_hex_with_timeout() {
 		// Receive two digits of hex, return -1 on timeout
 		//byte r;
 		int c;
 		int c2;
 		
 		do {
-			c = serial_getchar2();
+			c = bdos_host_receive_byte_with_timeout();
 			if (c < 0) return -1;
 		} while (c == 'U');
 		
-		//c2 = serial_getchar2();
-		c2 = serial_getchar();
+		//c2 = bdos_host_receive_byte_with_timeout();
+		c2 = bdos_host_receive_byte_with_timeout();
 		
 		if (c < 0) return -1;
 		if (c2 < 0) return -1;
@@ -292,9 +238,8 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		return (parse_hexDigit(c) << 4) + parse_hexDigit(c2);
 	}
 	
-	
-	void serial_sendSafe(const byte *data, byte ldata) {
-		byte line[HOST_SERIAL_MAX_LINE];
+	void bdos_host_send_frame(const byte *data, byte ldata) {
+		byte line[BDOS_HOST_MAX_LINE];
 		const byte *pdata;
 		byte *pline; 
 		byte lline;
@@ -316,7 +261,6 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		*pline++ = hexDigit(ldata >> 4);
 		*pline++ = hexDigit(ldata & 0x0f);
 		lline += 2;
-		
 		
 		// Data
 		checkactual = ldata;
@@ -343,16 +287,19 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		//printf(line);
 		
 		while(1) {
-			serial_debug("TX");
+			bdos_host_debug("TX");
 			//__asm
 			//	di
 			//__endasm;
 			
 			// Send synchronization
 			//serial_puts("UUUUUUUU");
-			serial_put(line, lline);
 			
-			c = serial_gethex2();
+			// Send line
+			//serial_put(line, lline);
+			bdos_host_send_data(line, lline);
+			
+			c = bdos_host_receive_hex_with_timeout();
 			
 			//__asm
 			//	ei
@@ -378,11 +325,11 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 				//bdos_printf("!\n");
 			}
 		}
-		serial_debug("OK\n");
+		bdos_host_debug("OK\n");
 	}
 	
-	int serial_receiveSafe(byte *data) {
-		char line[HOST_SERIAL_MAX_LINE];
+	int bdos_host_receive_frame(byte *data) {
+		char line[BDOS_HOST_MAX_LINE];
 		byte l;
 		char *pline;
 		byte *pdata;
@@ -393,7 +340,7 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 		byte checkactual;
 		//int r;
 		
-		serial_debug("RX");
+		bdos_host_debug("RX");
 		while(1) {
 			
 			// Send synchronization pad / request to answer
@@ -402,18 +349,8 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 			//printf(".");
 			
 			//@TODO: Use non-blocking get to detect timeouts?
-			serial_gets(&line[0]);
+			bdos_host_receive_line(&line[0]);
 			linel = strlen(&line[0]);
-			/*
-			r = serial_gets2(&line[0]);
-			if (r < 0) {
-				//printf(".");
-				//continue;
-				return -1;
-			}
-			
-			linel = r;
-			*/
 			//printf(line);
 			
 			pline = &line[0];
@@ -479,17 +416,23 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 				line[3] = hexDigit(checkactual >> 4);
 				line[4] = hexDigit(checkactual & 0x0f);
 				line[5] = '\n';
-				serial_put(&line[0], 6);
+				bdos_host_send_data(&line[0], 6);
 				
 				return l;
 			}
 		}
 		
 	}
-	
-	#define host_send serial_sendSafe
-	#define host_receive serial_receiveSafe
 #endif
+
+// Make sure one protocol is selected
+#ifndef BDOS_HOST_PROTOCOL_BINARY
+	#ifndef BDOS_HOST_PROTOCOL_HEX
+		#error One BDOS_HOST_PROTOCOL has to be selected (binary or hex)!
+	#endif
+#endif
+
+
 
 
 #ifdef BDOS_TRACE_CALLS
@@ -569,6 +512,8 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 
 
 
+// Protocol agnostic functions
+
 void host_sendfcb(byte num, struct FCB *fcb) {
 	byte data[1+1+2+36];
 	byte *pdata;
@@ -593,7 +538,7 @@ void host_sendfcb(byte num, struct FCB *fcb) {
 		*pdata++ = *pfcb++;
 	}
 	
-	host_send(&data[0], 1+1+2+36);
+	bdos_host_send_frame(&data[0], 1+1+2+36);
 	
 	// Use host_receivefcb() to receive result and altered FCB
 }
@@ -606,7 +551,7 @@ byte host_receivefcb(struct FCB *fcb) {
 	
 	// Receive result and FCB as one data frame
 	// do {
-		l = host_receive(data);
+		l = bdos_host_receive_frame(data);
 	// } while(l == 0);
 	
 	//@TODO: L must be 36 for a proper FCB (or 32 for dir listing). Return error if not.
@@ -641,7 +586,7 @@ word host_receivedma() {
 	// Using 1 dummy byte so we never send empty frames
 	while((l > 1) && (ltotal < BDOS_HOST_DMA_MAX_DATA)) {
 		//bdos_printf("rx=");
-		l = host_receive(&data[0]);
+		l = bdos_host_receive_frame(&data[0]);
 		//bdos_printf_x2(l); bdos_printf(".");
 		
 		if ((l == 1) && (data[0] == 0xAA)) {
@@ -660,18 +605,6 @@ word host_receivedma() {
 	//bdos_printf("DMA L="); bdos_printf_x2(ltotal);
 	
 	return ltotal;
-}
-
-byte host_receivebyte() {
-	byte data[BDOS_HOST_MAX_DATA];	// 1 is enough, but....
-	int l;
-	
-	l = 0;
-	while(l == 0) {
-		l = host_receive(data);
-	}
-	
-	return data[0];
 }
 
 #endif
