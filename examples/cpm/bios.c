@@ -275,16 +275,21 @@ byte bios_reader() {
 	
 	#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
 		// Read from SoftUART!
-		c = softuart_receiveByte();
+		int r;
+		do {
+			r = softuart_receiveByte();
+		} while(r < 0);
+		return (byte)r;
+	
 	#else
 		#ifdef BIOS_PAPER_TAPE_TO_MAME
-			c = mame_getchar();
+			return mame_getchar();
 		#else
-			c = getchar();
+			return getchar();
 		#endif
 	#endif
 	
-	bdos_printf_x2(c);
+	//bdos_printf_x2(c);
 	return c;
 }
 

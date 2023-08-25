@@ -150,6 +150,11 @@ void bdos_printf(char *pc) {
 	while(*pc) bios_conout(*pc++);
 }
 
+// Publish as stdio
+//@FIXME: Use stdlib! Only define getchar/putchar!
+//#define putchar bdos_putchar
+//#define puts bdos_puts
+//#define printf bdos_printf
 
 /*
 #define HEX_USE_DUMP	// Include dump()
@@ -419,6 +424,7 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 		check_addr = (byte *)0x0100;
 		
 		bdos_printf("RAM check...");
+		//@TODO: Maybe throttle this (in case there is FLASH installed)
 		do {
 			// Get old value
 			check_old = *check_addr;
@@ -435,19 +441,30 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 		} while (check_actual != check_new);
 		
 		bdos_puts("OK");
+		
+		// Debounce
+		for (word i = 0; i < 0xffff; i++) {
+			__asm
+				nop
+			__endasm;
+		}
+		
 	#endif
 	
 	#ifdef BDOS_RESTORE_LOWSTORAGE
 		// Restore lowstorage for next cold-boot (lowest 0x5c bytes, the rest at 0x5c... is def_fcb, bios_dma and transient)
 		//bdos_memcpy((byte *)0x0000, &lowstorage_data[0], 0x5c);
 		bdos_memcpy((byte *)lowstorage_origin, &lowstorage_data[0], lowstorage_size);
+		
+		//@TODO: Verify?
 	#endif
 	
-	// Set the cold boot vector (if not known at compile time)
+	/*
+	// Restore/set the cold boot vector (if not known at compile time)
+	// It is assumed to be the last 3 bytes in lowstorage cold boot code...
 	*((byte *)(0x0059)) = 0xc3;	// JMP ...
-	//*((word *)(0x005a)) = (word)&bdos_init;	// to bdos_init
 	*((word *)(0x005a)) = (word)&bios_boot;	// to bios_boot
-	
+	*/
 	
 	// Restore BDOS vector at 0x0005 (if corrupted / fresh boot)
 	*((byte *)(0x0005)) = 0xc3;	// JMP ...
@@ -514,7 +531,6 @@ void bdos_c_read() __naked {	// BDOS_FUNC_C_READ:	// 1: Console input
 	/*
 	char c = bios_conin();	// Get a char from bios
 	bios_conout(c);	// Echo it (as spec.)
-	//bios_conout(')');	// for debugging
 	bdos_return1(c);	// Return it
 	*/
 	__asm
@@ -596,8 +612,8 @@ void bdos_c_rawio(char c, char e) __naked {	//BDOS_FUNC_C_RAWIO:	// 6: Direct co
 		jr z, 0$
 		
 		ld a, e
-		cp a, #0xfe	; 0xfe = [CP/M3, NovaDOS, Z80DOS, DOS+] Return console input status. Zero if no character is waiting, nonzero otherwise.
-		jp z, _bios_const
+		cp a, #0xfe
+		jp z, 4$
 		
 		ld a, e
 		cp a, #0xfd
@@ -636,7 +652,17 @@ void bdos_c_rawio(char c, char e) __naked {	//BDOS_FUNC_C_RAWIO:	// 6: Direct co
 	3$:	; 0xfc = [DOS+] One-character lookahead - return the next character waiting but leave it in the buffer.
 		ld l, #0
 		ret
+	
+	4$:	; 0xfe = [CP/M3, NovaDOS, Z80DOS, DOS+] Return console input status. Zero if no character is waiting, nonzero otherwise.
+		call _bios_const	; Get key state
+		ld a, l	; Get return from L
 		
+		cp a, #0xff	; 0xff = key is pressed
+		jr nz, 1$
+		
+		; key is pressed
+		ld a, l
+		ret
 	__endasm;
 	
 	
