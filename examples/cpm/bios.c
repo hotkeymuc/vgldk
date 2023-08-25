@@ -58,6 +58,16 @@ In CP/M 3 and later, the rest also follows.
 	#include <driver/mame.h>
 #endif
 
+// Make sure one is selected
+#ifndef BIOS_PAPER_TAPE_TO_DISPLAY
+	#ifndef BIOS_PAPER_TAPE_TO_SOFTUART
+		#ifndef BIOS_PAPER_TAPE_TO_MAME
+			#error One BIOS_PAPER_TAPE destination has to be set (display, SoftUART, MAME)!
+		#endif
+	#endif
+#endif
+
+
 void bios();	// Forward declaration to function table (located at the end of this file)
 
 
@@ -141,16 +151,14 @@ void bios_boot() __naked {
 	
 	// Show the tape config
 	#ifdef BIOS_SHOW_PAPER_TAPE_MAPPING
-		//#if BIOS_PAPER_TAPE == SOFTUART
+		#ifdef BIOS_PAPER_TAPE_TO_DISPLAY
+			puts("Tape = LCD");
+		#endif
 		#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
 			puts("Tape = SoftUART");
-		#else
-			//#elif BIOS_PAPER_TAPE == MAME
-			#ifdef BIOS_PAPER_TAPE_TO_MAME
-				puts("Tape = MAME");
-			#else
-				puts("Tape = LCD");
-			#endif
+		#endif
+		#ifdef BIOS_PAPER_TAPE_TO_MAME
+			puts("Tape = MAME");
 		#endif
 	#endif
 	
@@ -255,42 +263,42 @@ void bios_punch(byte c) {
 	
 	//printf("punch"); printf_x2(c);
 	
+	#ifdef BIOS_PAPER_TAPE_TO_DISPLAY
+		putchar(c);
+	#endif
 	#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
 		// Send to SoftUART
 		softuart_sendByte(c);
-	#else
-		#ifdef BIOS_PAPER_TAPE_TO_MAME
-			mame_putchar(c);
-		#else
-			putchar(c);
-		#endif
+	#endif
+	#ifdef BIOS_PAPER_TAPE_TO_MAME
+		mame_putchar(c);
 	#endif
 }
 
 byte bios_reader() {
 	// Read a character from the "paper tape reader" - or whatever the current auxiliary device is. If the device isn't ready, wait until it is. The character will be returned in A. If this device isn't implemented, return character 26 (^Z).
-	byte c;
 	
 	//@TODO: Handle bios_iobyte, bits 2,3: 00=TTY, 01=PTR, 10=UR1, 11=UR2
 	
+	#ifdef BIOS_PAPER_TAPE_TO_DISPLAY
+		return getchar();
+	#endif
 	#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
-		// Read from SoftUART!
+		// Read from SoftUART (blocking)
 		int r;
 		do {
 			r = softuart_receiveByte();
 		} while(r < 0);
 		return (byte)r;
-	
-	#else
-		#ifdef BIOS_PAPER_TAPE_TO_MAME
-			return mame_getchar();
-		#else
-			return getchar();
-		#endif
+	#endif
+	#ifdef BIOS_PAPER_TAPE_TO_MAME
+		return mame_getchar();
 	#endif
 	
+	//byte c;
+	// c = ...
 	//bdos_printf_x2(c);
-	return c;
+	//return c;
 }
 
 void bios_home() {

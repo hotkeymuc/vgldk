@@ -419,12 +419,14 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 		byte check_old;
 		byte check_new;
 		byte check_actual;
+		word checks;
 		
 		// Address to perform write check
 		check_addr = (byte *)0x0100;
 		
 		bdos_printf("RAM check...");
 		//@TODO: Maybe throttle this (in case there is FLASH installed)
+		checks = 0;
 		do {
 			// Get old value
 			check_old = *check_addr;
@@ -437,12 +439,15 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 			
 			// Check if it changed
 			check_actual = *check_addr;
-		
+			
+			if (checks < 0x7fff) checks ++;
 		} while (check_actual != check_new);
 		
 		bdos_puts("OK");
 		
-		// Debounce
+		// Debounce if it seems like a "hot swap" has occured (which took some time)
+		// If check passed instantly, we do not need to debounce.
+		if (checks > 1)
 		for (word i = 0; i < 0xffff; i++) {
 			__asm
 				nop
@@ -559,7 +564,7 @@ void bdos_c_write(char c) __naked {	// BDOS_FUNC_C_WRITE:	// 2: Console output
 	__endasm;
 }
 
-void bdos_a_read() __naked {	// BDOS_FUNC_A_READ:	// 3: Reader input
+void bdos_a_read() __naked {	// BDOS_FUNC_A_READ:	// 3: Reader input (blocking)
 	//s = bios_reader();	// Get a char from bios
 	//// Return ^Z on EOF
 	//bdos_return1(s);	// Return it

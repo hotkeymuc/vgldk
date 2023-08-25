@@ -123,22 +123,26 @@ def cpm_make():
 	include_path = '../../include'	# VGLDK include directory
 	
 	### Set up the memory layout
-	transient = 0x0100	# Start of CP/M transient area (defined as being at 0x0100. Do not change.)
+	loc_cart = 0x8000
+	loc_internal_ram = 0xc000
+	loc_transient = 0x0100	# Start of CP/M transient area (defined as being at 0x0100. Do not change.)
+	loc_transient_top = 0x7FFF	# Last byte of transient area
 	
 	# Set-up CP/M layout
 	cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
 	cpm_code_size_estimate = 0x1380	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
+	cpm_data_size_estimate = 0x0800	# Approx size of CPM RAM usage
 	#cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CP/M as far up as possible in lower RAM bank
 	#cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CP/M as far up in cartridge space (0x8000-BFFF) as possible
-	cpm_loc_code = 0x8000 + cart_eeprom_size - cpm_code_size_estimate	# Put CP/M as far up in cartridge EPROM (0x8000-BFFF) as possible
-	cpm_loc_data = 0xc000	# Use stock system RAM at 0xC000-0xDFFF. Static variable data and gsinit-code will be put to this offset in binary file. Monitor uses 0xd000 for its data
+	cpm_loc_code = loc_cart + cart_eeprom_size - cpm_code_size_estimate	# Put CP/M as far up in cartridge EPROM (0x8000-BFFF) as possible
+	cpm_loc_data = loc_internal_ram	# Use stock system RAM at 0xC000-0xDFFF. Static variable data and gsinit-code will be put to this offset in binary file. Monitor uses 0xd000 for its data
 	
 	# Set-up CCP layout
 	ccp_code_size_estimate = 0x0c00	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
 	#ccp_data_size_estimate = 0x0600	# Don't know... Just a guess...
 	ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
 	#ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
-	ccp_loc_data = 0xc800	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
+	ccp_loc_data = loc_internal_ram + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
 	
 	
 	### Prepare
@@ -179,34 +183,35 @@ def cpm_make():
 			
 			## Configure VGLDK hardware and drivers
 			'VGLDK_SERIES': vgldk_series,	# e.g. 4000 for GL4000
-			'SOFTUART_BAUD': 19200,	# SoftUART baud rate. Currently 9600 or 19200
+			'SOFTUART_BAUD': 19200,	# SoftUART baud rate. Currently supported (2023-08) are 9600 or 19200
 			
 			## Configure BIOS
 			#'BIOS_SCROLL_WAIT': 1,	# Wait after 1 page of text	#@TODO: Make this runtime-changable!
-			'BIOS_SHOW_BANNER': 1,	# Show CP/M text banner and version on boot
+			'BIOS_SHOW_BANNER': 1,	# Show CP/M text banner and version on reset
 			
-			# Paper tape is directed to the LCD by default. This can be changed to SoftUART or MAME
-			#@TODO: Make this runtime-changable using the "iobyte"!
-			'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape to SoftUART
-			#'BIOS_PAPER_TAPE_TO_MAME': 1,	# Redirect paper tape to MAME for debugging BDOS using the emulator
+			#@TODO: Make aux device changable at runtime (using the "iobyte"!)
 			#'BIOS_SHOW_PAPER_TAPE_MAPPING': 1,	# Print the configured paper tape configuration on boot
+			'BIOS_PAPER_TAPE_TO_DISPLAY': 1,	# Redirect paper tape functions to display
+			#'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape functions to SoftUART
+			#'BIOS_PAPER_TAPE_TO_MAME': 1,	# Redirect paper tape functions to MAME
+			
 			
 			## Configure BDOS
 			'BDOS_SHOW_BANNER': 1,	# Show "BDOS" on boot (helpful for debugging)
 			'BDOS_WAIT_FOR_RAM': 1,	# Wait until RAM is writable before proceeding (recommended)
 			'BDOS_RESTORE_LOWSTORAGE': 1,	# Restore/fix the lower memory area on each start
 			
-			'BDOS_PATCHED_ENTRY_ADDRESS': (0x8000 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
+			'BDOS_PATCHED_ENTRY_ADDRESS': (loc_transient_top+1 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
 			#'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
 			
 			## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
 			'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
-			#'BDOS_HOST_DEVICE_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
-			#'BDOS_HOST_DEVICE_SOFTUART': 1,	# Re-direct to SoftUART (for real hardware)
-			'BDOS_HOST_DEVICE_MAME': 1,	# Re-direct to MAME (for emulation)
+			#'BDOS_HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
+			#'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
+			'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
 			
 			# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
-			'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using binary
+			'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary
 			#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
 			
 			
@@ -216,13 +221,13 @@ def cpm_make():
 	)
 	
 	# Check for overflow (code too big)
-	check_before = 8
-	check_after = 4
+	check_before = 8	# Check some bytes before actual end
+	check_after = 4	# Check some bytes after (for overflow)
 	for a in range(cpm_loc_code + cpm_code_size_estimate - check_before, cpm_loc_code + cpm_code_size_estimate + check_after):
 		if cpm_data[a] != 0x00:
-			put('CPM seems quite big. It should fill 0x%04X - 0x%04X, but around the end (0x%04X) it is not empty. Please adjust memory layout, code estimate or reduce code size.' % (cpm_loc_code, cpm_loc_code+cpm_code_size_estimate, a))
+			put('CPM seems quite big: It should fill 0x%04X...0x%04X, but around the end (0x%04X) it is not empty. Please adjust memory layout, code estimate or reduce code size.' % (cpm_loc_code, cpm_loc_code+cpm_code_size_estimate, a))
 			# Try guessing how big it is...
-			guess_max = 0x800
+			guess_max = 0x800	# How far to check
 			for a2 in range(a, a + guess_max):
 				if cpm_data[a2] != 0: continue
 				sum = 0
@@ -240,7 +245,7 @@ def cpm_make():
 	
 	if COMPILE_CCP:
 		### Compile CCP (as a simple CP/M .com file)
-		#transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
+		#loc_transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
 		#ccp_loc_code = 0x6000	# Must be known by BDOS in order to start up CCP!
 		#ccp_loc_data = 0x4000	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
 		ccp_bin_filename = '%s/ccp.com' % out_path
@@ -272,7 +277,7 @@ def cpm_make():
 		
 		### Extract CCP code area as stand-alone CP/M .COM binary (starting at transient area 0x100...)
 		# Beware of file offsets! File offset 0x5F00 corresponds to memory 0x6000, because only the transient area is included in the .com file!
-		ccp_data = ccp_data[ccp_loc_code - transient:]	# Note! The file data does not start at memory location 0x0000, but 0x100 (CP/M program transient area!)
+		ccp_data = ccp_data[ccp_loc_code - loc_transient:]	# Note! The file data does not start at memory location 0x0000, but 0x100 (CP/M program transient area!)
 		ccp_code_size = len(ccp_data)	# Determine the actually generated binary size
 		if ccp_code_size > ccp_code_size_estimate:
 			put('Compiled CCP code size (%d bytes / 0x%04X) is larger than estimated size "ccp_code_size_estimate" (%d bytes / 0x%04X). Code blocks will likely collide/overlap. Please adjust!' % (ccp_code_size,ccp_code_size, ccp_code_size_estimate,ccp_code_size_estimate))
@@ -316,7 +321,7 @@ def cpm_make():
 	
 	if DISASSEMBLE_BDOS:
 		## Disassemble BDOS area to investigate "stack confusion" bugs
-		bdos_addr = cpm_data[6] + cpm_data[7] * 0x100	# Get BDOS vector at location 0x0005-0x0007 ("JP xxxx")
+		bdos_addr = cpm_data[6] + cpm_data[7] * 256	# Get BDOS vector at location 0x0005-0x0007 ("JP xxxx")
 		put('Extracted BDOS vector at 0x0005: @bdos = 0x%04X' % bdos_addr)
 		put('Debugging BDOS area')
 		hexdump(cpm_data[bdos_addr:bdos_addr+128], bdos_addr)
@@ -343,11 +348,11 @@ def cpm_make():
 	### Write separate system ROM and cart ROM files
 	# Lower 32KB to system RAM file
 	with open(cpm_ram_filename, 'wb') as h:
-		h.write(cpm_data[:0x8000])
+		h.write(cpm_data[:0x8000])	# CP/M RAM is 0x0000...0x7FFF
 	
-	# Upper code to cartridge ROM file
+	# Upper code to cartridge ROM file (usually 0x8000...0xBFFF)
 	with open(cpm_cart_filename, 'wb') as h:
-		h.write(cpm_data[0x8000:0x8000+cart_eeprom_size])
+		h.write(cpm_data[loc_cart:loc_cart+cart_eeprom_size])
 	
 	
 	if GENERATE_LOWSTORAGE:
@@ -483,8 +488,8 @@ def compile(
 		output_bin_file = 'out/main.bin',
 		lib_path = None,	#'../../lib'
 		include_path = '../../include',
-		loc_code = 0x8000,
-		loc_data = 0xc000,
+		loc_code = 0x8000,	# 0x8000 for cartridge
+		loc_data = 0xc000,	# 0xc000 for internal RAM
 		defines = { 'VGLDK_SERIES': VGLDK_SERIES }
 	):
 	"""Wrapper around the SDCC compiler"""
@@ -647,7 +652,7 @@ def cpm_upload(data):
 	
 	put('Preparing RAM...')
 	dest = 0x0000
-	size = 0x8000	# Do not upload to ROM cartridge at 0x8000-0xbfff - it wont work ;-)
+	size = 0x8000	# 32KB (0x0000-0x7FFF). Do not upload to ROM cartridge at 0x8000-0xBFFF - it won't work ;-)
 	
 	# Clear area with zeros
 	comp.memset(dest=dest, pat=0x00, size=size)
@@ -657,9 +662,7 @@ def cpm_upload(data):
 	comp.upload(data=data[:size], src_addr=0x0000, dest_addr=0x0000, chunk_size=56, skip_zeros=True, verify=not True)
 	
 	
-	#sys.exit(0)
-	
-	dest = 0x0000
+	dest = 0x0000	# Entry jump
 	put('Disabling serial and calling 0x%04X...' % dest)
 	comp.write('sio;call %04x\n' % dest)
 	

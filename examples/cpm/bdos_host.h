@@ -9,18 +9,17 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 2023-08-22 Bernhard "HotKey" Slawik
 */
 
-// Hardware to use for communication (byte-level)
-//#define BDOS_HOST_DEVICE_PAPER_TAPE	// Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
-//#define BDOS_HOST_DEVICE_SOFTUART	// Re-direct to SoftUART (for real hardware)
-//#define BDOS_HOST_DEVICE_MAME	// Re-direct to MAME (for emulation)
+// Hardware to use for communication (byte-level) - select ONE
+//#define BDOS_HOST_DRIVER_PAPER_TAPE	// Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
+//#define BDOS_HOST_DRIVER_SOFTUART	// Re-direct to SoftUART (for real hardware)
+//#define BDOS_HOST_DRIVER_MAME	// Re-direct to MAME (for emulation)
 
-// Protocol to use for communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
-//#define BDOS_HOST_PROTOCOL_BINARY	// Send using binary
-//#define BDOS_HOST_PROTOCOL_HEX	// Send using hex text
+// Protocol to use for communication (frame level) - select ONE
+//#define BDOS_HOST_PROTOCOL_BINARY	// Send using 8bit binary data (e.g. for MAME driver or reliable serial)
+//#define BDOS_HOST_PROTOCOL_HEX	// Send using hex text (if communication is not binary-proof)
 
-
-#define BDOS_HOST_MAX_DATA 128
-#define BDOS_HOST_DMA_MAX_DATA 128
+#define BDOS_HOST_MAX_DATA 128	// To dismiss too large frames
+#define BDOS_HOST_DMA_MAX_DATA 128	// Buffer size for DMA data
 
 
 #include "bdos.h"	// Need some numbers and functions
@@ -29,30 +28,30 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 
 #include <stringmin.h>	// memcpy, memset, strlen
 
-// Driver (byte level)
-#ifdef BDOS_HOST_DEVICE_PAPER_TAPE
+// Device setup (byte level)
+#ifdef BDOS_HOST_DRIVER_PAPER_TAPE
 	// Use BIOS paper tape functions
 	#define bdos_host_send_byte	bios_punch
-	#define bdos_host_receive_byte	bios_reader
+	#define bdos_host_receive_byte	bios_reader	// bios_reader is blocking by spec.
 #endif
-#ifdef BDOS_HOST_DEVICE_SOFTUART
+#ifdef BDOS_HOST_DRIVER_SOFTUART
 	// Use SoftUART functions
 	#include <driver/softuart.h>
 	#define bdos_host_send_byte	softuart_sendByte
-	#define bdos_host_receive_byte	softuart_receiveByte
+	#define bdos_host_receive_byte	softuart_receiveByte	// non-blocking
 #endif
-#ifdef BDOS_HOST_DEVICE_MAME
+#ifdef BDOS_HOST_DRIVER_MAME
 	// Use MAME functions
 	#include <driver/mame.h>
 	#define bdos_host_send_byte	mame_putchar
-	#define bdos_host_receive_byte	mame_getchar
+	#define bdos_host_receive_byte	mame_getchar	// mame_getchar is blocking
 #endif
 
 // Make sure one driver is selected
-#ifndef BDOS_HOST_DEVICE_PAPER_TAPE
-	#ifndef BDOS_HOST_DEVICE_SOFTUART
-		#ifndef BDOS_HOST_DEVICE_MAME
-			#error One BDOS_HOST_DEVICE must be set (paper tape, SoftUART or MAME)!
+#ifndef BDOS_HOST_DRIVER_PAPER_TAPE
+	#ifndef BDOS_HOST_DRIVER_SOFTUART
+		#ifndef BDOS_HOST_DRIVER_MAME
+			#error One BDOS_HOST_DRIVER must be set (paper tape, SoftUART or MAME)!
 		#endif
 	#endif
 #endif
@@ -88,7 +87,7 @@ void bdos_host_send_data(byte *data, word l) {
 	}
 	
 	int bdos_host_receive_frame(byte *data) {
-		byte l;
+		int l;
 		byte i;
 		//byte c;
 		
@@ -96,7 +95,7 @@ void bdos_host_send_data(byte *data, word l) {
 		//bdos_printf("RX=");
 		do {
 			l = bdos_host_receive_byte();
-		} while (l == 0);
+		} while (l <= 0);
 		//bdos_printf_x2(l);
 		//bdos_printf("..."); //bdos_getchar();
 		
@@ -105,11 +104,11 @@ void bdos_host_send_data(byte *data, word l) {
 			//bdos_printf_x2(i);
 			//bdos_putchar('.');
 			
-			*data++ = bdos_host_receive_byte();
-			
-			//c = mame_getchar();
+			//c = bdos_host_receive_byte();
 			//bdos_printf_x2(c);
 			//*data++ = c;
+			
+			*data++ = bdos_host_receive_byte();
 		}
 		
 		//@TODO: Receive checksum
@@ -575,7 +574,7 @@ byte host_receivefcb(struct FCB *fcb) {
 }
 
 word host_receivedma() {
-	byte data[BDOS_HOST_DMA_MAX_DATA + 1];	// 128
+	byte data[BDOS_HOST_DMA_MAX_DATA + 4];	// 128 + headers
 	int l;
 	byte *p;
 	word ltotal;
