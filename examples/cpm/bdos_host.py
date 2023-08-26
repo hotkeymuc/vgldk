@@ -459,7 +459,6 @@ class Host:
 				if not os.path.isfile(full_filename):
 					# File was not found
 					put('File "%s" was NOT found!' % full_filename)
-					time.sleep(0.05)
 					self.reply_frame([0xff])
 					return
 				
@@ -483,7 +482,6 @@ class Host:
 				fcb_r1 = fcb[34] = 0
 				fcb_r2 = fcb[35] = 0
 				
-				time.sleep(0.05)
 				self.reply_frame([0x00] + fcb)
 				return
 			
@@ -570,15 +568,13 @@ class Host:
 				
 				fcb = fcb[:32]	# Only 32 bytes for directories!
 				
-				#time.sleep(0.05)
 				self.reply_frame([0x00] + fcb)	# Result = 0-3 = OK, 0xff = error
 				return
 			
 			
 			ofs = 0
 			if (num == BDOS_FUNC_F_READ):	# 20 = Read sequencial
-				put('Read sequencial...')
-				#@TODO: s1/s2?
+				#put('Read sequencial...')
 				#ofs = (fcb_ex * 16384) + (fcb_cr * 128)
 				
 				rn = ((fcb_s2 & 0x0f) * 16384) + (fcb_ex * 128) + fcb_cr
@@ -640,7 +636,7 @@ class Host:
 				#l2 = 64	# 64 works kind-of... but 8-bit checksum might not be sufficient
 				#l2 = 96	# Too big (NAK)
 				while (l2 > 0):
-					put('Sending chunk o=%d / %d' % (o, len(data)))
+					#put('Sending chunk o=%d / %d' % (o, len(data)))
 					d = data[o:o+l2]
 					l2 = len(d)
 					if (l2 == 0): break	# Only send zero-length frame on true EOF (not only "end of current payload")
@@ -758,19 +754,15 @@ class Protocol_binary_safe(Protocol):
 			
 			# Not OK: Send NAK
 			put('RX: Checksum mismatch rx=0x%02X != 0x%02X! Sending NAK...' % (check_received, check))
-			time.sleep(0.02)
-			#self.serial_write(bytes( [0] * 16 ))	# Pre-padding to sync
 			self.write_byte(BDOS_HOST_STATUS_NAK)	# Anything but 0xAA
+			
 			if callable(self.finish_frame): self.finish_frame()
-			#self.serial_write(bytes( [0] * 16 ))	# Post-padding to flush
 		#
 		
 		# Send ACK
-		#put('RX: OK, sending ACK')
-		#time.sleep(0.02)
 		self.write_byte(BDOS_HOST_STATUS_ACK)
+		
 		if callable(self.finish_frame): self.finish_frame()
-		#time.sleep(0.05)	# Throttle
 		
 		return list(data)	# Convert bytes to list
 	
@@ -787,8 +779,6 @@ class Protocol_binary_safe(Protocol):
 		frame = [ len(data) ] + data + [ check >> 8, check & 0xff ]	# 16 bit checksum
 		
 		while True:
-			#while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
-			#time.sleep(0.1)
 			
 			# Send frame
 			d = [0]*16 + frame	# Include pre-padding in same call (works great!)
@@ -829,10 +819,7 @@ class Protocol_binary_safe(Protocol):
 				#return
 			
 			# No ACK. Repeat!
-			put('TX: NAK received (0x%02X)!' % r)
-			#time.sleep(0.1)
-			#while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
-			put('TX: Re-transmitting...')
+			put('TX: NAK received (0x%02X)! Re-transmitting...' % r)
 		#
 		
 		#put('TX: ACK received.')
@@ -901,9 +888,6 @@ class Protocol_hex(Protocol):
 			return False
 		
 		# Acknowledge
-		#put('Ack...')
-		# Throttle...
-		#time.sleep(0.05)
 		ca = b'%02X' % check_actual
 		self.write_byte(ca[0])
 		self.write_byte(ca[1])
@@ -1080,10 +1064,9 @@ class Driver_MAME(Driver):
 		self.proc.stdin.write(bytes('%2X\n' % b, 'ascii'))
 	
 	def finish_frame(self):
-		# Flush STDIN
+		# Flush STDIN (or else the last byte(s) might not get through to MAME)
 		for i in range(3):
 			self.write_byte(0)	#@FIXME: Do not do this! Might destroy sync!
-			#time.sleep(.01)
 		pass
 	
 	def update(self):
@@ -1116,7 +1099,6 @@ class Driver_MAME(Driver):
 			put('MAME ended!')
 			return False	# False = driver stopped
 		
-		#time.sleep(0.01)	# Throttle a little
 		#put('Exit with returncode="%s"' % (str(p.returncode)))
 		#return self.proc.returncode
 	
@@ -1167,8 +1149,8 @@ class Driver_serial(Driver):
 			self.ser = None
 	
 	def read_byte(self):
-		while (self.ser.in_waiting == 0):
-			time.sleep(0.01)
+		# Block until data is there
+		while (self.ser.in_waiting == 0): time.sleep(0.01)
 		r = self.ser.read(1)[0]
 		
 		if SHOW_TRAFFIC_BYTES: put('< 0x%02X' % r)
@@ -1188,9 +1170,7 @@ class Driver_serial(Driver):
 		pass
 	
 	def update(self):
-		if (self.ser.in_waiting == 0):
-			# Idle
-			time.sleep(0.01)
+		if (self.ser.in_waiting == 0): time.sleep(0.01)
 		return True
 	
 
