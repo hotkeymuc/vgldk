@@ -148,6 +148,7 @@ def cpm_make():
 	
 	# Configure CP/M defines (features and options)
 	softuart_baud = 9600	# 9600 or 19200. 9600 is more reliable.
+	
 	cpm_defines = {	# Main "#define"s for the CP/M code base
 		
 		## Configure VGLDK hardware and drivers
@@ -176,8 +177,8 @@ def cpm_make():
 		## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
 		'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
 		#'BDOS_HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
-	'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
-	#'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation. Needs non-safe binary protocol)
+		'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
+		#'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
 		
 		# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
 		#'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
