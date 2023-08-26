@@ -274,10 +274,10 @@ void ccp_dir() {
 	// Search first
 	//@TODO: Move to program.h:bdos_f_sfirst(fcb)
 	__asm
-		push af
+		;push af
 		push bc
 		push de
-		push hl
+		;push hl
 		ld c, #17	; 17 = BDOS_FUNC_F_SFIRST
 		ld d, #>_def_fcb	; Address of FCB (high)
 		ld e, #<_def_fcb	; Address of FCB (low)
@@ -285,10 +285,10 @@ void ccp_dir() {
 		
 		ld (_ccp_ret_a), a
 		
-		pop hl
+		;pop hl
 		pop de
 		pop bc
-		pop af
+		;pop af
 	__endasm;
 	
 	

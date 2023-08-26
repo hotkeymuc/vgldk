@@ -9,6 +9,6 @@
 */
 
 #define CPM_TITLE "32K VGL CP/M 2.0"
-#define CPM_VERSION "2023-08-24 HotKey"
+#define CPM_VERSION "2023-08-26 HotKey"
 
 #endif // __CPM_H
