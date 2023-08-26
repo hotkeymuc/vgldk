@@ -69,6 +69,28 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 #define bdos_host_error(s)	;	// Be quiet!
 
 
+
+// Experiment: Light up SCROLL LOCK during disk access
+#if VGLDK_SERIES == 4000
+	// Using port 0x12:
+	//	* Toggle 0x04 to set/clear the STROBE pin (parallel port pin 1)
+	//	* Toggle 0x08 to let the piezo speaker buzz (2000)
+	//	* Toggle 0x20 to set the caps lock LED
+	__sfr __at 0x12 periphery_port;
+	
+	void bdos_host_activity_on() {
+		periphery_port |= 0x20;
+	}
+	void bdos_host_activity_off() {
+		periphery_port &= ~0x20;
+	}
+#else
+	// Disable
+	#define bdos_host_activity_on	;
+	#define bdos_host_activity_off	;
+#endif
+
+
 // Protocol (frame level)
 #ifdef BDOS_HOST_PROTOCOL_BINARY
 	// Send using simple binary data
@@ -637,7 +659,6 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 
 // Protocol agnostic functions
 
-//byte host_data[BDOS_HOST_MAX_DATA + 4];	// Maximum DMA size + some extra for headers
 
 void host_sendfcb(byte num, struct FCB *fcb) {
 	byte data[1+1+2+36 + 4];	// +4 extra
@@ -650,7 +671,6 @@ void host_sendfcb(byte num, struct FCB *fcb) {
 	//bdos_printf("F"); bdos_printf_x2(num);
 	
 	// Dump to serial
-	//pdata = &host_data[0];
 	pdata = &data[0];
 	
 	*pdata++ = 'F';
@@ -664,8 +684,9 @@ void host_sendfcb(byte num, struct FCB *fcb) {
 		*pdata++ = *pfcb++;
 	}
 	
-	//bdos_host_send_frame(&host_data[0], 1+1+2+36);
+	bdos_host_activity_on();
 	bdos_host_send_frame(&data[0], 1+1+2+36);
+	bdos_host_activity_off();
 	
 	// Use host_receivefcb() to receive result and altered FCB
 }
@@ -674,14 +695,12 @@ void host_sendfcb(byte num, struct FCB *fcb) {
 byte host_receive_byte() {
 	byte data[4];
 	byte l;
-	//l = bdos_host_receive_frame(&host_data[0]);	// Do NOT re-use the global buffer! It might still contain important info!
 	l = bdos_host_receive_frame(&data[0]);
 	if (l != 1) {
 		bdos_host_error("Rb!");
 		return 0xff;
 	}
 	
-	//return host_data[0];
 	return data[0];
 }
 
@@ -691,8 +710,10 @@ byte host_receivefcb(struct FCB *fcb) {
 	byte l;
 	byte r;
 	
+	// Light up LED during disk access! :-D
+	bdos_host_activity_on();
+	
 	// Receive result and FCB as one data frame
-	//l = bdos_host_receive_frame(&host_data[0]);
 	l = bdos_host_receive_frame(&data[0]);
 	
 	// L must be 32 or 36 for a proper FCB (32 for dir listing) plus 1 byte for the return value. Return error if not.
@@ -703,7 +724,6 @@ byte host_receivefcb(struct FCB *fcb) {
 	}
 	
 	// Get return value
-	//r = host_data[0];	// First byte = result value
 	r = data[0];	// First byte = result value
 	
 	if (r == 0xff) {
@@ -711,9 +731,10 @@ byte host_receivefcb(struct FCB *fcb) {
 		//printf("FCB FUN ERR!\n");
 	} else {
 		// Copy the received data over to the FCB pointer
-		//memcpy((byte *)fcb, (byte *)&host_data[1], l);	// data[0] = result value, data[1...] = actual FCB data
 		memcpy((byte *)fcb, (byte *)&data[1], l);	// data[0] = result value, data[1...] = actual FCB data
 	}
+	
+	bdos_host_activity_off();
 	
 	return r;
 }
@@ -728,10 +749,12 @@ word host_receivedma() {
 	p = bios_dma;
 	l_total = 0;
 	
+	// Light up LED during disk access! :-D
+	bdos_host_activity_on();
+	
 	while(l_total < BDOS_HOST_DMA_MAX_DATA) {
 		
 		// Receive one DMA chunk
-		//l = bdos_host_receive_frame(&host_data[0]);
 		l = bdos_host_receive_frame(&data[0]);
 		
 		if (l == 0) {
@@ -741,7 +764,6 @@ word host_receivedma() {
 		}
 		
 		// Handle first byte (DMA status)
-		//r = host_data[0];
 		r = data[0];
 		
 		if (r == BDOS_HOST_STATUS_DMA_DATA) {
@@ -749,7 +771,6 @@ word host_receivedma() {
 			l -= 1;	// Skip first byte (status), rest is DMA data
 			
 			// Copy from receive buffer to dma area
-			//memcpy(p, &host_data[1], l);
 			memcpy(p, &data[1], l);
 			
 			p += l;
@@ -770,6 +791,8 @@ word host_receivedma() {
 		
 	}
 	//bdos_printf("DMA L="); bdos_printf_x2(l_total);
+	
+	bdos_host_activity_off();
 	
 	return l_total;
 }
