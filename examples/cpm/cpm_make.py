@@ -130,22 +130,66 @@ def cpm_make():
 	
 	# Set-up CP/M layout
 	cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
-	cpm_code_size_estimate = 0x1380	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
-	cpm_data_size_estimate = 0x0800	# Approx size of CPM RAM usage
+	cpm_code_size_estimate = 0x1440	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
+	cpm_data_size_estimate = 0x1000	# Approx size of CPM RAM usage
 	#cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CP/M as far up as possible in lower RAM bank
 	#cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CP/M as far up in cartridge space (0x8000-BFFF) as possible
 	cpm_loc_code = loc_cart + cart_eeprom_size - cpm_code_size_estimate	# Put CP/M as far up in cartridge EPROM (0x8000-BFFF) as possible
 	cpm_loc_data = loc_internal_ram	# Use stock system RAM at 0xC000-0xDFFF. Static variable data and gsinit-code will be put to this offset in binary file. Monitor uses 0xd000 for its data
 	
 	# Set-up CCP layout
-	ccp_code_size_estimate = 0x0c00	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
+	ccp_code_size_estimate = 0x0b80	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
 	#ccp_data_size_estimate = 0x0600	# Don't know... Just a guess...
 	ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
 	#ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
-	ccp_loc_data = loc_internal_ram + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
+	#ccp_loc_data = loc_internal_ram + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
+	ccp_loc_data = cpm_loc_data + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
 	
 	
-	### Prepare
+	# Configure CP/M defines (features and options)
+	softuart_baud = 9600	# 9600 or 19200. 9600 is more reliable.
+	cpm_defines = {	# Main "#define"s for the CP/M code base
+		
+		## Configure VGLDK hardware and drivers
+		'VGLDK_SERIES': vgldk_series,	# e.g. 4000 for GL4000
+		'SOFTUART_BAUD': softuart_baud,	# SoftUART baud rate. Currently supported (2023-08) are 9600 or 19200
+		
+		## Configure BIOS
+		#'BIOS_SCROLL_WAIT': 1,	# Wait after 1 page of text	#@TODO: Make this runtime-changable!
+		'BIOS_SHOW_BANNER': 1,	# Show CP/M text banner and version on reset
+		
+		#@TODO: Make aux device changable at runtime (using the "iobyte"!)
+		#'BIOS_SHOW_PAPER_TAPE_MAPPING': 1,	# Print the configured paper tape configuration on boot
+		'BIOS_PAPER_TAPE_TO_DISPLAY': 1,	# Redirect paper tape functions to display
+		#'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape functions to SoftUART
+		#'BIOS_PAPER_TAPE_TO_MAME': 1,	# Redirect paper tape functions to MAME
+		
+		
+		## Configure BDOS
+		#'BDOS_SHOW_BANNER': 1,	# Show "BDOS" on boot (helpful for debugging)
+		'BDOS_WAIT_FOR_RAM': 1,	# Wait until RAM is writable before proceeding (recommended)
+		'BDOS_RESTORE_LOWSTORAGE': 1,	# Restore/fix the lower memory area on each start
+		
+		'BDOS_PATCHED_ENTRY_ADDRESS': (loc_transient_top+1 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
+		'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
+		
+		## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
+		'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
+		#'BDOS_HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
+	'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
+	#'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation. Needs non-safe binary protocol)
+		
+		# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
+		#'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
+		'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
+		#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
+		
+		## Configure CCP
+		'CCP_LOC_CODE': '0x%04X'%ccp_loc_code	# Tell BDOS where to find CCP. Mandatory.
+	}
+	
+	
+	### Prepare directory
 	# Make sure the output directory exists
 	if not os.path.isdir(out_path):
 		put('Creating directory "%s" because it does not exist...' % out_path)
@@ -178,46 +222,7 @@ def cpm_make():
 		loc_code = cpm_loc_code,	#0x8000 - code_size_estimate	# Put CPM as far up as possible
 		loc_data = cpm_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
 		
-		## CP/M defines (features and options)
-		defines = {	# Main "#define"s for the CP/M code base
-			
-			## Configure VGLDK hardware and drivers
-			'VGLDK_SERIES': vgldk_series,	# e.g. 4000 for GL4000
-			'SOFTUART_BAUD': 19200,	# SoftUART baud rate. Currently supported (2023-08) are 9600 or 19200
-			
-			## Configure BIOS
-			#'BIOS_SCROLL_WAIT': 1,	# Wait after 1 page of text	#@TODO: Make this runtime-changable!
-			'BIOS_SHOW_BANNER': 1,	# Show CP/M text banner and version on reset
-			
-			#@TODO: Make aux device changable at runtime (using the "iobyte"!)
-			#'BIOS_SHOW_PAPER_TAPE_MAPPING': 1,	# Print the configured paper tape configuration on boot
-			'BIOS_PAPER_TAPE_TO_DISPLAY': 1,	# Redirect paper tape functions to display
-			#'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape functions to SoftUART
-			#'BIOS_PAPER_TAPE_TO_MAME': 1,	# Redirect paper tape functions to MAME
-			
-			
-			## Configure BDOS
-			'BDOS_SHOW_BANNER': 1,	# Show "BDOS" on boot (helpful for debugging)
-			'BDOS_WAIT_FOR_RAM': 1,	# Wait until RAM is writable before proceeding (recommended)
-			'BDOS_RESTORE_LOWSTORAGE': 1,	# Restore/fix the lower memory area on each start
-			
-			'BDOS_PATCHED_ENTRY_ADDRESS': (loc_transient_top+1 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
-			#'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
-			
-			## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
-			'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
-			#'BDOS_HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
-			#'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
-			'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
-			
-			# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
-			'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary
-			#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
-			
-			
-			## Configure CCP
-			'CCP_LOC_CODE': '0x%04X'%ccp_loc_code	# Tell BDOS where to find CCP. Mandatory.
-		}
+		defines = cpm_defines
 	)
 	
 	# Check for overflow (code too big)
@@ -231,7 +236,7 @@ def cpm_make():
 			for a2 in range(a, a + guess_max):
 				if cpm_data[a2] != 0: continue
 				sum = 0
-				for a3 in range(a2, a2+8):
+				for a3 in range(a2, a2+16):	# Look ahead
 					sum += cpm_data[a3]
 				if sum == 0:
 					s = a2 - cpm_loc_code
@@ -460,26 +465,43 @@ def cpm_make():
 		"""
 		
 		### Emulate using bdos_host.py (Start MAME and serve files to bdos_host)
-		put('Starting MAME in BDOS host mode...')
+		put('Starting BDOS host...')
 		import bdos_host
-		
 		#bdos_host.SHOW_TRAFFIC = True	# Debug traffic
+		#bdos_host.SHOW_TRAFFIC_BYTES = True	# Debug traffic byte by byte
 		
 		# Start bdos_host in MAME mode...
-		#comp = bdos_host.Host_Serial(port=port, baud=baud, paths=paths)
-		comp = bdos_host.Host_MAME(rompath=MAME_ROMS_DIR, emusys=MAME_SYS, cart_file=cpm_cart_filename, paths=BDOS_MOUNTS)
-		comp.open()
-		if not comp.is_open:
+		
+		# Chose a driver
+		if 'BDOS_HOST_DRIVER_MAME' in cpm_defines:
+			driver = bdos_host.Driver_MAME(rompath=MAME_ROMS_DIR, emusys=MAME_SYS, cart_file=cpm_cart_filename)
+		if 'BDOS_HOST_DRIVER_SOFTUART' in cpm_defines:
+			driver = bdos_host.Driver_serial(baud=softuart_baud, stopbits=2)	# More stopbits = more time to process?
+		
+		# Chose a protocol
+		if 'BDOS_HOST_PROTOCOL_BINARY' in cpm_defines:
+			protocol = bdos_host.Protocol_binary()
+		if 'BDOS_HOST_PROTOCOL_BINARY_SAFE' in cpm_defines:
+			protocol = bdos_host.Protocol_binary_safe()
+		if 'BDOS_HOST_PROTOCOL_HEX' in cpm_defines:
+			protocol = bdos_host.Protocol_hex()
+		
+		# Start host
+		host = bdos_host.Host(driver=driver, protocol=protocol, mounts=BDOS_MOUNTS)
+		host.open()
+		
+		if not host.is_open:
 			put('Connection could not be opened. Aborting.')
 			sys.exit(4)
 		
 		#put('Loading binary file "%s"...' % (bin_filename))
-		#comp.upload(bin_filename)
-		comp.run()
+		#host.upload(bin_filename)
+		host.run()
 	#
 #
 
 
+# Wrapper around SDCC compiler
 def compile(
 		crt_s_files = ['./crt0.s'],
 		crt_rel_file = 'out/crt0.rel',

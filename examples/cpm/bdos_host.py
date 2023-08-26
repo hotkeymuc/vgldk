@@ -37,8 +37,9 @@ MAME_CMD = '/z/data/_code/_c/mame.git/mame64'
 
 # FTDI
 SERIAL_PORT = '/dev/ttyUSB0'
-SERIAL_BAUD = 19200	#9600
+SERIAL_BAUD = 9600	#19200	# 9600 or 19200
 SHOW_TRAFFIC = not True
+SHOW_TRAFFIC_BYTES = not True
 
 
 """
@@ -56,9 +57,13 @@ MAX_LINE = 255
 MAX_DATA = 128	# for HEX serial: 128 
 MAX_SEND = 120	# for HEX serial: < 128-header
 
-REPLY_THROTTLE = 0.05	# We need to wait a bit before sending a reply, because VGL does not have interrupt based serial and needs to be ready for data or it'll simply miss it
-DMA_THROTTLE = 0.15	#0.1-0.2
+# We need to wait a bit before sending a reply, because VGL does not have interrupt based serial and needs to be ready for data or it'll simply miss it
+DMA_THROTTLE = None	#0.15	#0.1-0.2
+DMA_MTU = 64	#32	# maximum transmission unit for DMA. e.g. 64 is fast, but checksums might be insufficient, data errors occur!
 
+
+# Included LOAD
+REPLY_THROTTLE = 0.05	# Only needed for LOAD
 DEFAULT_DAT_FILENAME = None
 
 #DEFAULT_BIN_FILENAME = 'out/app_busBuddy2.app.bin'
@@ -82,12 +87,9 @@ DEFAULT_DAT_FILENAME = None
 #DATA_PATH = 'programs'
 #DEFAULT_BIN_FILENAME = 'programs/WS30/WS.COM'
 #DATA_PATH = 'programs/WS30'
-
 DEFAULT_BIN_FILENAME = 'programs/ZORK123/ZORK1.COM'
 
-DATA_PATH = 'programs/ZORK123'
-
-DATA_PATHS = [
+BDOS_MOUNTS = [
 	# first entry = A: = default
 	#'programs',
 	
@@ -103,43 +105,13 @@ DATA_PATHS = [
 	#'programs/WRDMASTR',
 	#'programs/WS30',
 	'programs/ZORK123',
-	
 ]
 
 #DEFAULT_BIN_FILENAME = 'test/out/test.com'
-#DATA_PATH = 'test/out'
 
-
-def put(txt):
-	print('host: %s' % txt)
-
-def str_hex(s):
-	"Safe string conversion (encoding invalid chars to hex numbers)"
-	if PYTHON3:
-		if type(s) not in [str]:	# Python 3
-			s = str(s)
-	else:
-		if type(s) not in [str, unicode]:	# Python 2
-			s = str(s)
-	
-	r = ''
-	for b in s:
-		c = ord(b)
-		#if (c < 0x20) and (c < 128):
-		if (c >= 0x20) and (c < 128):
-			r += chr(c)
-		else:
-			r += ' [0x%02X] ' % c
-	return r
-
-
-def my_ceil(x, y):
-	# int + ceil division
-	return x//y + (1 if ((x % y) > 0) else 0)
 
 # BDOS definitions
 
-# BODS function numbers
 # https:#www.seasip.info/Cpm/bdos.html
 BDOS_FUNC_P_TERMCPM		= 0	# System Reset
 BDOS_FUNC_C_READ		= 1	# Console input
@@ -300,17 +272,41 @@ BDOS_HOST_STATUS_DMA_EOF = 0x1A
 BDOS_HOST_STATUS_DMA_DATA = 0x20
 
 
+def put(txt):
+	print('host: %s' % txt)
+
+def str_hex(s):
+	"Safe string conversion (encoding invalid chars to hex numbers)"
+	if PYTHON3:
+		if type(s) not in [str]:	# Python 3
+			s = str(s)
+	else:
+		if type(s) not in [str, unicode]:	# Python 2
+			s = str(s)
+	
+	r = ''
+	for b in s:
+		c = ord(b)
+		#if (c < 0x20) and (c < 128):
+		if (c >= 0x20) and (c < 128):
+			r += chr(c)
+		else:
+			r += ' [0x%02X] ' % c
+	return r
+
+
 class Host:
 	"""The VGL CP/M BDOS talks to this counter part as a virtual disk and/or monitor"""
 	
-	def __init__(self, driver, protocol, paths=DATA_PATHS):
+	def __init__(self, driver, protocol, mounts=BDOS_MOUNTS, chunk_throttle=DMA_THROTTLE):
 		self.running = False
 		self.is_open = False
 		
 		self.driver = driver
 		self.protocol = protocol
 		
-		self.paths = paths
+		self.mounts = mounts
+		self.chunk_throttle = chunk_throttle
 		
 		# Open bin file
 		with open(DEFAULT_BIN_FILENAME, 'rb') as h:
@@ -324,25 +320,47 @@ class Host:
 	def __del__(self):
 		self.driver.close()
 	
-	def run(self):
+	def open(self):
 		# Wire up
 		self.protocol.read_byte = self.driver.read_byte
 		self.protocol.write_byte = self.driver.write_byte
+		self.protocol.finish_frame = self.driver.finish_frame
 		
+		self.driver.open()
+		self.is_open = True
+	
+	def run(self):
+		# Run (blocking)
+		self.running = True
 		while self.running:
-			if not self.driver.update():
-				self.running = False
-				break
+			self.update()
+	
+	def update(self):
+		# Keep driver active
+		if not self.driver.update():
+			self.running = False
+			return
+		
+		# Ask protocol for new frame (blocking)
+		try:
 			data = self.protocol.receive_frame()
-			self.handle_frame(data)
+		except Exception as e:
+			put('Receiving frames failed (%s / %s). Quitting...' % (e.__class__.__name__, str(e)))
+			self.running = False
+			return
+		
+		# Handle frame
+		self.handle_frame(data)
 	
 	def reply_frame(self, data):
+		if SHOW_TRAFFIC: put('>> (%d) %s' % (len(data), ' '.join([ '0x%02X'%b for b in data])))
 		self.protocol.send_frame(data)
 	
 	def handle_frame(self, data):
 		"Handle one complete FRAME of data"
 		
 		#put('frame: %s' % (str(data)))
+		if SHOW_TRAFFIC: put('<< frame: (%d) [%s]' % (len(data), ' '.join([ '0x%02X'%b for b in data])))
 		if (len(data) == 0): return False
 		
 		realm = data[0]
@@ -358,7 +376,7 @@ class Host:
 			#put('Replying with %d bytes' % l)
 			
 			# Throttle...
-			if (REPLY_THROTTLE >= 0): time.sleep(REPLY_THROTTLE)
+			if REPLY_THROTTLE is not None: time.sleep(REPLY_THROTTLE)
 			
 			data = []
 			for i in range(l):
@@ -415,19 +433,17 @@ class Host:
 			fcb_r1 = fcb[34]
 			fcb_r2 = fcb[35]
 			
-			
 			if chr(0) in fcb_name: fcb_name = fcb_name[:fcb_name.index(chr(0))]	# Remove 0 bytes
 			filename = (fcb_name.strip() + '.' + fcb_typ.strip())
-			put('! FCB function #%d to FCB @ %04X: file drive=%d "%s.%s": ex=%02X, s1=%02X, s2=%02X, rc=%02X, cr=%02X' % (num, addr, fcb_dr, str_hex(fcb_name), str_hex(fcb_typ), fcb_ex, fcb_s1, fcb_s2, fcb_rc, fcb_cr))
+			put('FCB func #%d to FCB @ %04X: file drive=%d "%s.%s": ex=%02X, s1=%02X, s2=%02X, rc=%02X, cr=%02X' % (num, addr, fcb_dr, str_hex(fcb_name), str_hex(fcb_typ), fcb_ex, fcb_s1, fcb_s2, fcb_rc, fcb_cr))
 			
 			#@TODO: When using sfirst: dr = '?' (0x3f) means: Show metainfo / labels etc.
 			if fcb_dr == 0x3f: fcb_dr = 0
-			if fcb_dr > len(self.paths):
+			if fcb_dr > len(self.mounts):
 				put('Unknown FCB DR=%d - using default drive' % fcb_dr)
-				path = self.paths[0]
+				path = self.mounts[0]
 			else:
-				path = self.paths[fcb_dr]
-			
+				path = self.mounts[fcb_dr]
 			
 			if (num == BDOS_FUNC_F_OPEN): # 15 = Open file
 				#full_filename = os.path.join(DATA_PATH, filename)
@@ -455,6 +471,7 @@ class Host:
 				file_ofs = 0
 				
 				# Alter FCB
+				#@FIXME: Fill out correct values!
 				fcb_ex = fcb[12] = 0	#((file_size - file_ofs) % 524288) // 16384	# Current extent
 				fcb_s1 = fcb[13] = 2	# 2? Number of extents?
 				fcb_s2 = fcb[14] = ((file_size - file_ofs) // 524288) | 0x80	# Extent high byte; 0x80 is an "open" flag?
@@ -533,8 +550,6 @@ class Host:
 				fcb[1+8:1+8+len(ext)] = [ ord(c) for c in ext]
 				
 				#@TODO: Fill out more data!
-				#ex = my_ceil(file_size, 16384)
-				#rc = my_ceil((file_size % 16384), 128)
 				ex = (file_size % 524288) // 16384
 				rc = min(0x80, (file_size % 16384) // 128)
 				fcb[12] = ex	# ex = Current Extent = (file pointer % 524288) / 16384
@@ -613,16 +628,16 @@ class Host:
 				# Send immediate status
 				self.reply_frame([0x00])	# 0x00 = OK
 				
-				put('Sending DMA data (%d bytes)...' % len(data))
+				#put('Sending DMA data (%d bytes)...' % len(data))
 				# Send sector in smaller chunks (if communication is flaky and frequent re-transmissions are expected)
-				#time.sleep(0.05)
 				o = 0
 				
 				# MTU / Maximum transmission unit
+				l2 = DMA_MTU
 				#l2 = 16
-				#l2 = 32	# 32 works quite OK
+				##l2 = 32	# 32 works quite OK
 				#l2 = 48
-				l2 = 64	# 64 works kind-of... but 8-bit checksum might not be sufficient
+				#l2 = 64	# 64 works kind-of... but 8-bit checksum might not be sufficient
 				#l2 = 96	# Too big (NAK)
 				while (l2 > 0):
 					put('Sending chunk o=%d / %d' % (o, len(data)))
@@ -634,15 +649,15 @@ class Host:
 					o += l2
 					
 					# Throttle
-					if self.throttle is not None:
-						time.sleep(self.throttle)
+					if self.chunk_throttle is not None:
+						time.sleep(self.chunk_throttle)
 					
 				#
 				# Was this the very last sector of this file?
 				if is_eof:
 					put('Sending EOF')
 					self.reply_frame([BDOS_HOST_STATUS_DMA_EOF])	# Send DMA_EOF
-				put('DMA sent.')
+				#put('DMA sent.')
 			#
 		else:
 			put('Unknown realm 0x%02X / "%s"' % (realm, chr(realm)))
@@ -653,9 +668,10 @@ class Host:
 
 class Protocol:
 	"""Abstract protocol"""
-	def __init(self, read_byte=None, write_byte=None):
+	def __init(self, read_byte=None, write_byte=None, finish_frame=None):
 		self.read_byte = read_byte
 		self.write_byte = write_byte
+		self.finish_frame = finish_frame
 	
 	def receive_frame(self):
 		"""Receive new frame from driver (blocking)"""
@@ -663,6 +679,7 @@ class Protocol:
 	
 	def send_frame(self, data):
 		"""Send new frame to driver"""
+		if callable(self.finish_frame): self.finish_frame()
 		pass
 
 
@@ -671,312 +688,179 @@ class Protocol_binary(Protocol):
 	
 	def receive_frame(self):
 		"""Receive new frame from driver (blocking)"""
+		# Length
 		l = self.read_byte()
+		
+		# Data
 		data = []
 		for i in range(l):
-			data.append(self.read_byte)
+			data.append(self.read_byte())
+		
 		return data
 	
-	def send_frame(self, frame):
+	def send_frame(self, data):
 		"""Send new frame to driver"""
+		# Length
 		self.write_byte(len(data))
-		for b in frame:
+		
+		# Data
+		for b in data:
 			self.write_byte(b)
+		
+		if callable(self.finish_frame): self.finish_frame()
 	
 
-class Driver:
-	def open(self):
-		pass
-	def close(self):
-		pass
-	def update(self):
-		return True	# While running
-	def read_byte(self):
-		pass
-	def write_byte(self):
-		pass
+
+# Binary_safe protocol
+def bdos_host_checksum(data):
+	"""
+	check = 0x55
+	for b in data:
+		check ^= b
+	"""
+	
+	"""
+	check = BDOS_HOST_CHECK_INIT
+	for b in data:
+		check = ((check << 1) & 0xff) ^ b	# Shift and XOR
+	"""
+	
+	check = BDOS_HOST_CHECK_INIT
+	for b in data:
+		check = ((check << 1) & 0xffff) ^ b	# Shift and XOR
+	
+	return check
 
 
-class Driver_MAME:
-	"""Driver using MAME"""
-	def __init__(self, emusys='gl4000', rompath='./roms', cart_file=None, buffer_size=3, *args, **kwargs):
-		Driver.__init__(self)
+class Protocol_binary_safe(Protocol):
+	"""Binary protocol with checksum and retransmission"""
+	def receive_frame(self):
 		
-		#@FIXME: Use tools/mame.py to handle the MAME communication
-		self.proc = None
-		
-		self.emusys = emusys
-		self.rompath = rompath
-		self.cart_file = cart_file
-		
-		self.buffer_size = buffer_size	# HEX HEX newline = 3 bytes
-	
-	def open(self):
-		put('Starting MAME...')
-		start_new_thread(self._mame_run, ())
-		while(not self.is_open):
-			time.sleep(0.5)
-		put('MAME has exited.')
-	
-	def _mame_run(self):
-		self.is_open = False
-		
-		cmd = MAME_CMD
-		cmd += ' -nodebug'
-		if self.rompath is not None: cmd += ' -rompath %s' % self.rompath
-		cmd += ' %s' % self.emusys
-		if self.cart_file is not None: cmd += ' -cart %s' % self.cart_file
-		cmd += ' -window'
-		cmd += ' -nomax'
-		cmd += ' -nofilter'
-		cmd += ' -sleep'
-		cmd += ' -volume -24'
-		#cmd += ' -skip_disclaimer'	# When set: process ends immediately :-(
-		cmd += ' -skip_gameinfo'
-		cmd += ' -speed %.2f' % 1.0	#2.0
-		cmd += ' -nomouse'
-		
-		#self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
-		### https://stackoverflow.com/questions/1606795/catching-stdout-in-realtime-from-subprocess
-		#self.proc = subprocess.Popen('stdbuf -o0 '+ cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
-		self.proc = subprocess.Popen(
-			#cmd,
-			'stdbuf -i%d -o%d %s' % (self.buffer_size, self.buffer_size, cmd),	# use with bufsize=0
+		while True:	# Re-transmission loop
 			
-			stdin=subprocess.PIPE,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			shell=True,
+			# Receive length
+			l = self.read_byte()
 			
-			#close_fds=False,	# Use close_fds=False on unix, close_fds=True on linux
-			
-			#bufsize=self.buffer_size
-			bufsize=0	# 0=unbuffered, 1=line buffered, n=buffer ~n bytes
-		)
-		
-		"""
-		h = self.proc.stdout
-		
-		for l in iter(h.readline, b''):	# iter() is needed!
-			if len(l) > 0:
-				put('"%s"' % (l.strip()))
-				self.on_mame_line(l)
-		
-		self.proc.communicate()	# Close PIPE
-		
-		#put('Exit with returncode="%s"' % (str(p.returncode)))
-		return self.proc.returncode
-		"""
-		put('Start return code: %s' % str(self.proc.returncode))
-		self.is_open = True
-		
-	
-	def close(self):
-		if self.proc is not None:
-			self.proc.communicate()	# Close PIPE
-	
-	def read_byte(self):
-		#s = self.proc.stdout.read(2)
-		s = self.proc.stdout.readline()	# Read 2-digit HEX with trailing newline
-		#put('read="%s"' % str(s))
-		try:
-			v = int(s, 16)
-		except ValueError:
-			put('Got non-hex data from stdout: %s' % str_hex(s))
-			v = 0	# Error
-		
-		return v
-	
-	def write_byte(self, b):
-		self.proc.stdin.write(bytes('%2X\n' % b, 'ascii'))
-	
-	def update(self):
-		r = self.proc.poll()
-		if (r is None):
-			# Still running
-			
-			"""
-			# Handle BINARY protocol (length, data)
-			l = self.mame_read_byte()
+			# Receive data
 			data = []
 			for i in range(l):
-				data.append(self.mame_read_byte())
+				data.append(self.read_byte())
 			
-			if (SHOW_TRAFFIC):
-				put('<< Got %d bytes: %s' % (l, ' '.join(['%02X' % b for b in data]) ))
+			# Receive checksum
+			check_received = self.read_byte()
+			check_received = check_received * 256 + self.read_byte()	# 16 bit
 			
-			self.handle_frame(data)
+			# Calculate checksum
+			check = bdos_host_checksum(data)
+			
+			# Check
+			if check_received == check: break	# Checksums OK!
+			
+			# Not OK: Send NAK
+			put('RX: Checksum mismatch rx=0x%02X != 0x%02X! Sending NAK...' % (check_received, check))
+			time.sleep(0.02)
+			#self.serial_write(bytes( [0] * 16 ))	# Pre-padding to sync
+			self.write_byte(BDOS_HOST_STATUS_NAK)	# Anything but 0xAA
+			if callable(self.finish_frame): self.finish_frame()
+			#self.serial_write(bytes( [0] * 16 ))	# Post-padding to flush
+		#
+		
+		# Send ACK
+		#put('RX: OK, sending ACK')
+		#time.sleep(0.02)
+		self.write_byte(BDOS_HOST_STATUS_ACK)
+		if callable(self.finish_frame): self.finish_frame()
+		#time.sleep(0.05)	# Throttle
+		
+		return list(data)	# Convert bytes to list
+	
+	
+	def send_frame(self, data):
+		"Reply data inside a frame"
+		
+		#if SHOW_TRAFFIC: put('>>> Frame: %d bytes' % len(data))
+		
+		# Calculate checksum
+		check = bdos_host_checksum(data)
+		
+		#frame = [ len(data) ] + data + [ check ]	# 8 bit checksum
+		frame = [ len(data) ] + data + [ check >> 8, check & 0xff ]	# 16 bit checksum
+		
+		while True:
+			#while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
+			#time.sleep(0.1)
+			
+			# Send frame
+			d = [0]*16 + frame	# Include pre-padding in same call (works great!)
+			for b in d: self.write_byte(b)
+			if callable(self.finish_frame): self.finish_frame()
+			#self.serial_write(bytes( [0] * 16 ))	# Post-padding to flush
+			
+			# Wait for ACK/NAK
 			"""
-			# Flush while idle?
-			#for i in range(4): self.mame_write_byte(0)	#@FIXME: Do not do this! Might destroy sync!
+			put('Waiting for ACK/NAK...')
+			timeout = 50
+			while (self.ser.in_waiting == 0) and (timeout > 0):
+				time.sleep(0.01)
+				#self.serial_write(bytes( [0] * 2 ))	# Flush
+				timeout -= 1
 			
-			return True	# True = driver is running
+			# Check for timeout
+			if timeout <= 0:
+				put('TX: Timeout waiting for ACK/NAK! Re-transmitting...')
+				#time.sleep(0.1)
+				continue
+				#put('TX: Timeout waiting for ACK/NAK! Stopping TX!')
+				#return
 			
-		else:
-			# Process ended!
-			put('MAME ended! Poll returned: %s' % str(r))
-			return False	# False = driver stopped
+			#@FIXME: I have no clue why it always keeps sending 0x28!
+			#while r not in (0xaa, 0x99):
+			#r = self.ser.read(1)[0]
+			"""
+			r = self.read_byte()
+			
+			# Check for ACK
+			if r == BDOS_HOST_STATUS_ACK: break	# ACK received!
+			
+			if r != BDOS_HOST_STATUS_NAK:
+				put('!! TX: Invalid ACK/NAK response!!! (0x%02X / %d)!' % (r, r))
+				time.sleep(2)
+				#put('TX: Invalid response!!!! Stopping TX...')
+				#return
+			
+			# No ACK. Repeat!
+			put('TX: NAK received (0x%02X)!' % r)
+			#time.sleep(0.1)
+			#while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
+			put('TX: Re-transmitting...')
+		#
 		
-		time.sleep(0.01)	# Throttle a little
-		#put('Exit with returncode="%s"' % (str(p.returncode)))
-		#return self.proc.returncode
-	
-	
-	def reply_frame(self, data):
-		
-		if (SHOW_TRAFFIC):
-			#put('>> Replying %d bytes' % len(data))
-			put('>> Replying %d bytes: (%02X) %s' % (len(data), len(data), ' '.join(['%02X' % b for b in data]) ))
-		
-		# Binary protocol
-		self.mame_write_byte(len(data))	# Length
-		#time.sleep(.1)
-		
-		for c in data:
-			self.mame_write_byte(c)	# Data
-			#time.sleep(.1)
-		
-		# Flush
-		for i in range(4):
-			self.mame_write_byte(0)	#@FIXME: Do not do this! Might destroy sync!
-			#time.sleep(.01)
+		#put('TX: ACK received.')
 		
 	
 
-class Host_Serial_hex(Host):
-	"""Using serial protocol, with synch and checksum"""
-	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, *args, **kwargs):
-		Host.__init__(self, throttle=DMA_THROTTLE, *args, **kwargs)
-		
-		# Serial state
-		self.port = port
-		self.baud = baud
-		self.ser = None
+
+class Protocol_hex(Protocol):
+	"""Hex protocol with sync, checksum and retransmission"""
 	
-	def __del__(self):
-		self.serial_close()
+	def readline(self):
+		# Receive one line of text
+		data = []
+		while True:
+			b = self.read_byte()
+			if b in [ 10, 13 ]:
+				break
+			#@TODO: Filter out non-ascii / non-hex characters?
+			data.append(b)
+		
+		#@TODO: Try/catch if corrupted bytes
+		line = bytes(data).decode('ascii')
 	
-	def open(self):
-		self.serial_open()
 	
-	def serial_open(self):
-		self.ser = None
-		port = self.port
-		put('Opening "%s"...' % port)
+	def receive_frame(self):
+		"""Receive new frame from driver (blocking)"""
 		
-		try:
-			self.ser = serial.Serial(port=port, baudrate=self.baud, bytesize=8, parity='N', stopbits=1, timeout=3, xonxoff=0, rtscts=0)
-			put('Open!')
-			self.is_open = True
-			return True
-		except serial.serialutil.SerialException as e:
-			#except e:
-			put('Error opening serial device: %s' % str(e))
-			self.is_open = False
-			return False
-	
-	def serial_close(self):
-		self.running = False
-		time.sleep(0.2)
-		
-		if (self.ser is not None):
-			self.ser.close()
-			self.ser = None
-	
-	def serial_write(self, data):
-		if self.ser is None:
-			put('! Cannot send data, because serial is not open!')
-			return False
-		
-		if (SHOW_TRAFFIC): put('>>> "%s"' % str_hex(data.strip()))
-		self.ser.write(data)
-		#self.ser.flush()	#?
-	
-	def serial_readline(self, timeout=1):
-		r = ''
-		start_time = time.time()
-		end_time = start_time + timeout
-		data = ''
-		while (time.time() < end_time):
-			if (self.ser.in_waiting > 0):
-				data = self.ser.readline().strip()
-				if (SHOW_TRAFFIC): put('<<< "%s"' % str_hex(data))
-				
-				# Weird... I get a lot of 0xFF....
-				#while (len(data) > 0) and (ord(data[0]) == 0xff):
-				#	data = data[1:]
-				#put('<<< "%s"' % str_hex(data))
-				
-				return data
-				#end_time = time.time() + timeout	# Extend timeout
-			else:
-				time.sleep(0.05)
-		put('Timeout!')
-		return None
-	
-	def run(self):
-		self.serial_run()
-	
-	def serial_run(self):
-		"Main loop"
-		self.running = True
-		
-		put('Ready.')
-		line = ''
-		while(self.running):
-			if (self.ser.in_waiting > 0):
-				l = self.serial_readline()
-				if l is not None:
-					self.serial_handle_frame(l)
-			else:
-				# Idle
-				time.sleep(0.01)
-	
-	def reply_frame(self, data):
-		"Reply data inside a frame"
-		frame = []
-		l = len(data)
-		frame.append(l)
-		
-		check = l
-		for i in range(l):
-			b = data[i]
-			frame.append(b)
-			check ^= b
-		
-		frame.append(check)
-		
-		line = 'UU' + ''.join(('%02X' % b) for b in frame) + '\n'
-		acked = False
-		check_str = '%02X' % check
-		
-		# Send without checksum check
-		#self.write(line)
-		
-		# Check checksum, resend if wrong/not rcvd
-		
-		while not acked:
-			self.write(line)
-			
-			# Wait for checksum answer!
-			answer = self.readline()
-			
-			# Strip "U"
-			while ((answer is not None) and (len(answer) > 0) and (answer[0] == 'U')):
-				answer = answer[1:]
-			#put('Compare %02X vs "%s"' % (check, answer))
-			if (answer == check_str):
-				acked = True
-			else:
-				put('ACK wrong (expected "%s", got "%s"). Re-sending...' % (check_str, answer))
-				acked = False
-				time.sleep(0.05)
-		#
-	
-	def serial_handle_frame(self, line):
-		"Handle incoming raw data, check for validity, acknowledge and pass on to parser"
-		#put('Parsing serial frame...')
-		
+		line = self.readline()
 		lline = len(line)
 		
 		# Skip garbage until sync
@@ -1020,144 +904,241 @@ class Host_Serial_hex(Host):
 		#put('Ack...')
 		# Throttle...
 		#time.sleep(0.05)
-		self.write('%02X' % (check_actual))
+		ca = b'%02X' % check_actual
+		self.write_byte(ca[0])
+		self.write_byte(ca[1])
 		#put('Serial frame has been received OK! l=%d, data="%s"' % (len(data), str_hex(''.join(chr(b) for b in data) ) ))
-		self.handle_frame(data)
 		
+		return data
+	
+	
+	def send_frame(self, data):
+		"""Send new frame to driver"""
+		
+		frame = []
+		l = len(data)
+		frame.append(l)
+		
+		check = l
+		for i in range(l):
+			b = data[i]
+			frame.append(b)
+			check ^= b
+		
+		frame.append(check)
+		
+		line = 'UU' + ''.join(('%02X' % b) for b in frame) + '\n'
+		acked = False
+		check_str = '%02X' % check
+		
+		# Send without checksum check
+		#self.write(line)
+		
+		# Check checksum, resend if wrong/not rcvd
+		
+		while not acked:
+			#self.write(line)
+			for c in line:
+				self.write_byte(ord(c))
+			
+			# Wait for checksum answer!
+			answer = self.readline()
+			
+			# Strip "U"
+			while ((answer is not None) and (len(answer) > 0) and (answer[0] == 'U')):
+				answer = answer[1:]
+			#put('Compare %02X vs "%s"' % (check, answer))
+			if (answer == check_str):
+				acked = True
+			else:
+				put('ACK wrong (expected "%s", got "%s"). Re-sending...' % (check_str, answer))
+				acked = False
+				time.sleep(0.05)
+		#
+		
+		if callable(self.finish_frame): self.finish_frame()
 	
 
-class Host_Serial_binary(Host):
-	"""Using just binary frames (error prone)"""
-	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, *args, **kwargs):
-		Host.__init__(self, throttle=DMA_THROTTLE, *args, **kwargs)
-		
-		# Serial state
-		self.port = port
-		self.baud = baud
-		self.ser = None
+
+
+### Drivers (i.e. hardware abstraction)
+class Driver:
+	"""Abstract driver, e.g. serial or MAME"""
+	def open(self):
+		pass
+	def close(self):
+		pass
+	def update(self):
+		return True	# While running
+	def read_byte(self):
+		#if SHOW_TRAFFIC_BYTES: put('< 0x%02X' % b)
+		#return b
+		pass
+	def write_byte(self, b):
+		#if SHOW_TRAFFIC_BYTES: put('> 0x%02X' % b)
+		pass
+
+
+class Driver_MAME(Driver):
+	"""MAME Emulator driver (using stdin/stdout for communication)"""
 	
-	def __del__(self):
-		self.serial_close()
+	def __init__(self, emusys='gl4000', rompath='./roms', cart_file=None, buffer_size=3):
+		Driver.__init__(self)
+		
+		#@FIXME: Use tools/mame.py to handle the MAME communication
+		self.proc = None
+		
+		self.emusys = emusys
+		self.rompath = rompath
+		self.cart_file = cart_file
+		
+		self.buffer_size = buffer_size	# HEX HEX newline = 3 bytes
+	
+	def keep_alive(self):
+		if self.proc is None: return
+		
+		if self.proc.poll() is not None:
+			self.is_open = False
+			self.close()
+			raise Exception('Process closed while polling.')
 	
 	def open(self):
-		self.serial_open()
+		put('Starting MAME...')
+		#@FIXME: Use tools/mame.py to handle the MAME communication
+		start_new_thread(self._open_thread, ())
+		while self.proc is None:
+			time.sleep(0.1)	# Wait until running
 	
-	def serial_open(self):
-		self.ser = None
-		port = self.port
-		put('Opening "%s"...' % port)
+	def _open_thread(self):
+		self.is_open = False
 		
-		try:
-			self.ser = serial.Serial(port=port, baudrate=self.baud, bytesize=8, parity='N', stopbits=1, timeout=3, xonxoff=0, rtscts=0)
-			put('Open!')
-			self.is_open = True
-			return True
-		except serial.serialutil.SerialException as e:
-			#except e:
-			put('Error opening serial device: %s' % str(e))
-			self.is_open = False
-			return False
+		#@FIXME: Use tools/mame.py to handle the MAME communication
+		cmd = MAME_CMD
+		cmd += ' -nodebug'
+		if self.rompath is not None: cmd += ' -rompath %s' % self.rompath
+		cmd += ' %s' % self.emusys
+		if self.cart_file is not None: cmd += ' -cart %s' % self.cart_file
+		cmd += ' -window'
+		cmd += ' -nomax'
+		cmd += ' -nofilter'
+		cmd += ' -sleep'
+		cmd += ' -volume -24'
+		#cmd += ' -skip_disclaimer'	# When set: process ends immediately :-(
+		cmd += ' -skip_gameinfo'
+		cmd += ' -speed %.2f' % 1.0	#2.0
+		cmd += ' -nomouse'
+		
+		#self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
+		### https://stackoverflow.com/questions/1606795/catching-stdout-in-realtime-from-subprocess
+		#self.proc = subprocess.Popen('stdbuf -o0 '+ cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
+		self.proc = subprocess.Popen(
+			#cmd,
+			'stdbuf -i%d -o%d %s' % (self.buffer_size, self.buffer_size, cmd),	# use with bufsize=0
+			
+			stdin=subprocess.PIPE,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE,
+			shell=True,
+			
+			#close_fds=False,	# Use close_fds=False on unix, close_fds=True on linux
+			
+			#bufsize=self.buffer_size
+			bufsize=0	# 0=unbuffered, 1=line buffered, n=buffer ~n bytes
+		)
+		put('Start return code: %s' % str(self.proc.returncode))
+		
+		self.is_open = True
+		while self.is_open:
+			# Keep active
+			self.keep_alive()
+			time.sleep(0.01)
 	
-	def serial_close(self):
-		self.running = False
-		time.sleep(0.2)
-		
-		if (self.ser is not None):
-			self.ser.close()
-			self.ser = None
+	def close(self):
+		if self.proc is not None:
+			self.proc.communicate()	# Close PIPE
 	
-	def serial_write(self, data):
-		if self.ser is None:
-			put('! Cannot send data, because serial is not open!')
-			return False
-		
-		if (SHOW_TRAFFIC): put('>>> %s' % str(data))
-		self.ser.write(data)
-		#self.ser.flush()	#?
+	def read_byte(self):
+		while True:
+			# Do not hang
+			self.keep_alive()
+			
+			#s = self.proc.stdout.read(2)
+			s = self.proc.stdout.readline()	# Read 2-digit HEX with trailing newline
+			#put('read="%s"' % str(s))
+			try:
+				v = int(s, 16)
+				if SHOW_TRAFFIC_BYTES: put('< 0x%02X' % v)
+				return v
+			except ValueError:
+				put('Got non-hex data from stdout: %s' % str_hex(s))
+			#
+			time.sleep(0.01)
+		#
 	
-	def run(self):
-		self.serial_run()
+	def write_byte(self, b):
+		if SHOW_TRAFFIC_BYTES: put('> 0x%02X' % b)
+		self.proc.stdin.write(bytes('%2X\n' % b, 'ascii'))
 	
-	def serial_run(self):
-		"Main loop"
-		self.running = True
-		
-		put('Ready.')
-		line = ''
-		while(self.running):
-			if (self.ser.in_waiting > 0):
-				f = self.serial_read_frame()
-				if f is not None:
-					self.serial_handle_frame(f)
-			else:
-				# Idle
-				time.sleep(0.01)
+	def finish_frame(self):
+		# Flush STDIN
+		for i in range(3):
+			self.write_byte(0)	#@FIXME: Do not do this! Might destroy sync!
+			#time.sleep(.01)
+		pass
 	
-	def reply_frame(self, data):
-		"Reply data inside a frame"
+	def update(self):
+		#r = self.proc.poll()
 		
+		#if (r is None):
+		if self.is_open:
+			# Still running
+			
+			"""
+			# Handle BINARY protocol (length, data)
+			l = self.mame_read_byte()
+			data = []
+			for i in range(l):
+				data.append(self.mame_read_byte())
+			
+			if (SHOW_TRAFFIC):
+				put('<< Got %d bytes: %s' % (l, ' '.join(['%02X' % b for b in data]) ))
+			
+			self.handle_frame(data)
+			"""
+			# Flush while idle?
+			#for i in range(4): self.write_byte(0)	#@FIXME: Do not do this! Might destroy sync!
+			
+			return True	# True = driver is running
+			
+		else:
+			# Process ended!
+			#put('MAME ended! Poll returned: %s' % str(r))
+			put('MAME ended!')
+			return False	# False = driver stopped
 		
-		frame = [ len(data) ] + data
-		
-		# Prepend and pad with zero bytes (for synching, they get ignored as zero-length frames)
-		#frame = [ 0 ] * 8 + [ len(data) ] + data + [ 0 ] * 8
-		
-		# Pre-padding (to give some time and sync)
-		#self.serial_write(bytes( [0] * 4 ))
-		
-		# Send frame
-		#self.serial_write(bytes(frame))
-		self.serial_write(bytes([0] * 4 + frame))	# With some sync-bytes
-		
-		# Post padding (to give some time)
-		#self.serial_write(bytes( [0] * 4 ))
-		
-	
-	def serial_read_frame(self):
-		while (self.ser.in_waiting == 0): time.sleep(0.01)
-		l = self.ser.read(1)[0]
-		while (self.ser.in_waiting < l): time.sleep(0.01)
-		data = self.ser.read(l)
-		return list(data)	# Convert bytes to list
-	
-	def serial_handle_frame(self, f):
-		"Handle incoming raw data"
-		
-		self.handle_frame(f)
+		#time.sleep(0.01)	# Throttle a little
+		#put('Exit with returncode="%s"' % (str(p.returncode)))
+		#return self.proc.returncode
 	
 
-
-def bdos_host_checksum(data):
-	check = BDOS_HOST_CHECK_INIT
-	for b in data:
-		#check ^= b
-		check = ((check << 1) & 0xff) ^ b
-	return check
-
-class Host_Serial_binary_safe(Host):
-	"""Using just binary frames with checksum and retransmission"""
-	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, stopbits=1, *args, **kwargs):
-		Host.__init__(self, throttle=DMA_THROTTLE, *args, **kwargs)
+class Driver_serial(Driver):
+	"""Serial driver"""
+	def __init__(self, port=SERIAL_PORT, baud=SERIAL_BAUD, stopbits=1):
+		Driver.__init__(self)
 		
 		# Serial state
 		self.port = port
 		self.baud = baud
 		self.stopbits = stopbits
 		self.ser = None
-	
-	def __del__(self):
-		self.serial_close()
+		self.is_open = False
 	
 	def open(self):
-		self.serial_open()
-	
-	def serial_open(self):
 		self.ser = None
 		port = self.port
 		put('Opening "%s"...' % port)
 		
 		try:
-			#self.ser = serial.Serial(port=port, baudrate=self.baud, bytesize=8, parity='N', stopbits=1, timeout=3, xonxoff=0, rtscts=0)
 			self.ser = serial.Serial(
 				port=port,
 				baudrate=self.baud,
@@ -1168,163 +1149,53 @@ class Host_Serial_binary_safe(Host):
 				xonxoff=0,
 				rtscts=0
 			)
+			
 			put('Open!')
 			self.is_open = True
 			return True
 		except serial.serialutil.SerialException as e:
 			#except e:
-			put('Error opening serial device: %s' % str(e))
+			#put('Error opening serial device: %s' % str(e))
 			self.is_open = False
+			self.close()
+			raise e
 			return False
 	
-	def serial_close(self):
-		self.running = False
-		time.sleep(0.2)
-		
+	def close(self):
 		if (self.ser is not None):
 			self.ser.close()
 			self.ser = None
 	
-	def serial_write(self, data):
+	def read_byte(self):
+		while (self.ser.in_waiting == 0):
+			time.sleep(0.01)
+		r = self.ser.read(1)[0]
+		
+		if SHOW_TRAFFIC_BYTES: put('< 0x%02X' % r)
+		return r
+	
+	def write_byte(self, b):
 		if self.ser is None:
 			put('! Cannot send data, because serial is not open!')
 			return False
 		
-		if (SHOW_TRAFFIC): put('>>> %s' % str(data))
-		self.ser.write(data)
+		if SHOW_TRAFFIC_BYTES: put('> 0x%02X' % b)
+		
+		self.ser.write(bytes([ b ]))
 		#self.ser.flush()	#?
 	
-	def run(self):
-		self.serial_run()
+	def finish_frame(self):
+		pass
 	
-	def serial_run(self):
-		"Main loop"
-		self.running = True
-		
-		put('Ready.')
-		line = ''
-		while(self.running):
-			if (self.ser.in_waiting > 0):
-				f = self.serial_read_frame()
-				if f is not None:
-					self.serial_handle_frame(f)
-			else:
-				# Idle
-				time.sleep(0.01)
-				
-				# Flush
-				#self.serial_write(bytes([ 0x00 ]))	# 0x00 is ignored as a frame start
-				
-	
-	def reply_frame(self, data):
-		"Reply data inside a frame"
-		
-		put('>>> %d bytes...' % len(data))
-		
-		# Calculate checksum
-		check = bdos_host_checksum(data)
-		
-		frame = [ len(data) ] + data + [ check ]
-		
-		while True:
-			#while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
-			#time.sleep(0.1)
-			
-			# Send frame
-			#self.serial_write(bytes(frame))
-			self.serial_write(bytes( [0]*16 + frame ))	# Include pre-padding in same call (works great!)
-			#self.serial_write(bytes( [0] * 16 ))	# Post-padding to flush
-			
-			# Wait for ACK/NAK
-			"""
-			put('Waiting for ACK/NAK...')
-			timeout = 50
-			while (self.ser.in_waiting == 0) and (timeout > 0):
-				time.sleep(0.01)
-				#self.serial_write(bytes( [0] * 2 ))	# Flush
-				timeout -= 1
-			
-			# Check for timeout
-			if timeout <= 0:
-				put('TX: Timeout waiting for ACK/NAK! Re-transmitting...')
-				#time.sleep(0.1)
-				continue
-				#put('TX: Timeout waiting for ACK/NAK! Stopping TX!')
-				#return
-			
-			#@FIXME: I have no clue why it always keeps sending 0x28!
-			#while r not in (0xaa, 0x99):
-			#r = self.ser.read(1)[0]
-			"""
-			r = self.ser.read(1)
-			if len(r) != 1:
-				put('!! TX: received ACK/NAK [ %s ]' % (' '.join(['0x%02X'%b for b in r ])))
-			r = r[-1]	# Take last byte
-			
-			# Check for ACK
-			if r == BDOS_HOST_STATUS_ACK: break	# ACK received!
-			
-			if r != BDOS_HOST_STATUS_NAK:
-				put('!! TX: Invalid response!!! (%d / 0x%02X)!' % (r, r))
-				time.sleep(2)
-				#put('TX: Invalid response!!!! Stopping TX...')
-				#return
-			
-			# No ACK. Repeat!
-			put('TX: NAK received (0x%02X)!' % r)
-			#time.sleep(0.1)
-			#while (self.ser.in_waiting > 0): self.ser.read()	# Flush inputs
-			put('TX: Re-transmitting...')
-		#
-		
-		put('TX: OK, ACK received.')
-		
-	
-	def serial_read_frame(self):
-		
-		while True:
-			# Receive length
-			#while (self.ser.in_waiting == 0): time.sleep(0.01)
-			l = self.ser.read(1)[0]
-			
-			# Receive data
-			#while (self.ser.in_waiting < l): time.sleep(0.01)
-			data = self.ser.read(l)
-			
-			# Receive checksum
-			#while (self.ser.in_waiting == 0): time.sleep(0.01)
-			check_received = self.ser.read(1)[0]
-			
-			# Calculate checksum
-			check = bdos_host_checksum(data)
-			
-			# Check
-			if check_received == check: break	# Checksums OK!
-			
-			# Not OK: Send NAK
-			put('RX: Checksum mismatch rx=0x%02X != 0x%02X! Sending NAK...' % (check_received, check))
-			time.sleep(0.02)
-			#self.serial_write(bytes( [0] * 16 ))	# Pre-padding to sync
-			self.serial_write(bytes([ BDOS_HOST_STATUS_NAK ]))	# Anything but 0xAA
-			#self.serial_write(bytes( [0] * 16 ))	# Post-padding to flush
-		#
-		
-		# Send ACK
-		put('RX: OK, sending ACK')
-		time.sleep(0.02)
-		#self.serial_write(bytes( [0] * 4 ))	# Pre-padding to sync
-		self.serial_write(bytes([ BDOS_HOST_STATUS_ACK ]))
-		#self.serial_write(bytes( [0] * 16 ))	# Post-padding to flush
-		#time.sleep(0.05)	# Throttle
-		
-		return list(data)	# Convert bytes to list
-	
-	def serial_handle_frame(self, f):
-		"Handle incoming raw data"
-		
-		self.handle_frame(f)
+	def update(self):
+		if (self.ser.in_waiting == 0):
+			# Idle
+			time.sleep(0.01)
+		return True
 	
 
+
+### Main
 
 def show_help():
 	put(__doc__)
@@ -1356,20 +1227,26 @@ if __name__ == '__main__':
 		elif opt in ('-i', '--input'):
 			bin_filename = arg
 	
-	#comp = Host_Serial_hex(port=port, baud=baud)
-	#comp = Host_Serial_binary(port=port, baud=baud)
-	comp = Host_Serial_binary_safe(port=port, baud=baud, stopbits=2)	# More stopbits = more time to process?
-	#comp = Host_MAME()
 	
-	comp.open()
+	# Chose a driver
+	driver = Driver_serial(port=port, baud=baud, stopbits=2)	# More stopbits = more time to process?
+	#driver = Driver_MAME(cart_file='./out/cpm_cart.bin')
 	
-	if not comp.is_open:
+	# Chose a protocol
+	#protocol = Protocol_binary()	# For MAME
+	protocol = Protocol_binary_safe()	# For serial. Recommended.
+	#protocol = Protocol_hex()	# Old text-only protocol
+	
+	# Start host
+	host = Host(driver=driver, protocol=protocol, mounts=BDOS_MOUNTS)
+	host.open()
+	
+	if not host.is_open:
 		put('Connection could not be opened. Aborting.')
 		sys.exit(4)
 	
 	#put('Loading binary file "%s"...' % (bin_filename))
-	#comp.upload(bin_filename)
-	comp.run()
-	
+	#host.upload(bin_filename)
+	host.run()
 	
 	put('End.')
