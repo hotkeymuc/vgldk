@@ -34,17 +34,6 @@
 	#error "VGLDK_SERIES must be defined"
 #endif
 
-/*
-// Try having this function be the first define in the whole code segment
-// So one can can just jump to the first byte to get things rolling
-void vgldk_init();	// Forward
-void vgldk_entry() __naked {
-	__asm
-		jp	vgldk_init
-	__endasm;
-}
-*/
-
 
 // #include <arch/#VGLDK_ARCH/system.h>
 // #include <system.h>
