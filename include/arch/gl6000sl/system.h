@@ -3,8 +3,18 @@
 
 /*
 
-System header for the VTech Genius LEADER 6000SL / PreComputer Prestige
-also works for the 7007SL
+System header for
+	VTech Genius LEADER 6000 SL and 7007SL.
+
+Other international names:
+	- Genius Leader Power Notebook
+	- Genius 6000 (French version of Genius Leader 6000 SL)
+	- Genius 6500 Duo (alternate French version of Genius Leader 6000 SL)
+	- Talking Whiz-Kid Einstein (English version of Genius Leader Power Notebook)
+	- Talking Whiz-Kid Einstein Mouse (alternate English version of Genius Leader Power Notebook)
+	- YENO Compusavant
+	- Prestige
+	- ...
 
 TODO:
 	Shutdown: out 0x0b:=0 (YENO Compusavant Emulator)
@@ -195,7 +205,6 @@ Intro sound port accesses at 0x2x?:
 
 //#define VGLDK_STDIN_GETS stdio_gets
 //#define VGLDK_STDIN_INKEY keyboard_inkey
-
 
 void vgldk_init() __naked {
 	__asm

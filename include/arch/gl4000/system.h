@@ -1,13 +1,15 @@
-#ifndef __GL4000_H
-#define __GL4000_H
+#ifndef __GL4000_SYSTEM_H
+#define __GL4000_SYSTEM_H
 /*
-Header for
-	VTech Genius LEADER 4000 Quadro
-	VTech Genius LEADER 4004 Quadro L
-	(CompuSavant?)
+Header file for
+	VTech Genius LEADER 4000 Quadro (or 4004 Quadro L)
 
+Other international names:
+	- Genio 2000 (Spanish version of Genius Leader 4000 Quadro)
+	- Genius 4000 (French version of Genius Leader 4000 Quadro)
+	- PreComputer Power Pad (English version of Genius Leader 4000 Quadro)
 
-for use with SDCC compiler
+(for use with SDCC compiler)
 
 2020-01-21 by Bernhard "HotKey" Slawik
 */
@@ -24,8 +26,13 @@ for use with SDCC compiler
 // Keyboard
 #include "keyboard.h"
 
+// Non-essential (but fun) features:
+
 // Sound
 #include "sound.h"
+
+// LED
+#include "led.h"
 
 
 // Publish function NAMES for STDIO
@@ -58,23 +65,19 @@ void vgldk_init() __naked {
 }
 
 /*
-void vgl_shutdown() {
-	port_0x12_out(0x01);	// BIOS4000 0181
+void shutdown() {
 	__asm
-		halt
-	__endasm;
-
-}
-void vgl_shutdown() {
-	__asm
-		;; V-Tech power down:
+		; V-Tech power down:
+		
+		; LCD off?
 		ld	a, 1
 		out	(0ah), a
 		
+		; Power off
 		ld	a, 1
 		out	(12h), a
 		halt
 	__endasm;
 }
 */
-#endif
+#endif	// __GL4000_SYSTEM_H
