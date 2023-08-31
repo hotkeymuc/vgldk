@@ -6,10 +6,9 @@ V-Tech Genius Leader Sound
 2019-07-10 Bernhard "HotKey" Slawik
 */
 
-void vgl_sound_off() {
+void sound_off() {
 __asm
 	; Speaker off
-	;ld	a, #0x00	; +20h
 	
 	in	a, (0x12)
 	and	#0xf7
@@ -19,7 +18,7 @@ __asm
 __endasm;
 }
 
-void vgl_sound_tone(word frq, word len) {
+void sound_tone(word frq, word len) {
 	// Perform a beep (frq is actually a delay...)
 	(void)frq;	// suppress warning "unreferenced function argument"
 	(void)len;	// suppress warning "unreferenced function argument"
@@ -62,13 +61,14 @@ void vgl_sound_tone(word frq, word len) {
 		
 		; Actual sound loop
 		_sound_loop:
+			;@TODO: Only set/clear the 0x08 bit (bit 3)
 			; Speaker on
-			ld	a, #0x08	; +20h
+			ld	a, #0x08
 			out	(0x12), a
 			call _sound_delay
 			
 			; Speaker off
-			ld	a, #0x0	; +20h
+			ld	a, #0x0
 			out	(0x12), a
 			call _sound_delay
 		
@@ -111,10 +111,8 @@ void vgl_sound_tone(word frq, word len) {
 }
 
 
-// General names
-#define sound_off vgl_sound_off
-#define sound_tone vgl_sound_tone
-
+// Higher level
+#ifdef SOUND_NOTE
 void sound_note(word n, word len) {
 	word frq;
 	
@@ -137,8 +135,14 @@ void sound_note(word n, word len) {
 	len = 150 * (len / frq);	// Length to wave length, correcting for rough milliseconds
 	sound_tone(frq, len);
 }
-
 void beep() {
 	sound_note(12*4+0, 0x0111);
 }
+#else
+void beep() {
+	sound_tone(0x0900 << 4, 0x0111);
+}
+#endif
+
+
 #endif // __VGL_SOUND_H

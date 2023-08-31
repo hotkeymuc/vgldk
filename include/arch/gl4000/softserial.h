@@ -50,6 +50,13 @@ Here it is again, in order:
 */
 
 
+// Features to include
+#define SOFTSERIAL_ISREADY	// Include "serial_isReady" to check if serial is connected or not
+#define SOFTSERIAL_PUTS	// Include "serial_puts" to output a string at once
+#define SOFTSERIAL_GETS	// Include "serial_gets" to read a string at once
+
+
+
 // Hardware helpers
 /*
 byte port_in_0x10() __naked {
@@ -382,37 +389,6 @@ void serial_putchar(byte c) {
 }
 
 
-void serial_puts(const char *s) {
-	byte l;
-	const char *c;
-	
-	// Determine length
-	c = s;
-	l = 0;
-	while (*c != 0) {
-		c++;
-		l++;
-	}
-	
-	serial_put((byte *)s, l);
-}
-
-byte serial_isReady() __naked {
-__asm
-	in	a, (0x11)	; Get printer status
-	cp	#0x5f
-	jr	nz, _serial_isReady_not
-
-_serial_isReady_yes:
-	ld	l, #1
-	ret
-
-_serial_isReady_not:
-	ld	l, #0
-	ret
-__endasm;
-}
-
 int serial_getchar_nonblocking() __naked {
 // Return byte
 // If in "less blocking" mode, it returns "0" if no data was detected. In blocking mode all data is received
@@ -602,6 +578,46 @@ byte serial_getchar() {
 	//return c;
 }
 
+
+// More functionality (configurable)
+
+
+#ifdef SOFTSERIAL_ISREADY
+byte serial_isReady() __naked {
+__asm
+	in	a, (0x11)	; Get printer status
+	cp	#0x5f
+	jr	nz, _serial_isReady_not
+
+_serial_isReady_yes:
+	ld	l, #1
+	ret
+
+_serial_isReady_not:
+	ld	l, #0
+	ret
+__endasm;
+}
+#endif
+
+#ifdef SOFTSERIAL_PUTS
+void serial_puts(const char *s) {
+	byte l;
+	const char *c;
+	
+	// Determine length
+	c = s;
+	l = 0;
+	while (*c != 0) {
+		c++;
+		l++;
+	}
+	
+	serial_put((byte *)s, l);
+}
+#endif
+
+#ifdef SOFTSERIAL_GETS
 byte *serial_gets(byte *serial_get_buf) {
 	int c;
 	byte *b;
@@ -628,4 +644,6 @@ byte *serial_gets(byte *serial_get_buf) {
 	// Return buf (like stdlib gets())
 	return serial_get_buf;
 }
+#endif
+
 #endif //__VGL_SOFTSERIAL_H

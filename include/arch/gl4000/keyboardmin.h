@@ -150,7 +150,7 @@ byte keyboard_inkey() {
 
 
 // Return "true" if a key is pressed
-byte keyboard_checkkey() {
+byte keyboard_ispressed() {
 	
 	byte b1;
 	//byte b2;

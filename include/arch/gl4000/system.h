@@ -24,12 +24,20 @@ Other international names:
 #include <driver/hd44780.h>
 
 // Keyboard
-#include "keyboard.h"
+#ifdef KEYBOARD_MINIMAL
+	// Use minimal keyboard
+	#include "keyboardmin.h"
+#else
+	#include "keyboard.h"
+#endif
 
 // Non-essential (but fun) features:
 
 // Sound
 #include "sound.h"
+
+// Printer
+//#include "printer.h"
 
 // LED
 #include "led.h"
