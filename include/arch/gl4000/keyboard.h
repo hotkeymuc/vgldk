@@ -17,13 +17,13 @@ VTech Genius Leader Keyboard
 #define KEYBOARD_PORT_ROW_OUT 0x10
 #define KEYBOARD_PORT_COL_IN 0x10
 #define KEYBOARD_PORT_COL_IN2 0x11
-__sfr __at KEYBOARD_PORT_ROW_OUT keyboard_port_matrixRowOut;
-__sfr __at KEYBOARD_PORT_COL_IN keyboard_port_matrixColIn;
-__sfr __at KEYBOARD_PORT_COL_IN2 keyboard_port_matrixColIn2;
+__sfr __at KEYBOARD_PORT_ROW_OUT keyboard_port_matrix_col_out;
+__sfr __at KEYBOARD_PORT_COL_IN keyboard_port_matrix1_row_in;
+__sfr __at KEYBOARD_PORT_COL_IN2 keyboard_port_matrix2_row_in;
 
 #ifdef KEYBOARD_LATCH
 	#define KEYBOARD_PORT_LATCH 0x11
-	__sfr __at KEYBOARD_PORT_LATCH keyboard_port_matrixLatch;
+	__sfr __at KEYBOARD_PORT_LATCH keyboard_port_matrix_latch;
 #endif
 
 /*
@@ -93,8 +93,8 @@ typedef byte scancode_t;
 #define KEY_MATRIX1_ROWS 8
 #define KEY_MATRIX1_COLS 8
 
-#define KEY_MATRIX2_ROWS 5	//@FIXME! Matrix2 has only 40 activities (8 * 5)
 #define KEY_MATRIX2_COLS 8
+#define KEY_MATRIX2_ROWS 5	// Matrix2 has only 40 activities (8 * 5)
 
 // Map SCANCODE to KEYCODE (which can be the final char)
 const keycode_t KEY_CODES[(KEY_MATRIX1_ROWS*KEY_MATRIX1_COLS) + (KEY_MATRIX2_ROWS*KEY_MATRIX2_COLS)] = {
@@ -157,18 +157,18 @@ byte keyboard_ispressed() {
 	
 	#ifdef KEYBOARD_LATCH
 		// Set all mux lines HIGH (although in original firmware, keyboard matrix works without it)
-		keyboard_port_matrixLatch = 0xff;
+		keyboard_port_matrix_latch = 0xff;
 	#endif
 	
 	// Set all outputs at the same time
-	keyboard_port_matrixRowOut = 0xff;
+	keyboard_port_matrix_col_out = 0xff;
 	
 	// Read back if anything is pressed at all
-	b1 = keyboard_port_matrixColIn;
-	b2 = keyboard_port_matrixColIn2;
+	b1 = keyboard_port_matrix1_row_in;
+	b2 = keyboard_port_matrix2_row_in;
 	
 	// Set MUX back to idle
-	keyboard_port_matrixRowOut = 0x00;
+	keyboard_port_matrix_col_out = 0x00;
 	
 	if (b1 < 0xff) return 1;	//b1;	// Some key is pressed on matrix 1
 	
@@ -184,7 +184,7 @@ byte keyboard_ispressed() {
 
 void keyboard_update() {
 	
-	byte mx, my;
+	byte ix, iy;
 	byte m, m2;
 	byte b1;
 	byte b2;
@@ -205,29 +205,29 @@ void keyboard_update() {
 		
 		#ifdef KEYBOARD_LATCH
 			// BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
-			keyboard_port_matrixLatch = 0xff;
+			keyboard_port_matrix_latch = 0xff;
 		#endif
 		
 		m = 0x01;	// Row bit mask
-		for (my = 0; my < KEY_MATRIX1_COLS; my++) {
+		for (ix = 0; ix < KEY_MATRIX1_COLS; ix++) {
 			// Send bit mask to MUXer
 			
 			// BIOS4000 01bc: Send bit mask to 0x10
-			keyboard_port_matrixRowOut = m;
+			keyboard_port_matrix_col_out = m;
 			
 			// Get matrix 1 state
-			b1 = keyboard_port_matrixColIn;
+			b1 = keyboard_port_matrix1_row_in;
 			
 			// Get matrix 2 state
-			b2 = keyboard_port_matrixColIn2;
+			b2 = keyboard_port_matrix2_row_in;
 			
 			// BIOS4000 01c7: Reset it back to 0x00
-			keyboard_port_matrixRowOut = 0x00;
+			keyboard_port_matrix_col_out = 0x00;
 			
 			// Check matrix input 1
 			if (b1 != 0xff) {
-				m2 = 0x01;	// Column bit mask
-				for (mx = 0; mx < KEY_MATRIX1_ROWS; mx++) {
+				m2 = 0x01;	// Bit mask
+				for (iy = 0; iy < KEY_MATRIX1_ROWS; iy++) {
 					if ((b1 & m2) == 0) {
 						// Return first bit found. We could handle simulataneous presses!
 						//return vgl_key_map[8 * row + col];
@@ -237,7 +237,7 @@ void keyboard_update() {
 						
 						// Store scan code
 						if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
-							keyboard_pressed_new[keyboard_num_pressed_new++] = mx*KEY_MATRIX1_ROWS + my;
+							keyboard_pressed_new[keyboard_num_pressed_new++] = iy*KEY_MATRIX1_ROWS + ix;
 					}
 					m2 = m2 << 1;
 				}
@@ -247,11 +247,11 @@ void keyboard_update() {
 			(void)b2;
 			(void)m2;
 			
-			if (b2 != 0xff) {	//@FIXME: Row 2 has only bits 0..4
-				m2 = 0x01;	// Column bit mask
+			if (b2 != 0xff) {
+				m2 = 0x01;	// Bit mask
 				
-				// Caution: Row 2 has only bits 0..4 (for a total of 40 activity buttons, including "ON" and "OFF")
-				for (mx = 0; mx < KEY_MATRIX2_ROWS; mx++) {
+				// Caution: Matrix 2 has only bits 0..4 (for a total of 40 activity buttons, including "ON" and "OFF")
+				for (iy = 0; iy < KEY_MATRIX2_ROWS; iy++) {
 					if ((b2 & m2) == 0) {
 						// Return first bit found. We could handle simulataneous presses!
 						//return vgl_key_map2[8 * row + col];
@@ -261,7 +261,7 @@ void keyboard_update() {
 						
 						// Store scan code
 						if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
-							keyboard_pressed_new[keyboard_num_pressed_new++] = (KEY_MATRIX1_ROWS*KEY_MATRIX1_COLS) + mx*KEY_MATRIX2_ROWS + my;
+							keyboard_pressed_new[keyboard_num_pressed_new++] = (KEY_MATRIX1_ROWS*KEY_MATRIX1_COLS) + iy*KEY_MATRIX2_COLS + ix;
 					}
 					m2 = m2 << 1;
 				}
