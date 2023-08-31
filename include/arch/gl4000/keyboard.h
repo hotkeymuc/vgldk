@@ -90,33 +90,31 @@ __endasm;
 typedef byte keycode_t;
 typedef byte scancode_t;
 
-#define KEY_MATRIX1_COLS 8
 #define KEY_MATRIX1_ROWS 8
+#define KEY_MATRIX1_COLS 8
 
-#define KEY_MATRIX2_COLS 5	//@FIXME! Matrix2 has only 40 activities (8 * 5)
-#define KEY_MATRIX2_ROWS 8
+#define KEY_MATRIX2_ROWS 5	//@FIXME! Matrix2 has only 40 activities (8 * 5)
+#define KEY_MATRIX2_COLS 8
 
 // Map SCANCODE to KEYCODE (which can be the final char)
-const keycode_t KEY_CODES[(KEY_MATRIX1_COLS*KEY_MATRIX1_ROWS) + (KEY_MATRIX2_COLS*KEY_MATRIX2_ROWS)] = {
+const keycode_t KEY_CODES[(KEY_MATRIX1_ROWS*KEY_MATRIX1_COLS) + (KEY_MATRIX2_ROWS*KEY_MATRIX2_COLS)] = {
 	
-	KEY_TAB,	KEY_BREAK,	'E',	'F',	'G',	'I',	'J',	'K',
-	KEY_CAPS, '1', 'q', 'a', 'y'/*'z'*/, KEY_ALT, KEY_SPACE, KEY_PLAYER_LEFT,
-	'2', '3', 'e', 's', 'd', 'x', 'c', 'w',
-	'4', '5', 't', 'f', 'g', 'v', 'b', 'r',
-	'6', '7', 'u', 'h', 'j', 'n', 'm', 'z' /*'y'*/,
-	'8', '9', 'o', 'k', 'l', ',', '.', 'i',
-	'0', KEY_REPEAT, 'ü' /*'='*/, 'ö' /*':' ';'*/, 'ä' /*'\''*/, '-'/*'/'*/, KEY_SHIFT, 'P',
-	'X', 'Y', (char)KEY_CURSOR_LEFT, (char)KEY_CURSOR_RIGHT, KEY_ENTER, KEY_PLAYER_RIGHT, KEY_ANSWER, 'Z',
+	// German layout
+	KEY_TAB,  	KEY_CAPS,       	'2',	'4',	'6',	'8',	'0',      	'X',                   
+	KEY_BREAK,	'1',            	'3',	'5',	'7',	'9',	KEY_REPEAT,	'Y',                   
+	'E',      	'q',            	'e',	't',	'u',	'o',	'ü',      	(char)KEY_CURSOR_LEFT, 
+	'F',      	'a',            	's',	'f',	'h',	'k',	'ö',      	(char)KEY_CURSOR_RIGHT,
+	'G',      	'y',            	'd',	'g',	'j',	'l',	'ä',      	KEY_ENTER,             
+	'I',      	KEY_ALT,        	'x',	'v',	'n',	',',	'-',      	KEY_PLAYER_RIGHT,      
+	'J',      	KEY_SPACE,      	'c',	'b',	'm',	'.',	KEY_SHIFT,	KEY_ANSWER,            
+	'K',      	KEY_PLAYER_LEFT,	'w',	'r',	'z',	'i',	'P',      	'Z',                   
 	
 	// Activities...
-	KEY_ACTIVITY(0x00), KEY_ACTIVITY(0x07), KEY_ACTIVITY(0x0e), KEY_ACTIVITY(0x16), KEY_ACTIVITY(0x1e),
-	KEY_ACTIVITY(0x01), KEY_ACTIVITY(0x08), KEY_ACTIVITY(0x0f), KEY_ACTIVITY(0x17), KEY_ACTIVITY(0x1f),
-	KEY_ACTIVITY(0x02), KEY_ACTIVITY(0x09), KEY_ACTIVITY(0x10), KEY_ACTIVITY(0x18), KEY_ACTIVITY(0x20),
-	KEY_ACTIVITY(0x03), KEY_ACTIVITY(0x0a), KEY_ACTIVITY(0x11), KEY_ACTIVITY(0x19), KEY_ACTIVITY(0x21),
-	KEY_ACTIVITY(0x04), KEY_ACTIVITY(0x0b), KEY_ACTIVITY(0x12), KEY_ACTIVITY(0x1a), KEY_ACTIVITY(0x22),
-	KEY_ACTIVITY(0x05), KEY_ACTIVITY(0x0c), KEY_ACTIVITY(0x13), KEY_ACTIVITY(0x1b), KEY_ACTIVITY(0x23),
-	KEY_ACTIVITY(0x06), KEY_ACTIVITY(0x0d), KEY_ACTIVITY(0x14), KEY_ACTIVITY(0x1c), KEY_ACTIVITY(0x24),
-	KEY_ON,             KEY_OFF,            KEY_ACTIVITY(0x15), KEY_ACTIVITY(0x1d), KEY_ACTIVITY(0x25),
+	KEY_ACTIVITY(0x00), KEY_ACTIVITY(0x01), KEY_ACTIVITY(0x02), KEY_ACTIVITY(0x03), KEY_ACTIVITY(0x04), KEY_ACTIVITY(0x05), KEY_ACTIVITY(0x06), KEY_ON,
+	KEY_ACTIVITY(0x07), KEY_ACTIVITY(0x08), KEY_ACTIVITY(0x09), KEY_ACTIVITY(0x0a), KEY_ACTIVITY(0x0b), KEY_ACTIVITY(0x0c), KEY_ACTIVITY(0x0d), KEY_OFF,
+	KEY_ACTIVITY(0x0e), KEY_ACTIVITY(0x0f), KEY_ACTIVITY(0x10), KEY_ACTIVITY(0x11), KEY_ACTIVITY(0x12), KEY_ACTIVITY(0x13), KEY_ACTIVITY(0x14), KEY_ACTIVITY(0x15),
+	KEY_ACTIVITY(0x16), KEY_ACTIVITY(0x17), KEY_ACTIVITY(0x18), KEY_ACTIVITY(0x19), KEY_ACTIVITY(0x1a), KEY_ACTIVITY(0x1b), KEY_ACTIVITY(0x1c), KEY_ACTIVITY(0x1d),
+	KEY_ACTIVITY(0x1e), KEY_ACTIVITY(0x1f), KEY_ACTIVITY(0x20), KEY_ACTIVITY(0x21), KEY_ACTIVITY(0x22), KEY_ACTIVITY(0x23), KEY_ACTIVITY(0x24), KEY_ACTIVITY(0x25),
 };
 
 #define KEYBOARD_PRESSED_MAX 6	// 4	// How many scancodes can be pressed at once (roll-over)
@@ -211,7 +209,7 @@ void keyboard_update() {
 		#endif
 		
 		m = 0x01;	// Row bit mask
-		for (my = 0; my < KEY_MATRIX1_ROWS; my++) {
+		for (my = 0; my < KEY_MATRIX1_COLS; my++) {
 			// Send bit mask to MUXer
 			
 			// BIOS4000 01bc: Send bit mask to 0x10
@@ -229,7 +227,7 @@ void keyboard_update() {
 			// Check matrix input 1
 			if (b1 != 0xff) {
 				m2 = 0x01;	// Column bit mask
-				for (mx = 0; mx < KEY_MATRIX1_COLS; mx++) {
+				for (mx = 0; mx < KEY_MATRIX1_ROWS; mx++) {
 					if ((b1 & m2) == 0) {
 						// Return first bit found. We could handle simulataneous presses!
 						//return vgl_key_map[8 * row + col];
@@ -239,7 +237,7 @@ void keyboard_update() {
 						
 						// Store scan code
 						if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
-							keyboard_pressed_new[keyboard_num_pressed_new++] = my*KEY_MATRIX1_COLS + mx;
+							keyboard_pressed_new[keyboard_num_pressed_new++] = mx*KEY_MATRIX1_ROWS + my;
 					}
 					m2 = m2 << 1;
 				}
@@ -253,7 +251,7 @@ void keyboard_update() {
 				m2 = 0x01;	// Column bit mask
 				
 				// Caution: Row 2 has only bits 0..4 (for a total of 40 activity buttons, including "ON" and "OFF")
-				for (mx = 0; mx < KEY_MATRIX2_COLS; mx++) {
+				for (mx = 0; mx < KEY_MATRIX2_ROWS; mx++) {
 					if ((b2 & m2) == 0) {
 						// Return first bit found. We could handle simulataneous presses!
 						//return vgl_key_map2[8 * row + col];
@@ -263,7 +261,7 @@ void keyboard_update() {
 						
 						// Store scan code
 						if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
-							keyboard_pressed_new[keyboard_num_pressed_new++] = (KEY_MATRIX1_COLS*KEY_MATRIX1_ROWS) + my*KEY_MATRIX2_COLS + mx;
+							keyboard_pressed_new[keyboard_num_pressed_new++] = (KEY_MATRIX1_ROWS*KEY_MATRIX1_COLS) + mx*KEY_MATRIX2_ROWS + my;
 					}
 					m2 = m2 << 1;
 				}
