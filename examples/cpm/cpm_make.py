@@ -120,7 +120,10 @@ def cpm_make():
 	src_path = '.'	# source directory
 	out_path = 'out'	# Output directory for the compiler
 	lib_path = None
-	include_path = '../../include'	# VGLDK include directory
+	include_paths = [
+		'../../include',
+		'../../include/arch/gl%d'%vgldk_series	# Architecture specific drivers
+	]
 	
 	### Set up the memory layout
 	loc_cart = 0x8000
@@ -140,7 +143,8 @@ def cpm_make():
 	# Set-up CCP layout
 	ccp_code_size_estimate = 0x0b80	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
 	#ccp_data_size_estimate = 0x0600	# Don't know... Just a guess...
-	ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
+	#ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
+	ccp_loc_code = loc_cart + 0x0020	# Put CCP at start of cartridge (leave ~0x20 bytes for cart header)
 	#ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
 	#ccp_loc_data = loc_internal_ram + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
 	ccp_loc_data = cpm_loc_data + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
@@ -153,6 +157,7 @@ def cpm_make():
 		
 		## Configure VGLDK hardware and drivers
 		'VGLDK_SERIES': vgldk_series,	# e.g. 4000 for GL4000
+		'KEYBOARD_MINIMAL': 1,	# Use minimal keyboard (no modifiers, no buffer) to save code space
 		'SOFTUART_BAUD': softuart_baud,	# SoftUART baud rate. Currently supported (2023-08) are 9600 or 19200
 		
 		## Configure BIOS
@@ -163,6 +168,7 @@ def cpm_make():
 		#'BIOS_SHOW_PAPER_TAPE_MAPPING': 1,	# Print the configured paper tape configuration on boot
 		'BIOS_PAPER_TAPE_TO_DISPLAY': 1,	# Redirect paper tape functions to display
 		#'BIOS_PAPER_TAPE_TO_SOFTUART': 1,	# Redirect paper tape functions to SoftUART
+		#'BIOS_PAPER_TAPE_TO_SOFTSERIAL': 1,	# Redirect paper tape functions to SoftSerial
 		#'BIOS_PAPER_TAPE_TO_MAME': 1,	# Redirect paper tape functions to MAME
 		
 		
@@ -176,13 +182,15 @@ def cpm_make():
 		
 		## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
 		'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
+		'BDOS_HOST_ACTIVITY_LED': 1,	# Light up LED on BDOS host activity
+	'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
+	#'BDOS_HOST_DRIVER_SOFTSERIAL': 1,	# Re-direct to SoftSerial (for use with real hardware)
+	#'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
 		#'BDOS_HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
-		'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
-		#'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
 		
 		# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
-		#'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
-		'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
+	#'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
+	'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
 		#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
 		
 		## Configure CCP
@@ -219,7 +227,7 @@ def cpm_make():
 		output_bin_file = cpm_bin_filename,
 		
 		lib_path = lib_path,	#'../../lib'
-		include_path = include_path,	#'../../include'
+		include_paths = include_paths,	#'../../include'
 		loc_code = cpm_loc_code,	#0x8000 - code_size_estimate	# Put CPM as far up as possible
 		loc_data = cpm_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
 		
@@ -272,7 +280,7 @@ def cpm_make():
 			output_bin_file = ccp_bin_filename,
 			
 			lib_path = lib_path,	#'../../lib'
-			include_path = include_path,	#'../../include'
+			include_paths = include_paths,	#'../../include'
 			loc_code = ccp_loc_code,	#0x8000 - code_size_estimate	# Put CPM as far up as possible
 			loc_data = ccp_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
 			
@@ -478,6 +486,8 @@ def cpm_make():
 			driver = bdos_host.Driver_MAME(rompath=MAME_ROMS_DIR, emusys=MAME_SYS, cart_file=cpm_cart_filename)
 		if 'BDOS_HOST_DRIVER_SOFTUART' in cpm_defines:
 			driver = bdos_host.Driver_serial(baud=softuart_baud, stopbits=2)	# More stopbits = more time to process?
+		if 'BDOS_HOST_DRIVER_SOFTSERIAL' in cpm_defines:
+			driver = bdos_host.Driver_serial(baud=9600, stopbits=1)
 		
 		# Chose a protocol
 		if 'BDOS_HOST_PROTOCOL_BINARY' in cpm_defines:
@@ -510,7 +520,7 @@ def compile(
 		output_hex_file = 'out/main.hex',
 		output_bin_file = 'out/main.bin',
 		lib_path = None,	#'../../lib'
-		include_path = '../../include',
+		include_paths = ['../../include'],
 		loc_code = 0x8000,	# 0x8000 for cartridge
 		loc_data = 0xc000,	# 0xc000 for internal RAM
 		defines = { 'VGLDK_SERIES': VGLDK_SERIES }
@@ -564,7 +574,9 @@ def compile(
 	
 	#@TODO: Allow multiple paths
 	if lib_path is not None: cmd += ' --lib-path %s' % lib_path
-	if include_path is not None: cmd += ' -I %s' % include_path
+	if include_paths is not None:
+		for include_path in include_paths:
+			cmd += ' -I %s' % include_path
 	
 	cmd += ' --code-loc 0x%04X' % loc_code
 	#if loc_stack is not None: cmd += ' --stack-loc 0x%04X' % loc_stack
@@ -622,7 +634,8 @@ def cpm_upload(data):
 	"""Upload binary to real hardware running the MONITOR ROM"""
 	
 	#comp = monitor.Monitor()
-	comp = monitor.Monitor(baud=19200)	# Requires monitor to be compiled using SoftUART and 19200 baud
+	#comp = monitor.Monitor(baud=19200)	# Requires monitor to be compiled using SoftUART and 19200 baud
+	comp = monitor.Monitor(baud=9600)	# Requires monitor to be compiled using SoftSerial or SoftUART at 9600 baud
 	comp.open()
 	
 	monitor.SHOW_TRAFFIC = False	# disable verbose traffic

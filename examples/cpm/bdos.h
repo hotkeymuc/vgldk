@@ -25,7 +25,8 @@
 //#define BDOS_USE_HOST	// Re-direct file operations to a host computer (which acts like an external drive). See bdos_host.h for more config!
 
 #ifndef CCP_LOC_CODE
-	#define CCP_LOC_CODE	0x6000	// Entry address of CCP binary
+	//#define CCP_LOC_CODE	0x4000	// Entry address of CCP binary
+	#error Please set CCP_LOC_CODE so that BDOS knows where to start it.
 #endif
 
 #include <basictypes.h>	// byte, word, true, false, NULL, ...

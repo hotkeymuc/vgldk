@@ -1,10 +1,15 @@
-#ifndef __BDOS_HOST_H__
-#define __BDOS_HOST_H__
+#ifndef __BDOS_HOST_H
+#define __BDOS_HOST_H
 
 /*
+BDOS Host
+=========
 
-This file contains functions to allow sending FCBs top a host.
-The host might be connected via serial (SoftUART) or be a MAME emulator running a virtual instance of CP/M.
+This file contains functions to allow sending and receiving files from an external host.
+The host might be a PC connected via serial (SoftUART / SoftSerial) or a (modified) MAME emulator
+running inside bdos_host.py
+
+In the long run, this might migrate into the BIOS instead of the BDOS.
 
 2023-08-22 Bernhard "HotKey" Slawik
 */
@@ -12,12 +17,15 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 // Hardware to use for communication (byte-level) - select ONE
 //#define BDOS_HOST_DRIVER_PAPER_TAPE	// Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
 //#define BDOS_HOST_DRIVER_SOFTUART	// Re-direct to SoftUART (for real hardware)
+//#define BDOS_HOST_DRIVER_SOFTSERIAL	// Re-direct to SoftSerial (for real hardware)
 //#define BDOS_HOST_DRIVER_MAME	// Re-direct to MAME (for emulation)
 
 // Protocol to use for communication (frame level) - select ONE
 //#define BDOS_HOST_PROTOCOL_BINARY	// Send using 8bit binary data (e.g. for MAME driver or reliable serial)
 //#define BDOS_HOST_PROTOCOL_BINARY_SAFE	// Send using binary, but with checksum and retransmission (e.g. SoftUART)
 //#define BDOS_HOST_PROTOCOL_HEX	// Send using hex text (if communication is not binary-proof)
+
+//#define BDOS_HOST_ACTIVITY_LED	// Light up the LED on disk access (if available on current architecture)
 
 #define BDOS_HOST_MAX_DATA 144	//128	// To dismiss too large frames
 #define BDOS_HOST_DMA_MAX_DATA 128	// Buffer size for DMA data
@@ -48,6 +56,13 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 	#define bdos_host_send_byte	softuart_sendByte
 	#define bdos_host_receive_byte	softuart_receiveByte	// non-blocking
 #endif
+#ifdef BDOS_HOST_DRIVER_SOFTSERIAL
+	// Use SoftUART functions
+	#include <softserial.h>	// Comes bespoke for each architecture
+	#define bdos_host_send_byte	serial_putchar
+	#define bdos_host_receive_byte	serial_getchar_nonblocking	// non-blocking
+	//#define bdos_host_receive_byte	serial_getchar	// blocking
+#endif
 #ifdef BDOS_HOST_DRIVER_MAME
 	// Use MAME functions
 	#include <driver/mame.h>
@@ -58,8 +73,10 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 // Make sure one driver is selected
 #ifndef BDOS_HOST_DRIVER_PAPER_TAPE
 	#ifndef BDOS_HOST_DRIVER_SOFTUART
-		#ifndef BDOS_HOST_DRIVER_MAME
-			#error One BDOS_HOST_DRIVER must be set (paper tape, SoftUART or MAME)!
+		#ifndef BDOS_HOST_DRIVER_SOFTSERIAL
+			#ifndef BDOS_HOST_DRIVER_MAME
+				#error One BDOS_HOST_DRIVER must be set (paper tape, SoftUART, SoftSerial or MAME)!
+			#endif
 		#endif
 	#endif
 #endif
@@ -69,27 +86,21 @@ The host might be connected via serial (SoftUART) or be a MAME emulator running 
 #define bdos_host_error(s)	;	// Be quiet!
 
 
-
-// Experiment: Light up SCROLL LOCK during disk access
-#if VGLDK_SERIES == 4000
-	// Using port 0x12:
-	//	* Toggle 0x04 to set/clear the STROBE pin (parallel port pin 1)
-	//	* Toggle 0x08 to let the piezo speaker buzz (2000)
-	//	* Toggle 0x20 to set the caps lock LED
-	__sfr __at 0x12 periphery_port;
-	
-	void bdos_host_activity_on() {
-		periphery_port |= 0x20;
-	}
-	void bdos_host_activity_off() {
-		periphery_port &= ~0x20;
-	}
+#ifdef BDOS_HOST_ACTIVITY_LED
+	//  Light up LED during disk access
+	//@FIXME: Should go to bios.c:bios_read and bios.c:bios_write
+	#if VGLDK_SERIES == 4000
+		#include <arch/gl4000/led.h>
+		#define bdos_host_activity_on	led_on
+		#define bdos_host_activity_off	led_off
+	#else
+		#error LED is currently not available on this architecture, but BDOS_HOST_ACTIVITY_LED is set.
+	#endif
 #else
-	// Disable
+	// Disable activity LED
 	#define bdos_host_activity_on	;
 	#define bdos_host_activity_off	;
 #endif
-
 
 // Protocol (frame level)
 #ifdef BDOS_HOST_PROTOCOL_BINARY

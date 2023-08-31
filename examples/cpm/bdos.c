@@ -437,7 +437,7 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 	bdos_user = 1;	//@FIXME: This should be the upper bits of the bios_curdsk at 0x0004
 	
 	bdos_memset((byte *)bdos_fcb, 0x00, 36);	//sizeof(FCB));	// Clear default fcb
-	bdos_fcb_num = 0;	// currently used FCB in DMA area (0...3)
+	bdos_fcb_num = 0;	// currently used FCB number in DMA area (0...3)
 	
 	#ifdef BDOS_PATCHED_ENTRY_ADDRESS
 		// At the moment, the BODS entry point "bdos()" might not be at the top of RAM / bottom of code segment.
@@ -1100,10 +1100,8 @@ byte bdos_f_delete(struct FCB *fcb) __naked {	// BDOS_FUNC_F_DELETE:	// 19: Dele
 	// Returns A=0FFh if error, otherwise 0-3
 	
 	//@TODO: Implement!
-	__asm
-		ld l, #0xff
-		ret
-	__endasm;
+	bdos_not_implemented("f_delete");
+	return 0xff;
 }
 
 
@@ -1140,7 +1138,7 @@ byte bdos_f_read_(struct FCB *fcb) {
 		fcb->s2 = (0x80 | SEQ_S2(bdos_file_ofs));
 		*/
 		
-		rn = (word)fcb->cr + ((word)fcb->ex * 128) + ((word)(fcb->s2 & 1) * 16384);
+		rn = (word)fcb->cr + ((word)fcb->ex << 7) + ((word)(fcb->s2 & 1) << 14);
 		rn++;
 		ex = rn >> 7;	//	/ 128;
 		fcb->cr = rn & 0x7f;	// % 128;
@@ -1237,14 +1235,11 @@ byte bdos_f_make(struct FCB *fcb) __naked {	// BDOS_FUNC_F_MAKE:	// 22: Make fil
 byte bdos_f_rename(struct FCB *fcb) __naked {	// BDOS_FUNC_F_RENAME:	// 23: Rename file
 	(void)fcb;	// Silence the  compiler about unused argument
 	// DE=address of FCB. Returns error codes in BA and HL.
-	
-	bdos_not_implemented("f_rename");
+	// Returns A=0-3 if successful; A=0FFh if error. Under CP/M 3, if H is zero then the file could not be found
 	
 	//@TODO: Implement!
-	__asm
-		ld l, #0xff	; // Returns A=0-3 if successful; A=0FFh if error. Under CP/M 3, if H is zero then the file could not be found
-		ret
-	__endasm;
+	bdos_not_implemented("f_rename");
+	return 0xff;
 }
 
 byte bdos_drv_loginvec() __naked {	// BDOS_FUNC_DRV_LOGINVEC:	// 24: Return login vector
@@ -1296,7 +1291,11 @@ void bdos_drv_allocvec() __naked {	// BDOS_FUNC_DRV_ALLOCVEC:	// 27: Get addr (a
 	
 	//@TODO: Implement!
 	bdos_not_implemented("drv_allocvec");
-	return;
+	__asm
+		ld h, #0x00
+		ld l, #0x00
+		ret
+	__endasm;
 }
 
 // 28: Write protect disk
@@ -1582,8 +1581,7 @@ void bdos_funcs() __naked {
 		jp _bdos_unimplemented	; // 39: Undefined - go back
 		jp _bdos_f_writezf	; BDOS_FUNC_F_WRITEZF:	// 40: Fill random file w/ zeros
 		
-		; Pad with "unimplemented" vectors
-		jp _bdos_unimplemented
+		; Pad with "unimplemented" vector(s)
 		jp _bdos_unimplemented
 	__endasm;
 }

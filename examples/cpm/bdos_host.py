@@ -1117,12 +1117,11 @@ class Driver_serial(Driver):
 	
 	def open(self):
 		self.ser = None
-		port = self.port
-		put('Opening "%s"...' % port)
+		put('Opening "%s" at %d baud...' % (self.port, self.baud))
 		
 		try:
 			self.ser = serial.Serial(
-				port=port,
+				port=self.port,
 				baudrate=self.baud,
 				bytesize=8,
 				parity='N',

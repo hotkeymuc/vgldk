@@ -19,6 +19,7 @@
 // Paper tape mapping ("punch" and "reader")
 //#define BIOS_PAPER_TAPE_TO_DISPLAY	// Redirect paper tape functions to display
 //#define BIOS_PAPER_TAPE_TO_SOFTUART	// Redirect paper tape functions to SoftUART
+//#define BIOS_PAPER_TAPE_TO_SOFTSERIAL	// Redirect paper tape functions to SoftSerial
 //#define BIOS_PAPER_TAPE_TO_MAME	// Redirect paper tape functions to MAME-Host
 //#define BIOS_SHOW_PAPER_TAPE_MAPPING	// Print the configured paper tape configuration on boot
 

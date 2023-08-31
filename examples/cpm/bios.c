@@ -40,10 +40,6 @@ In CP/M 3 and later, the rest also follows.
 
 #include "bint.h"	// For resetting the timer on boot
 
-//#define VGLDK_SERIES 4000
-//#define VGLDK_VARIABLE_STDIO
-//#define VGLDK_STDOUT_PUTCHAR lcd_putchar
-//#define VGLDK_STDIN_GETCHAR keyboard_getchar
 #include <vgldk.h>	// For hardware specific stuff
 
 //#include <stdio.h>	// for puts() putchar() gets() getchar()
@@ -54,6 +50,9 @@ In CP/M 3 and later, the rest also follows.
 #ifdef BIOS_PAPER_TAPE_TO_SOFTUART
 	#include <driver/softuart.h>
 #endif
+#ifdef BIOS_PAPER_TAPE_TO_SOFTSERIAL
+	#include <softserial.h>	// bespoke for each architecture
+#endif
 #ifdef BIOS_PAPER_TAPE_TO_MAME
 	#include <driver/mame.h>
 #endif
@@ -61,8 +60,10 @@ In CP/M 3 and later, the rest also follows.
 // Make sure one is selected
 #ifndef BIOS_PAPER_TAPE_TO_DISPLAY
 	#ifndef BIOS_PAPER_TAPE_TO_SOFTUART
-		#ifndef BIOS_PAPER_TAPE_TO_MAME
-			#error One BIOS_PAPER_TAPE destination has to be set (display, SoftUART, MAME)!
+		#ifndef BIOS_PAPER_TAPE_TO_SOFTSERIAL
+			#ifndef BIOS_PAPER_TAPE_TO_MAME
+				#error One BIOS_PAPER_TAPE destination has to be set (display, SoftUART, SoftSerial, MAME)!
+			#endif
 		#endif
 	#endif
 #endif
@@ -91,7 +92,8 @@ void bios_scroll_cb() {
 		
 		if (bios_scroll_counter >= LCD_ROWS) {
 			// Sleep on scroll
-			sound_note(12*5, 100);
+			//sound_note(12*5, 100);
+			beep();
 			getchar();
 			bios_scroll_counter = 0;
 		}
@@ -156,6 +158,9 @@ void bios_boot() __naked {
 		#endif
 		#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
 			puts("Tape = SoftUART");
+		#endif
+		#ifdef BIOS_PAPER_TAPE_TO_SOFTSERIAL
+			puts("Tape = SoftSerial");
 		#endif
 		#ifdef BIOS_PAPER_TAPE_TO_MAME
 			puts("Tape = MAME");
@@ -225,7 +230,7 @@ byte bios_const() {
 	// console status, return 0ffh if character ready, 00h if not
 	
 	//@TODO: Handle bios_iobyte, bits 0,1: 00=TTY, 01=CRT, 10=BAT, 11=UC1
-	if (keyboard_checkkey() > 0) return 0xff;	// Key pressed
+	if (keyboard_ispressed() > 0) return 0xff;	// Key pressed
 	return 0x00;	// No key pressed
 }
 
@@ -269,6 +274,10 @@ void bios_punch(byte c) {
 	#ifdef BIOS_PAPER_TAPE_TO_SOFTUART
 		// Send to SoftUART
 		softuart_sendByte(c);
+	#endif
+	#ifdef BIOS_PAPER_TAPE_TO_SOFTSERIAL
+		// Send to SoftSerial
+		serial_putchar(c);
 	#endif
 	#ifdef BIOS_PAPER_TAPE_TO_MAME
 		mame_putchar(c);
@@ -344,6 +353,9 @@ void bios_setdma(byte *a) {
 byte bios_read() {
 	// Read the currently set track and sector at the current DMA address.
 	// Returns A=0 for OK, 1 for unrecoverable error, 0FFh if media changed.
+	
+	//@FIXME: Implement!
+	//@TODO: Don't forget to allow setting the activity led using led_on() and led_off() :-)
 	return 0;
 }
 
@@ -352,6 +364,10 @@ byte bios_write(byte c) {
 	// C=0 - Write can be deferred / C=1 - Write must be immediate / C=2 - Write can be deferred, no pre-read is necessary.
 	// Returns A=0 for OK, 1 for unrecoverable error, 2 if disc is readonly, 0FFh if media changed.
 	(void) c;
+	
+	//@FIXME: Implement!
+	//@TODO: Don't forget to allow setting the activity led using led_on() and led_off() :-)
+	
 	return 0;
 }
 
