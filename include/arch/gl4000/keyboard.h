@@ -4,12 +4,10 @@
 VTech Genius Leader Keyboard
 
 //@TODO: Handling of keyboard should happen inside an interrupt handler!
-//@TODO: Handle roll-over like in GL6000SL's implementation
 //@TODO: Unify into one single "matrix keyboard" driver
 
-2019-11-03 Bernhard "HotKey" Slawik
+2019-11-03 - 2023-08-31 Bernhard "HotKey" Slawik
 */
-
 
 // BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
 // This also makes the parallel port wiggle, so it interferes with serial/parallel communication!
@@ -28,131 +26,135 @@ __sfr __at KEYBOARD_PORT_COL_IN2 keyboard_port_matrixColIn2;
 	__sfr __at KEYBOARD_PORT_LATCH keyboard_port_matrixLatch;
 #endif
 
-
-#define VGL_KEYS_MASK_CAPS	0x20
-
-#define KEY_CAPS	'c'
-#define KEY_SHIFT	's'
-#define KEY_ALT	'a'
-#define KEY_TAB	'\t'	// Help / TAB
-#define KEY_BREAK	(char)27	// Asterisk / Break
-#define KEY_REPEAT	(char)8	// Repeat/Delete (Backspace)
-#define KEY_INS	'\r'	// Insert / LeftPlayer
-#define KEY_DEL (char)127	// Delete / RightPlayer
-#define KEY_SPACE ' '	// And/or "+" / "Antwort"?
-#define KEY_CURSOR_LEFT	'h'
-#define KEY_CURSOR_RIGHT	'l'
-#define KEY_ENTER '\r'	// '\n'	// Zork expects 0x0d as "ENTER"
-#define KEY_ESC (char)27
-const char vgl_key_map[8*8] = {
-	KEY_TAB,	KEY_BREAK,	'e',	'f',	'g',	'i',	'j',	'k',
-	KEY_CAPS, '1', 'Q', 'A', 'Y'/*'Z'*/, KEY_ALT, KEY_SPACE, KEY_INS,
-	'2', '3', 'E', 'S', 'D', 'X', 'C', 'W',
-	'4', '5', 'T', 'F', 'G', 'V', 'B', 'R',
-	'6', '7', 'U', 'H', 'J', 'N', 'M', 'Z' /*'Y'*/,
-	'8', '9', 'O', 'K', 'L', ',', '.', 'I',
-	'0', KEY_REPEAT, '=', ':' /*';'*/, '\'', '/', KEY_SHIFT, 'P',
-	'x', 'y', (char)KEY_CURSOR_LEFT, (char)KEY_CURSOR_RIGHT, KEY_ENTER, KEY_DEL, KEY_ESC, 'z',
-};
 /*
-const char vgl_key_map2[8*8] = {
-	(char)0x80, (char)0x81, (char)0x82, (char)0x83, (char)0x84, (char)0x85, (char)0x86, (char)0x87,
-	(char)0x90, (char)0x91, (char)0x92, (char)0x93, (char)0x94, (char)0x95, (char)0x96, (char)0x97,
-	(char)0xa0, (char)0xa1, (char)0xa2, (char)0xa3, (char)0xa4, (char)0xa5, (char)0xa6, (char)0xa7,
-	(char)0xb0, (char)0xb1, (char)0xb2, (char)0xb3, (char)0xb4, (char)0xb5, (char)0xb6, (char)0xb7,
-	(char)0xc0, (char)0xc1, (char)0xc2, (char)0xc3, (char)0xc4, (char)0xc5, (char)0xc6, (char)0xc7,
-	(char)0xd0, (char)0xd1, (char)0xd2, (char)0xd3, (char)0xd4, (char)0x05, (char)0xd6, (char)0xd7,
-	(char)0xe0, (char)0xe1, (char)0xe2, (char)0xe3, (char)0xe4, (char)0xe5, (char)0xe6, (char)0xe7,
-	(char)0xf0, (char)0xf1, (char)0xf2, (char)0xf3, (char)0xf4, (char)0xf5, (char)0xf6, (char)0xf7,
-};
+// If "__sfr" is not available: Use assembly
+// Keyboard matrix write
+void keyboard_matrix_out(byte a) __naked {(void)a;
+__asm
+	; Get parameter from stack into a
+	ld hl,#0x0002
+	add hl,sp
+	ld a,(hl)
+	
+	; Put it to port
+	out	(KEYBOARD_PORT_ROW_OUT), a	; 0x40
+	ret
+__endasm;
+}
+// Keyboard matrix read 1
+byte keyboard_matrix_in1() __naked {
+__asm
+	in	a, (KEYBOARD_PORT_COL_IN1)	; 0x41
+	ld	l, a
+	ret
+__endasm;
+}
+// Keyboard matrix read 2
+byte keyboard_matrix_in2() __naked {
+__asm
+	in	a, (KEYBOARD_PORT_COL_IN2)	; 0x42
+	ld	l, a
+	ret
+__endasm;
+}
 */
 
-//byte vgl_keys_state[16];
 
-byte keyboard_inkey() {
+// Key codes
+#define KEY_NONE	0	// key code for "not a valid key"
+#define KEY_CURSOR_LEFT	'h'
+#define KEY_CURSOR_RIGHT	'l'
+
+#define KEY_CAPS	'C'
+#define KEY_SHIFT	'S'
+#define KEY_ALT	'A'
+
+#define KEY_TAB	'\t'	// Help / TAB
+#define KEY_BREAK	(char)27	// Asterisk / Break
+#define KEY_REPEAT	(char)8	// Repeat/Delete (it is at the position of Backspace, above ENTER)
+#define KEY_PLAYER_LEFT	'\r'	// Insert / LeftPlayer
+#define KEY_PLAYER_RIGHT (char)127	// Delete / RightPlayer
+#define KEY_SPACE ' '	// And/or "+" / "Antwort"?
+#define KEY_ENTER '\r'	// '\n'	// Zork expects 0x0d as "ENTER"
+#define KEY_ANSWER '+'
+
+#define KEY_ACTIVITY_BASE 0x80	// Start of activity keys
+#define KEY_ACTIVITY(s) (keycode_t)(KEY_ACTIVITY_BASE + s)	// Macro for the numerous activity-buttons
+//#define KEY_CARTRIDGE 254
+#define KEY_OFF 'O'
+#define KEY_ON KEY_NONE	// Not pollable
+
+#define KEY_CHARCODE_NONE 0
+#define KEY_CHARCODE_ENTER '\r'
+
+typedef byte keycode_t;
+typedef byte scancode_t;
+
+#define KEY_MATRIX1_COLS 8
+#define KEY_MATRIX1_ROWS 8
+
+#define KEY_MATRIX2_COLS 5	//@FIXME! Matrix2 has only 40 activities (8 * 5)
+#define KEY_MATRIX2_ROWS 8
+
+// Map SCANCODE to KEYCODE (which can be the final char)
+const keycode_t KEY_CODES[(KEY_MATRIX1_COLS*KEY_MATRIX1_ROWS) + (KEY_MATRIX2_COLS*KEY_MATRIX2_ROWS)] = {
 	
-	//@TODO: Re-activate the second matrix (function keys)
+	KEY_TAB,	KEY_BREAK,	'E',	'F',	'G',	'I',	'J',	'K',
+	KEY_CAPS, '1', 'q', 'a', 'y'/*'z'*/, KEY_ALT, KEY_SPACE, KEY_PLAYER_LEFT,
+	'2', '3', 'e', 's', 'd', 'x', 'c', 'w',
+	'4', '5', 't', 'f', 'g', 'v', 'b', 'r',
+	'6', '7', 'u', 'h', 'j', 'n', 'm', 'z' /*'y'*/,
+	'8', '9', 'o', 'k', 'l', ',', '.', 'i',
+	'0', KEY_REPEAT, 'ü' /*'='*/, 'ö' /*':' ';'*/, 'ä' /*'\''*/, '-'/*'/'*/, KEY_SHIFT, 'P',
+	'X', 'Y', (char)KEY_CURSOR_LEFT, (char)KEY_CURSOR_RIGHT, KEY_ENTER, KEY_PLAYER_RIGHT, KEY_ANSWER, 'Z',
 	
-	byte b1;
-	//byte b2;
-	byte m, m2;
-	byte row, col;
-	char r;
+	// Activities...
+	KEY_ACTIVITY(0x00), KEY_ACTIVITY(0x07), KEY_ACTIVITY(0x0e), KEY_ACTIVITY(0x16), KEY_ACTIVITY(0x1e),
+	KEY_ACTIVITY(0x01), KEY_ACTIVITY(0x08), KEY_ACTIVITY(0x0f), KEY_ACTIVITY(0x17), KEY_ACTIVITY(0x1f),
+	KEY_ACTIVITY(0x02), KEY_ACTIVITY(0x09), KEY_ACTIVITY(0x10), KEY_ACTIVITY(0x18), KEY_ACTIVITY(0x20),
+	KEY_ACTIVITY(0x03), KEY_ACTIVITY(0x0a), KEY_ACTIVITY(0x11), KEY_ACTIVITY(0x19), KEY_ACTIVITY(0x21),
+	KEY_ACTIVITY(0x04), KEY_ACTIVITY(0x0b), KEY_ACTIVITY(0x12), KEY_ACTIVITY(0x1a), KEY_ACTIVITY(0x22),
+	KEY_ACTIVITY(0x05), KEY_ACTIVITY(0x0c), KEY_ACTIVITY(0x13), KEY_ACTIVITY(0x1b), KEY_ACTIVITY(0x23),
+	KEY_ACTIVITY(0x06), KEY_ACTIVITY(0x0d), KEY_ACTIVITY(0x14), KEY_ACTIVITY(0x1c), KEY_ACTIVITY(0x24),
+	KEY_ON,             KEY_OFF,            KEY_ACTIVITY(0x15), KEY_ACTIVITY(0x1d), KEY_ACTIVITY(0x25),
+};
+
+#define KEYBOARD_PRESSED_MAX 16	// 4	// How many scancodes can be pressed at once (roll-over)
+#define KEYBOARD_BUFFER_MAX 8
+#define KEYBOARD_SCANCODE_INVALID 0xff
+
+#define KEYBOARD_MODIFIER_SHIFT 1
+#define KEYBOARD_MODIFIER_ALT 2
+//#define KEYBOARD_MODIFIER_SYMBOL 4	// not available on GL4000
+
+byte keyboard_modifiers;
+
+byte keyboard_num_pressed;
+scancode_t keyboard_pressed[KEYBOARD_PRESSED_MAX];
+
+byte keyboard_buffer_in;
+byte keyboard_buffer_out;
+char keyboard_buffer[KEYBOARD_BUFFER_MAX];
+
+
+void keyboard_init() {
+	byte i;
 	
-	#ifdef KEYBOARD_LATCH
-		// BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
-		keyboard_port_matrixLatch = 0xff;
-	#endif
+	// Clear pressed keys
+	keyboard_buffer_in = 0;
+	keyboard_buffer_out = 0;
 	
-	r = 0;
-	//m = 0x80;
-	//row = 7;
-	//while(1) {
-	m = 0x01;
-	for(row = 0; row < 8; row++) {
-		// Send bit mask to MUXer
-		
-		// BIOS4000 01bc: Send bit mask to 0x10
-		keyboard_port_matrixRowOut = m;
-		
-		// Read back 0x10
-		b1 = keyboard_port_matrixColIn;
-		
-		// Read back 0x11
-		//b2= keyboard_port_matrixColIn2;
-		
-		
-		// BIOS4000 01c7: Reset it back to 0x00
-		keyboard_port_matrixRowOut = 0x00;
-		
-		if (b1 < 0xff) {
-			m2 = 0x01;
-			for(col = 0; col < 8; col++) { 
-				if ((b1 & m2) == 0) {
-					// Return first bit found. We could handle simulataneous presses!
-					return vgl_key_map[8 * row + col];
-					//return 0x00 + (8 * row + col);	// Just return the scan code
-				}
-				m2 = m2 << 1;
-			}
-		}
-		
-		/*
-		if (b2 < 0xff) {	//@FIXME: Row 2 has only bits 0..4?
-			m2 = 0x01;
-			//@FIXME: Row 2 has only bits 0..4?
-			for(col = 0; col < 8; col++) { 
-				if ((b2 & m2) == 0) {
-					// Return first bit found. We could handle simulataneous presses!
-					//return vgl_key_map2[8 * row + col];
-					return 0x80 + (8 * row + col);	// Just return the scan code
-				}
-				m2 = m2 << 1;
-			}
-		}
-		*/
-		
-		m = m << 1;
-		
-		/*
-		if (row == 0) break;
-		m = m >> 1;
-		row --;
-		*/
-	}
-	//port_0x12_out(port_0x12_in() | VGL_KEYS_MASK_CAPS);	// CAPS on?
-	//port_0x12_out(port_0x12_in() & (0xff - VGL_KEYS_MASK_CAPS));	// CAPS off?
-	
-	// Non-blocking: Return "0" if nothing pressed
-	return 0;
+	keyboard_num_pressed = 0;
+	for (i = 0; i < KEYBOARD_PRESSED_MAX; i++) keyboard_pressed[i] = 0xff;
+	keyboard_modifiers = 0x00;
 }
 
-
 // Return "true" if a key is pressed
-byte keyboard_checkkey() {
+// formerly "keyboard_checkkey"
+byte keyboard_ispressed() {
 	
 	byte b1;
-	//byte b2;
+	byte b2;
 	
 	#ifdef KEYBOARD_LATCH
 		// Set all mux lines HIGH (although in original firmware, keyboard matrix works without it)
@@ -162,37 +164,296 @@ byte keyboard_checkkey() {
 	// Set all outputs at the same time
 	keyboard_port_matrixRowOut = 0xff;
 	
-	// Read back if anything is pressed
+	// Read back if anything is pressed at all
 	b1 = keyboard_port_matrixColIn;
-	//b2= keyboard_port_matrixColIn2;
+	b2 = keyboard_port_matrixColIn2;
+	
+	// Set MUX back to idle
 	keyboard_port_matrixRowOut = 0x00;
 	
-	if (b1 < 0xff) return b1;	// Some key is pressed
-	//if (b2 < 0xff) return b2;	// Some key is pressed (2)
+	if (b1 < 0xff) return 1;	//b1;	// Some key is pressed on matrix 1
+	
+	// Matrix 2:
+	// IDLE	0x5F
+	// ROW1	0x5E
+	// ROW2	0x5D
+	if ((b2 & 0x1f) < 0x1f) return 1;	// Some key is pressed on matrix 2
 	
 	return 0;	// No keys are pressed
 }
 
 
-char keyboard_getchar_last = 0;
-char keyboard_getchar() {
-	char c;
+void keyboard_update() {
 	
-	//while (checkkey()) {}
-	//c = getchar_blocking();
+	byte mx, my;
+	byte m, m2;
+	byte b1;
+	byte b2;
+	int i, j;
+	scancode_t scancode;
+	keycode_t keycode;
+	char charcode;
 	
-	while(1) {
-		c = keyboard_inkey();
-		if (c == 0) keyboard_getchar_last = 0;
-		if (c != keyboard_getchar_last) break;
+	byte keyboard_num_pressed_new;
+	scancode_t keyboard_pressed_new[KEYBOARD_PRESSED_MAX];
+	
+	// Reset buffer
+	keyboard_num_pressed_new = 0;
+	
+	// If nothing is pressed at all - skip scanning the matrix
+	if (keyboard_ispressed() != 0) {
+		// Scan the keyboard matrix
+		
+		#ifdef KEYBOARD_LATCH
+			// BIOS4000 01a6: Send 0xff to port 0x11 (although in original firmware, keyboard matrix works without it)
+			keyboard_port_matrixLatch = 0xff;
+		#endif
+		
+		m = 0x01;	// Row bit mask
+		for (my = 0; my < KEY_MATRIX1_ROWS; my++) {
+			// Send bit mask to MUXer
+			
+			// BIOS4000 01bc: Send bit mask to 0x10
+			keyboard_port_matrixRowOut = m;
+			
+			// Get matrix 1 state
+			b1 = keyboard_port_matrixColIn;
+			
+			// Get matrix 2 state
+			b2 = keyboard_port_matrixColIn2;
+			
+			// BIOS4000 01c7: Reset it back to 0x00
+			keyboard_port_matrixRowOut = 0x00;
+			
+			// Check matrix input 1
+			if (b1 != 0xff) {
+				m2 = 0x01;	// Column bit mask
+				for (mx = 0; mx < KEY_MATRIX1_COLS; mx++) {
+					if ((b1 & m2) == 0) {
+						// Return first bit found. We could handle simulataneous presses!
+						//return vgl_key_map[8 * row + col];
+						
+						// Just return the scan code
+						//return 0x00 + (8 * row + col);
+						
+						// Store scan code
+						if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
+							keyboard_pressed_new[keyboard_num_pressed_new++] = my*KEY_MATRIX1_COLS + mx;
+					}
+					m2 = m2 << 1;
+				}
+			}
+			
+			// Check matrix input 2
+			(void)b2;
+			(void)m2;
+			
+			if (b2 != 0xff) {	//@FIXME: Row 2 has only bits 0..4
+				m2 = 0x01;	// Column bit mask
+				
+				// Caution: Row 2 has only bits 0..4 (for a total of 40 activity buttons, including "ON" and "OFF")
+				for (mx = 0; mx < KEY_MATRIX2_COLS; mx++) {
+					if ((b2 & m2) == 0) {
+						// Return first bit found. We could handle simulataneous presses!
+						//return vgl_key_map2[8 * row + col];
+						
+						// Just return the scan code
+						//return 0x80 + (8 * row + col);
+						
+						// Store scan code
+						if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
+							keyboard_pressed_new[keyboard_num_pressed_new++] = (KEY_MATRIX1_COLS*KEY_MATRIX1_ROWS) + my*KEY_MATRIX2_COLS + mx;
+					}
+					m2 = m2 << 1;
+				}
+			}
+			
+			
+			// Next row
+			m = m << 1;
+		}
+		
 	}
 	
-	keyboard_getchar_last = c;
-	return c;
+	// Done scanning the matrix
+	
+	// Check for key releases (i.e. scancodes in keyboard_pressed[] that are not in keyboard_pressed_new[] any more)
+	for (i = 0; i < keyboard_num_pressed; i++) {
+		scancode = keyboard_pressed[i];
+		
+		// See if it is still pressed...
+		for (j = 0; j < keyboard_num_pressed_new; j++) {
+			if (keyboard_pressed_new[j] == scancode) {
+				// Key is still pressed
+				scancode = KEYBOARD_SCANCODE_INVALID;
+				break;
+			}
+		}
+		if (scancode == KEYBOARD_SCANCODE_INVALID) continue;
+		// Key was released
+		
+		keycode = KEY_CODES[scancode];
+		if (keycode == KEY_NONE) continue;
+		
+		//printf("KeyUp%02X", scancode);
+		//putchar('U'); printf_x2(scancode);
+		
+		// Update modifier status
+		/*
+		switch (keycode) {
+			//case KEY_LEFT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
+			//case KEY_RIGHT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
+			case KEY_SHIFT:			keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
+			case KEY_ALT:			keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_ALT); break;
+			//case KEY_SYMBOL: 		keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SYMBOL); break;
+		}
+		*/
+		if (keycode == KEY_SHIFT)	keyboard_modifiers &= ~KEYBOARD_MODIFIER_SHIFT;
+		if (keycode == KEY_ALT)		keyboard_modifiers &= ~KEYBOARD_MODIFIER_ALT;
+		
+		// Remove (copy last element there)
+		keyboard_pressed[i] = keyboard_pressed[--keyboard_num_pressed];
+		i--;
+	}
+	
+	// Check for key presses (i.e. scancodes in keyboard_pressed_new[] that are not in keyboard_pressed[])
+	for (i = 0; i < keyboard_num_pressed_new; i++) {
+		scancode = keyboard_pressed_new[i];
+		
+		// See if it was pressed before...
+		for (j = 0; j < keyboard_num_pressed; j++) {
+			if (keyboard_pressed[j] == scancode) {
+				// Key was already pressed
+				scancode = KEYBOARD_SCANCODE_INVALID;
+				break;
+			}
+		}
+		
+		if (scancode == KEYBOARD_SCANCODE_INVALID) continue;
+		
+		// Key was previously unknown
+		
+		// Handle key press
+		keycode = KEY_CODES[scancode];
+		if (keycode == KEY_NONE) continue;
+		
+		//printf("KeyDown%02X", scancode);
+		//putchar('D'); printf_x2(scancode);
+		/*
+		switch (keycode) {
+			//case KEY_LEFT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
+			//case KEY_RIGHT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
+			case KEY_SHIFT:			keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
+			case KEY_ALT:			keyboard_modifiers |= KEYBOARD_MODIFIER_ALT; break;
+			//case KEY_SYMBOL:		keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL; break;
+			
+			default:
+		*/
+		
+		if (keycode == KEY_SHIFT)	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
+		else
+		if (keycode == KEY_ALT)		keyboard_modifiers |= KEYBOARD_MODIFIER_ALT;
+		else {
+			// Normal key (not a modifier)
+			
+			// Map keycode to charcode
+			charcode = keycode;
+			
+			if (keycode == KEY_ENTER) {
+				if (keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT) charcode = '\n';	// Force NL
+				else if (keyboard_modifiers & KEYBOARD_MODIFIER_ALT) charcode = '\r';	// Force CR
+				else charcode = KEY_CHARCODE_ENTER;	// Default
+			}
+			
+			if (keyboard_modifiers & KEYBOARD_MODIFIER_ALT > 0) {
+				// Like Ctrl: A=chr(1), B=chr(2), C=chr(3), ...
+				charcode = 1 + (keycode - 'a');
+			}
+			
+			if (keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT > 0) {
+				// Shift
+				
+				if ((keycode >= 'a') && (keycode <= 'z')) {
+					charcode = 'A' + (keycode - 'a');
+				}
+				else
+				switch(keycode) {
+					// German layout
+					case '1': charcode = '!'; break;
+					case '2': charcode = '"'; break;
+					case '3': charcode = '§'; break;
+					case '4': charcode = '$'; break;
+					case '5': charcode = '%'; break;
+					case '6': charcode = '&'; break;
+					case '7': charcode = '/'; break;
+					case '8': charcode = '('; break;
+					case '9': charcode = ')'; break;
+					case '0': charcode = '='; break;
+					//case 'ß': charcode = '?'; break;	// Not present
+					
+					case ',': charcode = ';'; break;
+					case '.': charcode = ':'; break;
+					case '-': charcode = '_'; break;
+					
+					case 'ä': charcode = 'Ä'; break;
+					case 'ü': charcode = 'Ü'; break;
+					case 'ö': charcode = 'Ö'; break;
+					
+					case KEY_CURSOR_LEFT: charcode = '<'; break;
+					case KEY_CURSOR_RIGHT: charcode = '>'; break;
+					
+					// Add more shift-mappings here!
+					
+				}
+			}
+			
+			// Store CHARCODE to buffer
+			keyboard_buffer[keyboard_buffer_in] = charcode;
+			keyboard_buffer_in = (keyboard_buffer_in + 1) % KEYBOARD_BUFFER_MAX;
+			// if (keyboard_buffer_in == keyboard_buffer_out) { FULL! }
+		}
+		
+		// Store SCANCODE as "pressed"
+		if (keyboard_num_pressed < KEYBOARD_PRESSED_MAX)
+			keyboard_pressed[keyboard_num_pressed++] = scancode;
+		
+	}
+	
 }
 
-void keyboard_init() {
-	keyboard_getchar_last = 0;
+
+#define KEY_CHARCODE_NONE 0
+byte keyboard_inkey() {
+	byte charcode;
+	
+	keyboard_update();
+	
+	// Check if a new key has been put to the buffer
+	if (keyboard_buffer_in != keyboard_buffer_out) {
+		
+		// Get from buffer
+		charcode = keyboard_buffer[keyboard_buffer_out];
+		keyboard_buffer_out = (keyboard_buffer_out + 1) % KEYBOARD_BUFFER_MAX;
+		
+		// Return it
+		return charcode;
+	} else {
+		// No key
+		return KEY_CHARCODE_NONE;
+	}
 }
+
+
+byte keyboard_getchar() {
+	byte charcode;
+	
+	while((charcode = keyboard_inkey()) == KEY_CHARCODE_NONE) {
+		// Block
+	}
+	
+	return charcode;
+	
+}
+
 
 #endif // __KEYBOARD_H
