@@ -119,7 +119,7 @@ const keycode_t KEY_CODES[(KEY_MATRIX1_COLS*KEY_MATRIX1_ROWS) + (KEY_MATRIX2_COL
 	KEY_ON,             KEY_OFF,            KEY_ACTIVITY(0x15), KEY_ACTIVITY(0x1d), KEY_ACTIVITY(0x25),
 };
 
-#define KEYBOARD_PRESSED_MAX 16	// 4	// How many scancodes can be pressed at once (roll-over)
+#define KEYBOARD_PRESSED_MAX 6	// 4	// How many scancodes can be pressed at once (roll-over)
 #define KEYBOARD_BUFFER_MAX 8
 #define KEYBOARD_SCANCODE_INVALID 0xff
 
@@ -145,7 +145,8 @@ void keyboard_init() {
 	keyboard_buffer_out = 0;
 	
 	keyboard_num_pressed = 0;
-	for (i = 0; i < KEYBOARD_PRESSED_MAX; i++) keyboard_pressed[i] = 0xff;
+	for (i = 0; i < KEYBOARD_PRESSED_MAX; i++) keyboard_pressed[i] = KEY_NONE;
+	
 	keyboard_modifiers = 0x00;
 }
 
@@ -298,7 +299,7 @@ void keyboard_update() {
 		//printf("KeyUp%02X", scancode);
 		//putchar('U'); printf_x2(scancode);
 		
-		// Update modifier status
+		// Clear modifier status
 		/*
 		switch (keycode) {
 			//case KEY_LEFT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
@@ -339,6 +340,8 @@ void keyboard_update() {
 		
 		//printf("KeyDown%02X", scancode);
 		//putchar('D'); printf_x2(scancode);
+		
+		// Set modifier status
 		/*
 		switch (keycode) {
 			//case KEY_LEFT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
@@ -349,7 +352,6 @@ void keyboard_update() {
 			
 			default:
 		*/
-		
 		if (keycode == KEY_SHIFT)	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
 		else
 		if (keycode == KEY_ALT)		keyboard_modifiers |= KEYBOARD_MODIFIER_ALT;
@@ -360,28 +362,25 @@ void keyboard_update() {
 			charcode = keycode;
 			
 			if (keycode == KEY_ENTER) {
+				// Allow all kinds of ENTER mappings
 				if (keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT) charcode = '\n';	// Force NL
 				else if (keyboard_modifiers & KEYBOARD_MODIFIER_ALT) charcode = '\r';	// Force CR
 				else charcode = KEY_CHARCODE_ENTER;	// Default
 			}
-			
-			if (keyboard_modifiers & KEYBOARD_MODIFIER_ALT > 0) {
+			else
+			if ((keyboard_modifiers & KEYBOARD_MODIFIER_ALT) > 0) {
 				// Like Ctrl: A=chr(1), B=chr(2), C=chr(3), ...
 				charcode = 1 + (keycode - 'a');
 			}
-			
-			if (keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT > 0) {
+			else
+			if ((keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT) > 0) {
 				// Shift
 				
-				if ((keycode >= 'a') && (keycode <= 'z')) {
-					charcode = 'A' + (keycode - 'a');
-				}
-				else
 				switch(keycode) {
 					// German layout
 					case '1': charcode = '!'; break;
 					case '2': charcode = '"'; break;
-					case '3': charcode = '§'; break;
+					case '3': charcode = 'ß'; break;	// § becomes "ß" on german layout
 					case '4': charcode = '$'; break;
 					case '5': charcode = '%'; break;
 					case '6': charcode = '&'; break;
@@ -389,7 +388,6 @@ void keyboard_update() {
 					case '8': charcode = '('; break;
 					case '9': charcode = ')'; break;
 					case '0': charcode = '='; break;
-					//case 'ß': charcode = '?'; break;	// Not present
 					
 					case ',': charcode = ';'; break;
 					case '.': charcode = ':'; break;
@@ -403,7 +401,11 @@ void keyboard_update() {
 					case KEY_CURSOR_RIGHT: charcode = '>'; break;
 					
 					// Add more shift-mappings here!
-					
+					default:
+						if ((keycode >= 'a') && (keycode <= 'z')) {
+							// Upper case
+							charcode = 'A' + (keycode - 'a');
+						}
 				}
 			}
 			
