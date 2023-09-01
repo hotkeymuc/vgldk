@@ -195,8 +195,7 @@ Intro sound port accesses at 0x2x?:
 
 
 // Sound
-//#include "speech.h"
-//#include "sound.h"
+#include "sound.h"
 
 
 // Publish function NAMES for STDIO
@@ -236,6 +235,7 @@ void vgldk_init() __naked {
 	
 	keyboard_init();
 	
+	sound_off();
 	
 	//main();
 	__asm

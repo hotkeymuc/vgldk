@@ -60,6 +60,8 @@ __endasm;
 
 
 // Key codes
+#define KEY_CHARCODE_NONE 0
+
 #define KEY_MOUSE_LMB 1
 #define KEY_MOUSE_RMB 2
 
@@ -104,7 +106,7 @@ __endasm;
 typedef byte keycode_t;
 typedef byte scancode_t;
 
-// Map scancode to keycode (i.e. char)
+// Map SCANCODE to KEYCODE (which can be the final char)
 const keycode_t KEY_CODES[8*8*2] = {
 	KEY_MOUSE_LMB,  '1', '9', 'e', '(', 'g', KEY_LEFT_SHIFT, ',',
 	KEY_MOUSE_RMB,  '2', '0', 'r', '+', 'h', 'z', '.',
@@ -182,7 +184,8 @@ byte keyboard_ispressed() {
 
 void keyboard_update() {
 	byte mx, my;
-	byte b;
+	byte b1;
+	byte b2;
 	int i, j;
 	scancode_t scancode;
 	keycode_t keycode;
@@ -191,18 +194,21 @@ void keyboard_update() {
 	byte keyboard_num_pressed_new;
 	scancode_t keyboard_pressed_new[KEYBOARD_PRESSED_MAX];
 	
+	// Reset buffer
 	keyboard_num_pressed_new = 0;
 	
+	// If nothing is pressed at all - skip scanning the matrix
 	if (keyboard_ispressed() > 0) {
 		// Scan the keyboard matrix
 		
-		for(my = 0; my < 8; my++) {
+		for (my = 0; my < 8; my++) {
 			keyboard_matrix_out(0xff - (1 << my));
 			
 			// Check matrix input 1
-			b = keyboard_matrix_in1();
-			for(mx = 0; mx < 8; mx++) {
-				if (!(b & (1 << mx))) {
+			b1 = keyboard_matrix_in1();
+			// if (b2 != 0xff) ...
+			for (mx = 0; mx < 8; mx++) {
+				if (!(b1 & (1 << mx))) {
 					// Store scan code
 					if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
 						keyboard_pressed_new[keyboard_num_pressed_new++] = my*8 + mx;
@@ -210,9 +216,10 @@ void keyboard_update() {
 			}
 			
 			// Check matrix input 2
-			b = keyboard_matrix_in2();
-			for(mx = 0; mx < 8; mx++) {
-				if (!(b & (1 << mx))) {
+			b2 = keyboard_matrix_in2();
+			// if (b2 != 0xff) ...
+			for (mx = 0; mx < 8; mx++) {
+				if (!(b2 & (1 << mx))) {
 					// Store scan code
 					if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
 						keyboard_pressed_new[keyboard_num_pressed_new++] = (8*8) + my*8 + mx;
@@ -221,9 +228,13 @@ void keyboard_update() {
 		}
 	}
 	
+	// Done scanning the matrix
+	
 	// Check for key releases (i.e. scancodes in keyboard_pressed[] that are not in keyboard_pressed_new[] any more)
 	for (i = 0; i < keyboard_num_pressed; i++) {
 		scancode = keyboard_pressed[i];
+		
+		// See if it is still pressed...
 		for (j = 0; j < keyboard_num_pressed_new; j++) {
 			if (keyboard_pressed_new[j] == scancode) {
 				// Key is still pressed
@@ -233,6 +244,7 @@ void keyboard_update() {
 		}
 		if (scancode != KEYBOARD_SCANCODE_INVALID) {
 			// Key was released
+			
 			keycode = KEY_CODES[scancode];
 			//printf("KeyUp%02X", scancode);
 			//putchar('U'); putchar(scancode);
@@ -278,7 +290,8 @@ void keyboard_update() {
 				default:
 					// Normal key
 					charcode = keycode;
-				
+					
+					
 					if (keyboard_modifiers & KEYBOARD_MODIFIER_SYMBOL > 0) {
 						// Symbol
 						charcode = keycode - 'a' + 0x01;
@@ -300,14 +313,14 @@ void keyboard_update() {
 						charcode = keycode;
 					}
 					
-					// Store to buffer
+					// Store CHARCODE to buffer
 					keyboard_buffer[keyboard_buffer_in] = charcode;
 					keyboard_buffer_in = (keyboard_buffer_in + 1) % KEYBOARD_BUFFER_MAX;
 					// if (keyboard_buffer_in == keyboard_buffer_out) { FULL! }
 			}
 			
 			
-			// Store scancode
+			// Store SCANCODE as "pressed"
 			if (keyboard_num_pressed < KEYBOARD_PRESSED_MAX)
 				keyboard_pressed[keyboard_num_pressed++] = scancode;
 			
@@ -316,7 +329,6 @@ void keyboard_update() {
 	
 }
 
-#define KEY_CHARCODE_NONE 0
 byte keyboard_inkey() {
 	byte charcode;
 	

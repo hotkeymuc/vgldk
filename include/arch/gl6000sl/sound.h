@@ -12,11 +12,11 @@ Re-directing to speech.h
 #include "speech.h"
 
 
-void vgl_sound_off() {
+void sound_off() {
 	speech_stop();
 }
 
-void vgl_sound(word frq, word len) {
+void sound_tone(word frq, word len) {
 	// Perform a beep (frq is actually a delay...)
 	(void)frq;
 	(void)len;
@@ -27,7 +27,7 @@ void vgl_sound(word frq, word len) {
 }
 
 
-void vgl_sound_note(word n, word len) {
+void sound_note(word n, word len) {
 	(void)n;
 	(void)len;
 	
