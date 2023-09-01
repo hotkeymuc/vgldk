@@ -17,6 +17,7 @@
 
 //#define BODS_WAIT_FOR_RAM	// Wait until RAM is writable before proceeding
 //#define BDOS_RESTORE_LOWSTORAGE	// Restore the lower memory addresses for next cold-start
+//#define BDOS_RESTORE_BINT_VECTORS	// Re-set the interrupt vectors 0x0010...0x0038
 
 // Compatibility patch: Make the BDOS vector at 0x0005 a jump to the top of user-usable RAM. This allows BDOS to live anywhere in address space, while still marking the end of usable transient area.
 //#define BDOS_PATCHED_ENTRY_ADDRESS (0x7fff - 2)	// Address of the "virtual BDOS entry", i.e. the limit of usable transient area, after which BDOS/CPM/CCP/ROM etc. start.

@@ -671,7 +671,7 @@ class Protocol:
 	
 	def receive_frame(self):
 		"""Receive new frame from driver (blocking)"""
-		pass
+		return b''
 	
 	def send_frame(self, data):
 		"""Send new frame to driver"""
@@ -960,6 +960,8 @@ class Driver:
 		pass
 	def write_byte(self, b):
 		#if SHOW_TRAFFIC_BYTES: put('> 0x%02X' % b)
+		pass
+	def finish_frame(self):
 		pass
 
 

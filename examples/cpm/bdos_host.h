@@ -98,8 +98,8 @@ In the long run, this might migrate into the BIOS instead of the BDOS.
 	#endif
 #else
 	// Disable activity LED
-	#define bdos_host_activity_on	;
-	#define bdos_host_activity_off	;
+	#define bdos_host_activity_on()	;
+	#define bdos_host_activity_off()	;
 #endif
 
 // Protocol (frame level)

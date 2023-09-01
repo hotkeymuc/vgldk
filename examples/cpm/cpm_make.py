@@ -59,7 +59,8 @@ How to start up CP/M:
 """
 
 # Have a look at these settings:
-VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
+#VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
+VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
 COMPILE_CPM = True	# Compile BINT/BIOS/BDOS (main)
 COMPILE_CCP = True	# Compile CCP (command line processor)
 EMULATE_CCP_IN_YAZE = False	# Run the CCP in YAZE emulator to test cross-compatibility
@@ -135,7 +136,8 @@ def cpm_make():
 	# Set-up CP/M layout
 	cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
 	#cpm_code_size_estimate = 0x1440	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
-	cpm_code_size_estimate = 0x1800	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
+	#cpm_code_size_estimate = 0x1800	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
+	cpm_code_size_estimate = 0x1FC0	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
 	cpm_data_size_estimate = 0x1000	# Approx size of CPM RAM usage
 	#cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CP/M as far up as possible in lower RAM bank
 	#cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CP/M as far up in cartridge space (0x8000-BFFF) as possible
@@ -183,22 +185,23 @@ def cpm_make():
 		#'BDOS_SHOW_BANNER': 1,	# Show "BDOS" on boot (helpful for debugging)
 		'BDOS_WAIT_FOR_RAM': 1,	# Wait until RAM is writable before proceeding (recommended)
 		'BDOS_RESTORE_LOWSTORAGE': 1,	# Restore/fix the lower memory area on each start
+		'BDOS_RESTORE_BINT_VECTORS': 1,	# Restore/fix the interrupt vectors 0x0010...0x0038 on each start
 		
 		'BDOS_PATCHED_ENTRY_ADDRESS': (loc_transient_top+1 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
-		'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
+	#	'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
 		'BDOS_LOAD_CCP_FROM_DISK': 1,	# Do not assume CCP is in ROM, but load it from disk (using BDOS file functions)
 		
 		## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
 		'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
-		'BDOS_HOST_ACTIVITY_LED': 1,	# Light up LED on BDOS host activity
-	#'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
-	#'BDOS_HOST_DRIVER_SOFTSERIAL': 1,	# Re-direct to SoftSerial (for use with real hardware)
+	#	'BDOS_HOST_ACTIVITY_LED': 1,	# Light up LED on BDOS host activity
+	#	'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
+	#	'BDOS_HOST_DRIVER_SOFTSERIAL': 1,	# Re-direct to SoftSerial (for use with real hardware)
 	'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
 		#'BDOS_HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
 		
 		# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
 	'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
-	#'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
+	#	'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
 		#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
 		
 		## Configure CCP
@@ -425,8 +428,12 @@ def cpm_make():
 		if vgldk_series == 4000:
 			OUTPUT_FILE_SYSROM = '27-5480-00'	# This filename is specific to each MAME system!
 			OUTPUT_FILE_SYSROMZIP = '%s/%s.zip' % (MAME_ROMS_DIR, MAME_SYS)
+		elif vgldk_series == 6000:
+			MAME_SYS = 'gl%dsl' % vgldk_series	# MAME system name
+			OUTPUT_FILE_SYSROM = '27-5894-01'	# This filename is specific to each MAME system!
+			OUTPUT_FILE_SYSROMZIP = '%s/%s.zip' % (MAME_ROMS_DIR, MAME_SYS)
 		else:
-			put('At the moment, only generation of gl4000 ROMs is implemented.')
+			put('At the moment, only generation of gl4000/gl6000sl ROMs is implemented.')
 			sys.exit(1)
 		
 		# Make sure ROMs directory exists
@@ -493,18 +500,22 @@ def cpm_make():
 		# Chose a driver
 		if 'BDOS_HOST_DRIVER_MAME' in cpm_defines:
 			driver = bdos_host.Driver_MAME(rompath=MAME_ROMS_DIR, emusys=MAME_SYS, cart_file=cpm_cart_filename)
-		if 'BDOS_HOST_DRIVER_SOFTUART' in cpm_defines:
+		elif 'BDOS_HOST_DRIVER_SOFTUART' in cpm_defines:
 			driver = bdos_host.Driver_serial(baud=softuart_baud, stopbits=2)	# More stopbits = more time to process?
-		if 'BDOS_HOST_DRIVER_SOFTSERIAL' in cpm_defines:
+		elif 'BDOS_HOST_DRIVER_SOFTSERIAL' in cpm_defines:
 			driver = bdos_host.Driver_serial(baud=9600, stopbits=1)
+		else:
+			driver = bdos_host.Driver()
 		
 		# Chose a protocol
 		if 'BDOS_HOST_PROTOCOL_BINARY' in cpm_defines:
 			protocol = bdos_host.Protocol_binary()
-		if 'BDOS_HOST_PROTOCOL_BINARY_SAFE' in cpm_defines:
+		elif 'BDOS_HOST_PROTOCOL_BINARY_SAFE' in cpm_defines:
 			protocol = bdos_host.Protocol_binary_safe()
-		if 'BDOS_HOST_PROTOCOL_HEX' in cpm_defines:
+		elif 'BDOS_HOST_PROTOCOL_HEX' in cpm_defines:
 			protocol = bdos_host.Protocol_hex()
+		else:
+			protocol = bdos_host.Protocol()
 		
 		# Start host
 		host = bdos_host.Host(driver=driver, protocol=protocol, mounts=BDOS_MOUNTS)
