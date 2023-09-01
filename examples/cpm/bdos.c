@@ -249,112 +249,11 @@ void bdos_memset(byte *addr, byte b, word count) {
 
 
 #ifdef BDOS_TRAP
-	#define TRAP_SIZE 10
-	
-	byte *trap_addr;
-	byte trap_backup[TRAP_SIZE];
-	
-	void trap_set(byte *a) {
-		// Install a "trap" at specified address
-		
-		trap_addr = a;	// Store trap address
-		memcpy(&trap_backup[0], a, TRAP_SIZE);
-		
-		// PUSH all
-		*a++ = 0xf5;	// PUSH AF
-		*a++ = 0xc5;	// PUSH BC
-		*a++ = 0xd5;	// PUSH DE
-		*a++ = 0xe5;	// PUSH HL
-		
-		// LD C, #0xff
-		*a++ = 0x0e;	// LD C, #..
-		*a++ = 0xff;	// 0xff
-		
-		// CALL 0x0005
-		*a++ = 0xcd;	// CALL ....
-		*a++ = 0x05;	// low
-		*a++ = 0x00;	// high
-	}
-	
-	void trap_unset() {
-		memcpy(trap_addr, &trap_backup[0], TRAP_SIZE);
-	}
-	
-	void trap_trigger() __naked {
-		__asm
-			pop af	; Initial POP (has been pushed on call)
-			
-			; Store all registers
-			push af
-			push bc
-			push de
-			push hl
-			
-			
-			; Dump BEFORE fixing
-			;call _host_sendstack
-			
-			; Fix return address to point at trap origin
-			ld hl,#0x0008
-			add hl,sp
-			ld d, h
-			ld e, l
-			
-			ld hl, (_trap_addr)
-			ld a, l
-			ld (de), a
-			inc de
-			ld a,h
-			ld (de), a
-			
-		__endasm;
-		
-		bdos_puts("** TRAP **");
-		
-		#ifdef BDOS_USE_HOST
-			#ifdef BDOS_TRACE_CALLS
-				host_sendstack();
-			#endif
-		#endif
-		
-		getchar();
-		
-		trap_unset();
-		
-		bdos_puts("cont...");
-		__asm
-			
-			pop hl
-			pop de
-			pop bc
-			pop af
-			
-			ret
-			
-			
-		__endasm;
-		
-	}
+	#include "bdos_trap.h"
 #endif
 
 // CCP start-up
-void bdos_start_ccp() {
-	
-	//@TODO: Load CCP from a file! (Using BDOS functions fopen, fread, fclose...)
-	
-	// Clear DMA area (contains CCP command line arguments)
-	// You could also provide some start-up arguments (will be run by CCP)
-	bdos_memset((byte *)0x0080, 0, 128);
-	//*((byte *)0x0080) = 0;	// Clear CCP argl (dma area)
-	//*((byte *)0x0081) = 0;	// Clear CCP args (dma area+1)
-	
-	// Invoke CCP entry point (must match LOC_CODE of ccp.c compilation!)
-	//bdos_printf_x4(CCP_LOC_CODE); bdos_printf("...");
-	__asm
-		jp CCP_LOC_CODE
-	__endasm;
-}
-
+void bdos_start_ccp(); // Forward
 
 // Well-known BDOS functions
 void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
@@ -1532,6 +1431,74 @@ void bdos_unimplemented() __naked {
 		ret
 	__endasm;
 }
+
+
+// CCP startup
+void bdos_start_ccp() {
+	
+	#ifdef BDOS_LOAD_CCP_FROM_DISK
+	// Load CCP from a file! (Using BDOS functions fopen, fread, fclose...)
+	byte r;
+	byte *a;
+	const char *filename;
+	
+	filename = "CCP     COM\0";
+	
+	bdos_printf("Load CCP @ ");
+	bdos_printf_x4(CCP_LOC_CODE);
+	//bdos_printf((char *)filename);
+	bdos_printf("...");
+	
+	bdos_fcb.dr = 0;	// Drive to load from
+	bdos_memcpy(&bdos_fcb.f[0], &filename[0], 8+3);
+	bdos_fcb.cr = 0;
+	bdos_fcb.ex = 0;
+	bdos_fcb.s1 = 0;
+	bdos_fcb.s2 = 0;
+	
+	// Open file
+	r = bdos_f_open_(&bdos_fcb);
+	if (r != 0x00) {
+		bdos_puts("Error!");
+		bdos_getchar();
+	}
+	
+	// Load data into CCP_LOC_CODE
+	a = (byte *)0x0100;	// cpm_transient
+	//a = (byte *)CCP_LOC_CODE;	//0x0100;	// cpm_transient
+	do {
+		//printf(".");	// Progress
+		
+		// Read next record
+		r = bdos_f_read_(&bdos_fcb);
+		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
+		if (r != 0)
+			break;
+		
+		// Copy from DMA area to destination
+		bdos_memcpy(a, (byte *)0x0080, 128);
+		a += 128;
+		
+	} while(r == 0x00);
+	bdos_puts("OK");
+	r = bdos_f_close_(&bdos_fcb);
+	#endif
+	
+	// Clear DMA area (contains CCP command line arguments)
+	// You could also provide some start-up arguments (will be run by CCP)
+	bdos_memset((byte *)0x0080, 0, 128);
+	//*((byte *)0x0080) = 0;	// Clear CCP argl (dma area)
+	//*((byte *)0x0081) = 0;	// Clear CCP args (dma area+1)
+	
+	// Invoke CCP entry point (must match LOC_CODE of ccp.c compilation!)
+	//bdos_printf_x4(CCP_LOC_CODE); bdos_printf("...");
+	__asm
+		//jp CCP_LOC_CODE
+		jp 0x0100
+	__endasm;
+}
+
+
 
 // BDOS function jump table
 void bdos_funcs() __naked {

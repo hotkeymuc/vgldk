@@ -20,7 +20,8 @@
 
 // Compatibility patch: Make the BDOS vector at 0x0005 a jump to the top of user-usable RAM. This allows BDOS to live anywhere in address space, while still marking the end of usable transient area.
 //#define BDOS_PATCHED_ENTRY_ADDRESS (0x7fff - 2)	// Address of the "virtual BDOS entry", i.e. the limit of usable transient area, after which BDOS/CPM/CCP/ROM etc. start.
-//#define BDOS_AUTOSTART_CCP	// Start CCP at boot without asking
+//#define BDOS_AUTOSTART_CCP	// Start CCP automatically, do not ask
+//#define BDOS_LOAD_CCP_FROM_DISK	// Do not assume CCP is in ROM (always present), but load it from disk
 
 //#define BDOS_USE_HOST	// Re-direct file operations to a host computer (which acts like an external drive). See bdos_host.h for more config!
 
@@ -301,7 +302,6 @@ void bdos_printf_x4(word w);
 // String Helpers
 //byte bdos_strlen(const char *c);
 //void bdos_memset(byte *addr, byte b, word count);
-
 
 
 // Functions for jump table

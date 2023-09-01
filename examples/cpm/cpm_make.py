@@ -73,6 +73,7 @@ EMULATE_IN_MAME = True	# Start MAME and switch to BDOS host mode
 # Default local paths to serve as CP/M drives using bdos_host.py
 # first entry = A: = default
 BDOS_MOUNTS = [
+	'out',	# Output directory is A: (CCP.COM should be there)
 	#'programs',
 	#'programs/ASCOM22',
 	#'programs/BBCBASIC',	# Works!
@@ -133,18 +134,24 @@ def cpm_make():
 	
 	# Set-up CP/M layout
 	cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
-	cpm_code_size_estimate = 0x1440	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
+	#cpm_code_size_estimate = 0x1440	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
+	cpm_code_size_estimate = 0x1800	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
 	cpm_data_size_estimate = 0x1000	# Approx size of CPM RAM usage
 	#cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CP/M as far up as possible in lower RAM bank
 	#cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CP/M as far up in cartridge space (0x8000-BFFF) as possible
-	cpm_loc_code = loc_cart + cart_eeprom_size - cpm_code_size_estimate	# Put CP/M as far up in cartridge EPROM (0x8000-BFFF) as possible
+	#cpm_loc_code = loc_cart + cart_eeprom_size - cpm_code_size_estimate	# Put CP/M as far up in cartridge EPROM (0x8000-BFFF) as possible
+	cpm_loc_code = loc_cart + 0x0020	# Put CP/M at start of cartridge EPROM (0x8000-BFFF)
 	cpm_loc_data = loc_internal_ram	# Use stock system RAM at 0xC000-0xDFFF. Static variable data and gsinit-code will be put to this offset in binary file. Monitor uses 0xd000 for its data
 	
 	# Set-up CCP layout
 	ccp_code_size_estimate = 0x0b80	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
 	#ccp_data_size_estimate = 0x0600	# Don't know... Just a guess...
+	ccp_merge_into_rom = False	# Merge CCP binary into ROM, so BDOS can jump to it without loading
+	ccp_loc_code = 0x0100 + 0x10	# Regular transient COM file (add some bytes for CRT0 header)
+	#ccp_loc_code = 0x4000	# Arbitrary location in transient area (must be in cartridge area if it should be merged into ROM)
+	#ccp_loc_code = loc_transient_top - ccp_data_size_estimate	# At top of transient area
 	#ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
-	ccp_loc_code = loc_cart + 0x0020	# Put CCP at start of cartridge (leave ~0x20 bytes for cart header)
+	#ccp_loc_code = loc_cart + 0x0020	# Put CCP at start of cartridge (leave ~0x20 bytes for cart header)
 	#ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
 	#ccp_loc_data = loc_internal_ram + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
 	ccp_loc_data = cpm_loc_data + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
@@ -157,7 +164,7 @@ def cpm_make():
 		
 		## Configure VGLDK hardware and drivers
 		'VGLDK_SERIES': vgldk_series,	# e.g. 4000 for GL4000
-		'KEYBOARD_MINIMAL': 1,	# Use minimal keyboard (no modifiers, no buffer) to save code space
+		#'KEYBOARD_MINIMAL': 1,	# Use minimal keyboard (no modifiers, no buffer) to save code space
 		'SOFTUART_BAUD': softuart_baud,	# SoftUART baud rate. Currently supported (2023-08) are 9600 or 19200
 		
 		## Configure BIOS
@@ -179,18 +186,19 @@ def cpm_make():
 		
 		'BDOS_PATCHED_ENTRY_ADDRESS': (loc_transient_top+1 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
 		'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
+		'BDOS_LOAD_CCP_FROM_DISK': 1,	# Do not assume CCP is in ROM, but load it from disk (using BDOS file functions)
 		
 		## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
 		'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
 		'BDOS_HOST_ACTIVITY_LED': 1,	# Light up LED on BDOS host activity
-	'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
+	#'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
 	#'BDOS_HOST_DRIVER_SOFTSERIAL': 1,	# Re-direct to SoftSerial (for use with real hardware)
-	#'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
+	'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
 		#'BDOS_HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
 		
 		# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
-	#'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
-	'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
+	'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
+	#'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
 		#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
 		
 		## Configure CCP
@@ -298,22 +306,23 @@ def cpm_make():
 			sys.exit(1)
 		#hexdump(ccp_data, ccp_loc_code)
 		
-		
-		### Merge CCP binary into CP/M image
-		put('Merging CCP binary (%d bytes / 0x%04X) into CP/M image at 0x%04X-0x%04X...' % (ccp_code_size, ccp_code_size, ccp_loc_code, ccp_loc_code+ccp_code_size))
-		
-		# Check if area is empty
-		for a in range(ccp_loc_code, ccp_loc_code+ccp_code_size):
-			if cpm_data[a] != 0x00:
-				put('Destination of CCP (0x%04X) is not empty! Please adjust memory layout or reduce code size.' % a)
-				sys.exit(5)
+		if ccp_merge_into_rom:
+			### Merge CCP binary into CP/M image
+			put('Merging CCP binary (%d bytes / 0x%04X) into CP/M image at 0x%04X-0x%04X...' % (ccp_code_size, ccp_code_size, ccp_loc_code, ccp_loc_code+ccp_code_size))
 			
-		#cpm_data[ccp_loc_code:ccp_loc_code+len(ccp_data)] = ccp_data[:]
-		cpm_data = cpm_data[:ccp_loc_code] + ccp_data + cpm_data[ccp_loc_code+ccp_code_size:]
-		
-		# Write merged output CCP CP/M .COM binary
-		with open(cpm_bin_filename, 'wb') as h:
-			h.write(cpm_data)
+			# Check if area is empty
+			for a in range(ccp_loc_code, ccp_loc_code+ccp_code_size):
+				if cpm_data[a] != 0x00:
+					put('Destination of CCP (0x%04X) is not empty! Please adjust memory layout or reduce code size.' % a)
+					sys.exit(5)
+				
+			#cpm_data[ccp_loc_code:ccp_loc_code+len(ccp_data)] = ccp_data[:]
+			cpm_data = cpm_data[:ccp_loc_code] + ccp_data + cpm_data[ccp_loc_code+ccp_code_size:]
+			
+			# Write merged output CCP CP/M .COM binary
+			with open(cpm_bin_filename, 'wb') as h:
+				h.write(cpm_data)
+		#
 	#
 	
 	### Debugging
