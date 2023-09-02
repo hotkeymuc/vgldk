@@ -1,4 +1,4 @@
-; CP/M CRT0 file for VTech Genius Leader 4000
+; CP/M CRT0 file for VTech Genius Leader 4000 / 6000
 ; 
 ; Memory layout of a running CP/M system
 ;
@@ -8,15 +8,13 @@
 ;; Definitions
 	.module cpm_crt0
 	
-	; Addresses
-	stack .equ 0xdff0	; Stack top (GL4000 bios uses 0xdff0)
-	
 	; Global C functions
 	.globl _main	; cpm.c:main() = jumps to _bios_boot
 	.globl _bint	; bint.c:bint()
 	.globl _bios_boot	; bios.c:bios_boot() = initializes VGL hardware and continues to bios_wboot(), bdos_init() and finally ccp()
 	.globl _bdos	; bdos.c:bdos()
 	
+
 
 ;; Start of memory layout
 .area _HEADER (ABS)
@@ -45,33 +43,33 @@ bdos_call:
 
 ;; IM2 vectors
 .org 0x08
-	;reti
-	jp	_bint
+	;jp	_bint
+	reti
 
 .org 0x10
-	;reti
-	jp	_bint
+	;jp	_bint
+	reti
 
 .org 0x18
-	;reti
-	jp	_bint
+	;jp	_bint
+	reti
 
 .org 0x20
-	;reti
-	jp	_bint
+	;jp	_bint
+	reti
 
 .org 0x28
-	;reti
-	jp	_bint
+	;jp	_bint
+	reti
 
 .org 0x30
-	;reti
-	jp	_bint
+	;jp	_bint
+	reti
 
 ;; IM1 vector
 .org 0x38
-	;reti
-	jp	_bint
+	;jp	_bint
+	reti
 
 ;; BIOS workarea
 .org 0x40
@@ -106,15 +104,17 @@ init:
 	;; Set up interrupt mode
 	di
 	im 1	; Only call 0x38
+	;ei
 	
-	
-	;; Stack at the top of memory.
-	ld sp, #stack	; GL4000: ld sp, #0xdff0 - leave just a little bit more
 	
 	;; Bare minimum VTech hardware init
 	;; Note: This depends on the model...
 	
+	
 ;	;; GL4000
+;	
+;	ld sp, #0xdff0	; GL4000: ld sp, #0xdff0 - leave just a little bit more
+;	
 ;	; Parallel port reset
 ;	;ld	a, #0x00				; Set all D0-D7 to HIGH
 ;	;out	(0x10), a
@@ -148,13 +148,78 @@ init:
 ;	;out (0x06), a
 	
 	
+	
 	;; GL6000SL
-	;; TODO: Bank-switching is at 0x50...0x56
+	
+	ld sp, #0xff87	; GL6000: ld sp, #0xff87 - leave just a little bit more
+	ld a, #0
+	ld i, a
+	
+	; LCD
+	;ld a, #3
+	;out (0x31), a
+	
+	; Bank switching (0x50...0x56, e.g. 0x50=0x0000-0x4000, 0x51=0x4000-0x8000, ...)
 	;; e.g. OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
-	;; out(0x52),0x24, check 0x8000 for 0x88, set b accordingly -> 27a8
+	;; e.g. OUT 0x52, 0x20	-> maps CART:0x0000 to CPU:0x8000
+	ld a, #0
+	out (0x55), a
+	
+	out (0x50), a
+	ld a, #1
+	out (0x51), a
+	
+	;ld a, #2
+	;out (0x52), a
+	; Map cart to 0x8000 (found by trial and error)
+	ld a, #0x0e
+	out (0x55), a
 	ld a, #0x20
 	out (0x52), a
 	
+	ld a, #1
+	out (0x53), a
+	; 0x54 = 0xe000 = vram
+	ld a, #0
+	out (0x54), a
+	
+	; ?
+	;ld a, #0
+	;out (0x22), a
+	;ld a, #0xe0
+	;out (0x21), a
+	;ld a, #0x60
+	;out (0x23), a
+	
+	
+	;	; Trial and error... Trying to find the port-combination to mount cart at 0x8000
+	;	ld h, #0x80
+	;	ld l, #0x00
+	;	
+	;	ld b, #0x00
+	;	ld c, #0xff
+	;loop_outer_start:
+	;	inc c
+	;	ld a, c
+	;	;out(0x13), a
+	;	out(0x55), a
+	;loop_start:
+	;	ld a, b
+	;	out(0x13), a
+	;	out(0x52), a
+	;	
+	;	; Check for cartridge header
+	;	ld a, (hl)
+	;	cp a, #0x55
+	;	jr z, found
+	;	inc b
+	;	jr c, loop_outer_start
+	;	jr loop_start
+	;found:
+	
+	
+	
+	;ei
 	;; Hardware is ready now
 	
 	;; Setup global static variables
@@ -162,6 +227,7 @@ init:
 	
 	
 	;; Call main code
+	
 	;call _main
 	;jp _main	; VGLDK default entry point
 	jp _bios_boot	; CP/M entry point
