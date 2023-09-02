@@ -59,8 +59,8 @@ How to start up CP/M:
 """
 
 # Have a look at these settings:
-#VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
-VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
+VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
+#VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
 COMPILE_CPM = True	# Compile BINT/BIOS/BDOS (main)
 COMPILE_CCP = True	# Compile CCP (command line processor)
 EMULATE_CCP_IN_YAZE = False	# Run the CCP in YAZE emulator to test cross-compatibility
@@ -126,6 +126,7 @@ def cpm_make():
 		'../../include',
 		'../../include/arch/gl%d'%vgldk_series	# Architecture specific drivers
 	]
+	rom_out_path = 'roms'
 	
 	### Set up the memory layout
 	loc_cart = 0x8000
@@ -137,8 +138,8 @@ def cpm_make():
 	cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
 	#cpm_code_size_estimate = 0x1440	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
 	#cpm_code_size_estimate = 0x1800	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
-	cpm_code_size_estimate = 0x1FC0	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
-	cpm_data_size_estimate = 0x1000	# Approx size of CPM RAM usage
+	cpm_code_size_estimate = 0x1FE0	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
+	cpm_data_size_estimate = 0x0800	# Approx size of CPM RAM usage
 	#cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CP/M as far up as possible in lower RAM bank
 	#cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CP/M as far up in cartridge space (0x8000-BFFF) as possible
 	#cpm_loc_code = loc_cart + cart_eeprom_size - cpm_code_size_estimate	# Put CP/M as far up in cartridge EPROM (0x8000-BFFF) as possible
@@ -185,11 +186,14 @@ def cpm_make():
 		#'BDOS_SHOW_BANNER': 1,	# Show "BDOS" on boot (helpful for debugging)
 		'BDOS_WAIT_FOR_RAM': 1,	# Wait until RAM is writable before proceeding (recommended)
 		'BDOS_RESTORE_LOWSTORAGE': 1,	# Restore/fix the lower memory area on each start
-		'BDOS_RESTORE_BINT_VECTORS': 1,	# Restore/fix the interrupt vectors 0x0010...0x0038 on each start
-		
+		'BDOS_RESTORE_BINT_VECTORS': 1,	# Restore/fix the interrupt vectors 0x0008...0x0038 on each start
 		'BDOS_PATCHED_ENTRY_ADDRESS': (loc_transient_top+1 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
-	#	'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
+		
+		# CCP handling
+		'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
 		'BDOS_LOAD_CCP_FROM_DISK': 1,	# Do not assume CCP is in ROM, but load it from disk (using BDOS file functions)
+		'BDOS_CCP_LOAD_ADDRESS': 0x100,	# Where to load the CPM binary to
+		'BDOS_CCP_JUMP_ADDRESS': 0x100,	#ccp_loc_code,	# Where to jump after loading
 		
 		## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
 		'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
@@ -226,7 +230,8 @@ def cpm_make():
 	cpm_data = compile(
 		# The .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
 		crt_s_files = [
-			'%s/cpm_crt0.s' % src_path
+			#'%s/cpm_crt0.s' % src_path
+			'%s/cpm_crt0_%d.s' % (src_path, vgldk_series)
 		],
 		crt_rel_file = '%s/cpm_crt0.rel' % out_path,
 		
@@ -297,6 +302,7 @@ def cpm_make():
 			
 			defines = {
 				#'VGLDK_SERIES': vgldk_series	#@FIXME: CP/M binaries should be completely architecture agnostic!
+				'CCP_SHOW_BANNER': 1,	# Show "CCP" on startup
 			}
 		)
 		
@@ -419,33 +425,35 @@ def cpm_make():
 	
 	
 	# MAME settings (used for system ROM generation and emulation)
-	MAME_ROMS_DIR = 'roms'	# Where to put the generates "fake" system ROM
-	MAME_SYS = 'gl%d' % vgldk_series	# MAME system name
+	mame_sys = 'gl%d' % vgldk_series	# MAME system name
 	
 	if GENERATE_MAME_ROM:
 		### Create MAME sys ROM for emulation
 		put('Creating MAME sys ROM for emulation...')
 		if vgldk_series == 4000:
-			OUTPUT_FILE_SYSROM = '27-5480-00'	# This filename is specific to each MAME system!
-			OUTPUT_FILE_SYSROMZIP = '%s/%s.zip' % (MAME_ROMS_DIR, MAME_SYS)
+			mame_sys = 'gl4000'	# MAME system name
+			output_file_sysrom = '27-5480-00'	# This filename is specific to each MAME system!
+			output_file_sysromzip = '%s/%s.zip' % (rom_out_path, mame_sys)
 		elif vgldk_series == 6000:
-			MAME_SYS = 'gl%dsl' % vgldk_series	# MAME system name
-			OUTPUT_FILE_SYSROM = '27-5894-01'	# This filename is specific to each MAME system!
-			OUTPUT_FILE_SYSROMZIP = '%s/%s.zip' % (MAME_ROMS_DIR, MAME_SYS)
+			mame_sys = 'gl6000sl'	# MAME system name
+			output_file_sysrom = '27-5894-01'	# This filename is specific to each MAME system!
+			#mame_sys = 'gl7007sl'	# MAME system name
+			#output_file_sysrom = '27-6060-00'	# This filename is specific to each MAME system!
+			output_file_sysromzip = '%s/%s.zip' % (rom_out_path, mame_sys)
 		else:
 			put('At the moment, only generation of gl4000/gl6000sl ROMs is implemented.')
 			sys.exit(1)
 		
 		# Make sure ROMs directory exists
-		if not os.path.isdir(MAME_ROMS_DIR):
-			put('Creating directory "%s", because it does not exits, yet...' % MAME_ROMS_DIR)
+		if not os.path.isdir(rom_out_path):
+			put('Creating ROMs directory "%s", because it does not exits, yet...' % rom_out_path)
 			os.mkdir(MAME_ROMS_DIR)
 			put('Don\'t forget to copy the required additional driver ROMs (e.g. hd44780_a00.zip) there, too!') 
 		
 		
 		# Generate the system ROM .zip file
-		put('Generating zip file "%s"...' % OUTPUT_FILE_SYSROMZIP)
-		with zipfile.ZipFile(OUTPUT_FILE_SYSROMZIP, 'w') as z:
+		put('Generating zip file "%s"...' % output_file_sysromzip)
+		with zipfile.ZipFile(output_file_sysromzip, 'w') as z:
 			
 			# Write dynamic info file
 			with z.open('_this_is_cpm.txt', 'w') as h:
@@ -455,7 +463,7 @@ def cpm_make():
 				h.write(b'File created by %b on %b.' % (bytes(__file__, 'ascii'), bytes(str(now), 'ascii')))
 			
 			# Write properly named system ROM (must match machine specific name)
-			with z.open(OUTPUT_FILE_SYSROM, 'w') as h_sysrom:
+			with z.open(output_file_sysrom, 'w') as h_sysrom:
 				#h_sysrom.write(cpm_data)	# Write the whole address space to sysrom
 				
 				# Copy CP/M RAM to system ROM file
@@ -499,7 +507,10 @@ def cpm_make():
 		
 		# Chose a driver
 		if 'BDOS_HOST_DRIVER_MAME' in cpm_defines:
-			driver = bdos_host.Driver_MAME(rompath=MAME_ROMS_DIR, emusys=MAME_SYS, cart_file=cpm_cart_filename)
+			mame_roms_dir = rom_out_path	# Use the newly created sysrom
+			#mame_roms_dir = None	# Use stock ROM
+			
+			driver = bdos_host.Driver_MAME(rompath=mame_roms_dir, emusys=mame_sys, cart_file=cpm_cart_filename)
 		elif 'BDOS_HOST_DRIVER_SOFTUART' in cpm_defines:
 			driver = bdos_host.Driver_serial(baud=softuart_baud, stopbits=2)	# More stopbits = more time to process?
 		elif 'BDOS_HOST_DRIVER_SOFTSERIAL' in cpm_defines:
@@ -576,7 +587,9 @@ def compile(
 	"""
 	
 	# Compile .s file(s) to .rel file
-	cmd = 'sdasz80 -o %s %s' % (crt_rel_file, ' '.join(crt_s_files))
+	cmd = 'sdasz80'
+	cmd += ' -o %s' % crt_rel_file
+	cmd += ' %s' % ' '.join(crt_s_files)
 	
 	put('>> %s' % cmd)
 	r = os.system(cmd)
@@ -610,6 +623,7 @@ def compile(
 	
 	#cmd += ' --verbose'	# Show stages of compilation
 	#cmd += ' --vc'	# vc = messages are compatible with Micro$oft visual studio
+	cmd += ' -V'	# V = Show actual commands
 	
 	cmd += ' -o %s' % output_hex_file
 	cmd += ' %s %s' % (crt_rel_file, ' '.join(source_files))	# .rel, .c, .c ...
