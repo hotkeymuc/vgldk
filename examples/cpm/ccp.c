@@ -12,6 +12,9 @@
 	VER and EXIT are also available, but that's pretty much it...
 	
 	
+	!!!! We need a "smart" loading algorithm that does not overwrite CCP in RAM while loading the next file!
+	
+	
 @TODO: Implement stock functions:
 	DIR <filespec>
 		Produces a list of files matching the <filespec>, if no filespec is entered, the result is the same as *.*, i.e., all files on the currently logged disk. The command accepts similar wildcards as DOS.
@@ -43,16 +46,18 @@ void main() __naked {
 
 //#define PROGRAM_GETS_LOCAL_ECHO	// Force local echo (even though getchar() and gets() output the typed character as per spec.!)
 
-#include "program.c"
-
-#include "ccp.h"
-
-#include "fcb.h"
-
 //#include <string.h>	// For strcmp
 #include <stringmin.h>	// For memcpy
 
 #include <strcmpmin.h>	// For strcmp
+
+#include "program.h"
+#include "program_stdio.h"
+#include "program_fileio.h"
+
+#include "ccp.h"
+
+#include "fcb.h"
 
 
 byte fcb_isspace(byte b) {
@@ -363,151 +368,6 @@ void ccp_dir() {
 	
 }
 
-//@TODO: Move to program.h
-byte ccp_fopen(char *filename) {
-	byte i;
-	char c;
-	char *pc;
-	
-	//@FIXME: Extract drive from filename!
-	//def_fcb.dr = bios_curdsk;	// Default drive (setting it to bios_curdsk will throw "invalid drive" in yaze)
-	def_fcb.dr = 0;	// this works in YAZE
-	
-	// Convert filename
-	pc = filename;
-	for(i = 0; i < 8; i++) {
-		c = *pc;
-		if (c == '.') break;
-		if (c == 0) break;
-		def_fcb.f[i] = c;
-		pc++;
-	}
-	while (i < 8) def_fcb.f[i++] = 0x20;
-	pc++;
-	
-	for(i = 0; i < 3; i++) {
-		c = *pc;
-		if (c == 0) break;
-		def_fcb.t[i] = c;
-		pc++;
-	}
-	while (i < 3) def_fcb.t[i++] = 0x20;
-	
-	// Prepare FCB
-	def_fcb.ex = 0;
-	def_fcb.s1 = 0;
-	def_fcb.s2 = 0;
-	
-	def_fcb.cr = 0;
-	def_fcb.r0 = 0;
-	def_fcb.r1 = 0;
-	def_fcb.r2 = 0;
-	
-	//printf("Opening...\r\n");
-	//dump((word)(&def_fcb), 36);
-	
-	__asm
-		push af
-		push bc
-		push de
-		push hl
-		
-		ld c, #15	; 15 = BDOS_FUNC_F_OPEN
-		ld d, #>_def_fcb	; Address of FCB (high)
-		ld e, #<_def_fcb	; Address of FCB (low)
-		call 5
-		
-		// Result FCB should now (also?) be at DMA + A*32
-		
-		ld (_ccp_ret_a), a
-		
-		pop hl
-		pop de
-		pop bc
-		pop af
-	__endasm;
-	
-	return ccp_ret_a;
-}
-
-//@TODO: Move to program.h
-byte ccp_fclose() {
-	__asm
-		push af
-		push bc
-		push de
-		push hl
-		ld c, #16	; BDOS_FUNC_F_CLOSE = 16
-		ld d, #>_def_fcb	; Address of FCB (high)
-		ld e, #<_def_fcb	; Address of FCB (low)
-		call 5
-		
-		ld (_ccp_ret_a), a
-		
-		pop hl
-		pop de
-		pop bc
-		pop af
-	__endasm;
-	
-	return ccp_ret_a;
-}
-
-//@TODO: Move to program.h
-byte ccp_fread() {	// Read next record (from def_fcb to ccp_dma/bios_dma)
-	
-	__asm
-		push af
-		push bc
-		push de
-		push hl
-		
-		ld c, #20	; 20 = BDOS_FUNC_F_READ
-		ld d, #>_def_fcb	; Address of FCB (high)
-		ld e, #<_def_fcb	; Address of FCB (low)
-		call 5
-		
-		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
-		ld (_ccp_ret_a), a
-		
-		pop hl
-		pop de
-		pop bc
-		pop af
-	__endasm;
-	
-	return ccp_ret_a;
-}
-
-byte ccp_freadrand(byte r0, byte r1, byte r2) {
-	def_fcb.r0 = r0;
-	def_fcb.r1 = r1;
-	def_fcb.r2 = r2;
-	
-	__asm
-		push af
-		push bc
-		push de
-		push hl
-		
-		ld c, #33	; 33 = BDOS_FUNC_F_READRAND
-		ld d, #>_def_fcb	; Address of FCB (high)
-		ld e, #<_def_fcb	; Address of FCB (low)
-		call 5
-		
-		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
-		ld (_ccp_ret_a), a
-		
-		pop hl
-		pop de
-		pop bc
-		pop af
-	__endasm;
-	
-	return ccp_ret_a;
-}
-
-
 byte ccp_load(char *filename) {
 	byte r;
 	byte *a;
@@ -517,7 +377,7 @@ byte ccp_load(char *filename) {
 	//printf("\"...");
 	//putchar('?');getchar();
 	
-	r = ccp_fopen(filename);
+	r = fopen(filename);
 	
 	if (r != 0x00) {
 		ccp_print_error(r);
@@ -536,7 +396,7 @@ byte ccp_load(char *filename) {
 		//printf(".");	// Progress
 		
 		// Read next record
-		r = ccp_fread();
+		r = fread();
 		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
 		if (r != 0)
 			break;
@@ -549,7 +409,7 @@ byte ccp_load(char *filename) {
 	ccp_print_ok();
 	
 	// Close file
-	ccp_fclose();
+	fclose();
 	
 	// Run file
 	/*
