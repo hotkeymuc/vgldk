@@ -11,20 +11,26 @@ It contains wrappers for BDOS function calls.
 //#define PROGRAM_GETS_LOCAL_ECHO	// Should gets() have local echo?
 #define PROGRAM_GETS_MAX_SIZE 127
 
-void putchar(char b);
-char getchar();
+//#include <basictypes.h>
+#ifndef __BASICTYPES_H__
+typedef unsigned char byte;
+typedef unsigned short word;
+#endif
 
-void puts(const char *s);
-//char *gets(char *pc);
-//void gets(char *pc, byte max_size);
-void gets(char *pc);
+volatile byte ret_a;
 
-// Helpers
-void printf(const char *s);
-//void printf_d(char *pc, byte d);
-//void printf_d(byte d);
-
-
+// BDOS Essentials
 void exit();
+
+
+// BDOS essentials
+void exit() __naked {
+	__asm
+		ld c, #0x00	; System reset
+		ld d, #0x00	; DL=0: Do not keep resident
+		call 5	; Call? I guess this is one-way...
+	__endasm;
+}
+
 
 #endif	// __PROGRAM_H
