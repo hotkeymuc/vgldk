@@ -730,10 +730,10 @@ byte bdos_f_open_(struct FCB *fcb) {
 	#ifdef BDOS_USE_HOST
 		byte r;
 		// Send request to host
-		host_sendfcb(BDOS_FUNC_F_OPEN, fcb);
+		bdos_host_sendfcb(BDOS_FUNC_F_OPEN, fcb);
 		
 		//@TODO: Receive to different location (fcb_result) inside DMA area and return its 32-byte index (0...3)
-		r = host_receivefcb(fcb);
+		r = bdos_host_receivefcb(fcb);
 		
 		if (r != 0xff) {
 			fcb->s2 |= 0x80;	// Mark open?
@@ -791,7 +791,7 @@ byte bdos_f_close_(struct FCB *fcb) {
 	byte r;
 	
 	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_CLOSE, fcb);
+		bdos_host_sendfcb(BDOS_FUNC_F_CLOSE, fcb);
 		r = 0x00;
 		
 		// if (r != 0xff) {
@@ -841,14 +841,14 @@ byte bdos_f_s_(struct FCB *fcb, byte f) {
 		// Send given FCB
 		//host_sendfcb(BDOS_FUNC_F_SFIRST, fcb);
 		//host_sendfcb(BDOS_FUNC_F_SNEXT, fcb);
-		host_sendfcb(f, fcb);	// Note the dynamic function number!
+		bdos_host_sendfcb(f, fcb);	// Note the dynamic function number!
 		
 		// Chose free FCB in DMA area
 		bdos_fcb_num = (bdos_fcb_num + 1) & 0x03;	// 0...3
 		fcb_result = (struct FCB *)((word)bios_dma + bdos_fcb_num * 32);
 		
 		// Receive into this area
-		r = host_receivefcb(fcb_result);
+		r = bdos_host_receivefcb(fcb_result);
 		
 		// Result 0xff means error
 		if (r == 0xff) return 0xff;
@@ -1009,14 +1009,14 @@ byte bdos_f_read_(struct FCB *fcb) {
 		word rn;
 		word ex;
 		
-		host_sendfcb(BDOS_FUNC_F_READ, fcb);
+		bdos_host_sendfcb(BDOS_FUNC_F_READ, fcb);
 		
 		// Receive immediate return value (OK, Hardware Error, EOF)
-		r = host_receive_byte();
+		r = bdos_host_receive_byte();
 		if (r != 0x00) return r;
 		
 		// Receive data
-		l = host_receivedma();
+		l = bdos_host_receivedma();
 		
 		// Return 1 on EOF
 		//if (l == 0) return 1;	// 1 = EOF
@@ -1076,7 +1076,7 @@ byte bdos_f_read(struct FCB *fcb) __naked {	// BDOS_FUNC_F_READ:	// 20: Read seq
 
 byte bdos_f_write_(struct FCB *fcb) {
 	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITE, fcb);
+		bdos_host_sendfcb(BDOS_FUNC_F_WRITE, fcb);
 		//return 0xff;
 		return 0x00;	// Fake "OK"
 	#else
@@ -1260,15 +1260,14 @@ byte bdos_f_readrand_(struct FCB *fcb) {
 		//word rn;
 		//word ex;
 		
-		host_sendfcb(BDOS_FUNC_F_READ, fcb);
-		//host_sendfcb(BDOS_FUNC_F_READRAND, fcb);
+		bdos_host_sendfcb(BDOS_FUNC_F_READ, fcb);
 		
 		// Receive immediate return value (OK, Hardware Error, EOF)
-		r = host_receive_byte();
+		r = bdos_host_receive_byte();
 		if (r != 0x00) return r;
 		
 		// Receive data
-		l = host_receivedma();
+		l = bdos_host_receivedma();
 		
 		// Return 1 on EOF
 		//if (l == 0) return 1;	// 1 = EOF
@@ -1317,7 +1316,7 @@ byte bdos_f_readrand(struct FCB *fcb) __naked {	// BDOS_FUNC_F_READRAND:	// 33: 
 
 byte bdos_f_writerand_(struct FCB *fcb) {
 	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITERAND, fcb);
+		bdos_host_sendfcb(BDOS_FUNC_F_WRITERAND, fcb);
 		//return 0xff;
 		return 0x00;	// Fake "OK"
 	#else
@@ -1390,7 +1389,7 @@ void bdos_drv_reset() __naked {	// BDOS_FUNC_DRV_RESET:	// 37: Reset drive
 
 byte bdos_f_writezf_(struct FCB *fcb) {
 	#ifdef BDOS_USE_HOST
-		host_sendfcb(BDOS_FUNC_F_WRITEZF, fcb);
+		bdos_host_sendfcb(BDOS_FUNC_F_WRITEZF, fcb);
 		
 		//return 0xff;
 		return 0x00;	// Fake "OK"
@@ -1442,16 +1441,14 @@ void bdos_start_ccp() {
 	
 	// Load data into CCP_LOC_CODE
 	//addr = (byte *)0x0100;	// cpm_transient
-	//addr = (byte *)CCP_LOC_CODE;	//0x0100;	// cpm_transient
+	//addr = (byte *)CCP_LOC_CODE;
 	a = (byte *)BDOS_CCP_LOAD_ADDRESS;
 	
 	filename = "CCP     COM\0";
 	//filename = "ZORK1   COM\0";
 	
-	bdos_printf("Load CCP @ ");
-	bdos_printf_x4((word)a);
-	//bdos_printf((char *)filename);
-	bdos_printf("...");
+	// Show loading CCP...
+	//bdos_printf("Load CCP @ "); bdos_printf_x4((word)a); bdos_printf("...");
 	
 	bdos_fcb.dr = 0;	// Drive to load from
 	bdos_memcpy(&bdos_fcb.f[0], &filename[0], 8+3);
@@ -1482,7 +1479,8 @@ void bdos_start_ccp() {
 		a += 128;
 		
 	}	// while(r == 0x00);
-	bdos_puts("OK");	//@TODO: 0=OK, 1=EOF, else=ERROR
+	
+	//bdos_puts("OK");	//@TODO: 0=OK, 1=EOF, else=ERROR
 	r = bdos_f_close_(&bdos_fcb);
 	#endif
 	
@@ -1496,7 +1494,8 @@ void bdos_start_ccp() {
 	//bdos_dump(BDOS_CCP_LOAD_ADDRESS, 32);
 	
 	// Invoke CCP entry point (must match LOC_CODE of ccp.c compilation!)
-	bdos_printf("Run CCP @ ");	bdos_printf_x4((word)BDOS_CCP_JUMP_ADDRESS);	bdos_printf("...");
+	//bdos_printf("Run CCP @ "); bdos_printf_x4((word)BDOS_CCP_JUMP_ADDRESS); bdos_printf("...");
+	
 	__asm
 		jp BDOS_CCP_JUMP_ADDRESS
 		;call BDOS_CCP_JUMP_ADDRESS
