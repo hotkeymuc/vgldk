@@ -895,7 +895,9 @@ void drawScreen() {
 	}
 }
 
-
+// Map to text mode cursor
+#define lcd_x lcd_text_col
+#define lcd_y lcd_text_row
 
 void main() {
 	char c;

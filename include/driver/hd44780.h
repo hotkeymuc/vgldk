@@ -156,8 +156,8 @@ __sfr __at LCD_PORT_DATA lcd_dataPort;
 #endif
 
 
-byte lcd_x = 0;
-byte lcd_y = 0;
+byte lcd_text_col = 0;
+byte lcd_text_row = 0;
 
 #ifndef LCD_MINIMAL
 	// "Minimal" version does not include a screen buffer and custom scrolling
@@ -232,7 +232,7 @@ void lcd_set_cursor() {
 	// Set cursor to position
 	byte o;
 	
-	o = lcd_x + (lcd_y * LCD_COLS);
+	o = lcd_text_col + (lcd_text_row * LCD_COLS);
 	lcd_writeControl(LCD_SETDDRAMADDR | lcd_map[o]);
 	
 	if (lcd_cursor) lcd_writeControl(LCD_DISPLAYCONTROL | LCD_DISPLAYON | LCD_CURSORON | LCD_BLINKON);
@@ -249,8 +249,8 @@ void lcd_clear() {
 	lcd_writeControl(LCD_RETURNHOME);
 	lcd_delay_long();
 	
-	lcd_x = 0;
-	lcd_y = 0;
+	lcd_text_col = 0;
+	lcd_text_row = 0;
 	
 	#ifndef LCD_MINIMAL
 	//@TODO: Use fillmem function!
@@ -291,8 +291,8 @@ void lcd_init() {
 	//lcd_delay_long();
 	
 	
-	//lcd_x = 0;
-	//lcd_y = 0;
+	//lcd_text_col = 0;
+	//lcd_text_row = 0;
 	
 	#ifndef LCD_MINIMAL
 	lcd_cursor = 1;
@@ -308,8 +308,8 @@ void lcd_init() {
 	// Home
 	lcd_writeControl(LCD_RETURNHOME);
 	
-	lcd_x = 0;
-	lcd_y = 0;
+	lcd_text_col = 0;
+	lcd_text_row = 0;
 	for(i = 0; i < (LCD_COLS * LCD_ROWS); i++) {
 		lcd_buffer[i] = 0x20;
 	}
@@ -385,8 +385,8 @@ void lcd_scroll() {
 
 /*
 void lcd_scroll_cb_scroll() {
-	while(lcd_y >= LCD_ROWS) {
-		lcd_y--;
+	while(lcd_text_row >= LCD_ROWS) {
+		lcd_text_row--;
 		lcd_scroll();
 	}
 }
@@ -419,49 +419,49 @@ void lcd_putchar(byte c) {
 	
 	if (c == '\r') {
 		// Carriage return
-		lcd_x = 0;
+		lcd_text_col = 0;
 		c = 0;
 	}
 	else
 	if (c == '\n') {
 		// New line
-		lcd_x = 0;
-		lcd_y++;
+		lcd_text_col = 0;
+		lcd_text_row++;
 		c = 0;
 	}
 	else
 	if (c == 8) {
 		// Backspace
-		if (lcd_x > 0) lcd_x--;
+		if (lcd_text_col > 0) lcd_text_col--;
 		c = 0;
 	}
 	
 	
-	if (lcd_x >= LCD_COLS) {
-		lcd_x = 0;
-		lcd_y++;
+	if (lcd_text_col >= LCD_COLS) {
+		lcd_text_col = 0;
+		lcd_text_row++;
 	}
 	
-	if (lcd_y >= LCD_ROWS) {
+	if (lcd_text_row >= LCD_ROWS) {
 		#ifndef LCD_MINIMAL
 		// Invoke scroll callback
 		if (lcd_scroll_cb != 0)
 			(*lcd_scroll_cb)();
 		else
-			while(lcd_y >= LCD_ROWS) {
-				lcd_y--;
+			while(lcd_text_row >= LCD_ROWS) {
+				lcd_text_row--;
 				lcd_scroll();
 			}
 		#else
 			// Minimal
-			lcd_y = 0;
+			lcd_text_row = 0;
 		#endif
 	}
 	
-	//lcd_putchar_at(lcd_x, lcd_y, c);
+	//lcd_putchar_at(lcd_text_col, lcd_text_row, c);
 	
 	// Calculate DDRAM offset
-	o = lcd_x + (lcd_y * LCD_COLS);
+	o = lcd_text_col + (lcd_text_row * LCD_COLS);
 	
 	// Set DDRAM insert point for data
 	lcd_writeControl(LCD_SETDDRAMADDR | lcd_map[o]);
@@ -469,7 +469,7 @@ void lcd_putchar(byte c) {
 	if (c > 0) {
 		// Actually display
 		lcd_writeData(c);
-		lcd_x++;
+		lcd_text_col++;
 		
 		#ifndef LCD_MINIMAL
 		// Store in buffer (for scrolling)

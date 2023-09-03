@@ -41,11 +41,25 @@ const word lcd_addr = LCD_ADDR;
 #define LCD_SCANLINE_SIZE (LCD_W / 8)
 
 // Select a font
-//#define LCD_FONT_4x6
-//#define LCD_FONT_4x7
-//#define LCD_FONT_5x8
-#define LCD_FONT_6x8
-//#define LCD_FONT_8x8
+//#define LCD_FONT_4x6	// Allows 60x16 text mode
+//#define LCD_FONT_4x7	// Allows 60x14 text mode
+//#define LCD_FONT_5x8	// Allows 48x12 text mode
+//#define LCD_FONT_6x8	// Allows 40x12 text mode
+//#define LCD_FONT_8x8	// Allows 30x12 text mode
+
+#ifndef LCD_FONT_4x6
+#ifndef LCD_FONT_4x7
+#ifndef LCD_FONT_5x8
+#ifndef LCD_FONT_6x8
+#ifndef LCD_FONT_8x8
+	// Auto-select 4x6
+	#define LCD_FONT_4x6
+#endif
+#endif
+#endif
+#endif
+#endif
+
 
 // Font
 #ifdef LCD_FONT_4x6
@@ -88,6 +102,10 @@ const word lcd_addr = LCD_ADDR;
 	#define font_first_char  console_font_8x8_first_char
 	#define font_last_char   console_font_8x8_last_char
 #endif
+#ifndef font_bitmap
+	#error No default font selected. Please set LCD_FONT_xxx
+#endif
+
 
 // Text mode cursor
 byte lcd_text_col = 0;
