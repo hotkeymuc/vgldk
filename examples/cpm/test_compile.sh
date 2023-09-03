@@ -71,7 +71,7 @@ if [ -f ${OUTPUT_FILE_HEX} ]; then
   objcopy -Iihex -Obinary ${OUTPUT_FILE_HEX} ${OUTPUT_FILE_HEXBIN}
   
   #echo Extracting "${OUTPUT_FILE_COM}"...
-  #dd bs=1024 skip=256 iflag=skip_bytes if=${OUTPUT_FILE_HEXBIN} of=${OUTPUT_FILE_COM}
-  cp ${OUTPUT_FILE_HEXBIN} ${OUTPUT_FILE_COM}
+  dd bs=1024 skip=256 iflag=skip_bytes if=${OUTPUT_FILE_HEXBIN} of=${OUTPUT_FILE_COM}
+  #cp ${OUTPUT_FILE_HEXBIN} ${OUTPUT_FILE_COM}
   
 fi

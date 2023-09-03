@@ -123,8 +123,8 @@ def cpm_make():
 	out_path = 'out'	# Output directory for the compiler
 	lib_path = None
 	include_paths = [
-		'../../include',
-		'../../include/arch/gl%d'%vgldk_series	# Architecture specific drivers
+		'../../include/arch/gl%d'%vgldk_series,	# Architecture specific drivers
+		'../../include',	# General hardware drivers
 	]
 	rom_out_path = 'roms'
 	
@@ -135,8 +135,7 @@ def cpm_make():
 	loc_transient_top = 0x7FFF	# Last byte of transient area (low 32KB)
 	
 	#@FIXME: I cannot mount the upper 16kb (0x4000-7FFF) in MAME at the moment...
-	if vgldk_series == 6000:
-		loc_transient_top = 0x3FFF	# Last byte of transient area (low 16KB)
+	if vgldk_series == 6000: loc_transient_top = 0x3FFF	# Last byte of transient area (end of lower 16KB)
 	
 	# Set-up CP/M layout
 	cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
@@ -154,14 +153,16 @@ def cpm_make():
 	ccp_code_size_estimate = 0x0b80	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
 	#ccp_data_size_estimate = 0x0600	# Don't know... Just a guess...
 	ccp_merge_into_rom = False	# Merge CCP binary into ROM, so BDOS can jump to it without loading
-	ccp_loc_code = 0x0100 + 0x20	# Regular transient COM file (add some bytes for CRT0 header)
+	#ccp_loc_code = 0x0100 + 0x20	# Regular transient COM file (add some bytes for CRT0 header)
 	#ccp_loc_code = 0x4000	# Arbitrary location in transient area (must be in cartridge area if it should be merged into ROM)
 	#ccp_loc_code = loc_transient_top - ccp_data_size_estimate	# At top of transient area
 	#ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
 	#ccp_loc_code = loc_cart + 0x0020	# Put CCP at start of cartridge (leave ~0x20 bytes for cart header)
+	ccp_loc_code = 0xd000
 	#ccp_loc_data = ccp_loc_code - ccp_data_size_estimate	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
 	#ccp_loc_data = loc_internal_ram + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
-	ccp_loc_data = cpm_loc_data + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
+	#ccp_loc_data = cpm_loc_data + cpm_data_size_estimate	# Use stock system RAM to keep CP/M RAM as free as possible. But don't collide with other CP/M modules.
+	ccp_loc_data = ccp_loc_code + ccp_code_size_estimate
 	
 	
 	# Configure CP/M defines (features and options)
@@ -200,21 +201,22 @@ def cpm_make():
 		# CCP handling
 		'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
 		'BDOS_LOAD_CCP_FROM_DISK': 1,	# Do not assume CCP is in ROM, but load it from disk (using BDOS file functions)
-		'BDOS_CCP_LOAD_ADDRESS': 0x100,	# Where to load the CPM binary to
-		'BDOS_CCP_JUMP_ADDRESS': 0x100,	#ccp_loc_code,	# Where to jump after loading
+		'BDOS_CCP_LOAD_ADDRESS': ccp_loc_code,	#0x100,	# Where to load the CPM binary to
+		'BDOS_CCP_JUMP_ADDRESS': ccp_loc_code,	#0x100,	#ccp_loc_code,	# Where to jump after loading
 		
 		## BDOS file access is not handled by BDOS itself (yet) and must be re-directed to an external host ("BDOS HOST")
 		'BDOS_USE_HOST': 1,	# Re-direct file access to a host (see bdos_host.h). Recommended as there is no "internal" storage, yet.
 	#	'BDOS_HOST_ACTIVITY_LED': 1,	# Light up LED on BDOS host activity
-	#	'BDOS_HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
-	#	'BDOS_HOST_DRIVER_SOFTSERIAL': 1,	# Re-direct to SoftSerial (for use with real hardware)
-	'BDOS_HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
-		#'BDOS_HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
+	
+		#'HOST_DRIVER_PAPER_TAPE': 1,	# Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
+	#	'HOST_DRIVER_SOFTUART': 1,	# Re-direct to SoftUART (for use with real hardware)
+	#	'HOST_DRIVER_SOFTSERIAL': 1,	# Re-direct to SoftSerial (for use with real hardware)
+	'HOST_DRIVER_MAME': 1,	# Re-direct to MAME (for use in emulation)
 		
-		# Protocol to use for BDOS_HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
-	'BDOS_HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
-	#	'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
-		#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
+		# Protocol to use for HOST communication (frame level; serial usually requires some sort of error correction and might not support 8bit)
+	'HOST_PROTOCOL_BINARY': 1,	# Send using 8bit binary (e.g. for MAME)
+	#	'HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
+		#'HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
 		
 	}
 	
@@ -293,7 +295,8 @@ def cpm_make():
 		#loc_transient = 0x0100	# Start of CP/M transient area (defined as being 0x0100)
 		#ccp_loc_code = 0x6000	# Must be known by BDOS in order to start up CCP!
 		#ccp_loc_data = 0x4000	# Don't collide with BDOS/BIOS (or optional MONITOR which may be still resident)
-		ccp_bin_filename = '%s/ccp.com' % out_path
+		ccp_bin_filename = '%s/ccp.bin' % out_path
+		ccp_com_filename = '%s/ccp.com' % out_path
 		
 		put('Compiling CCP for entry at 0x%04X...' % ccp_loc_code)
 		ccp_data = compile(
@@ -317,18 +320,23 @@ def cpm_make():
 			
 			defines = {
 				#'VGLDK_SERIES': vgldk_series	#@FIXME: CP/M binaries should be completely architecture agnostic!
-				'CCP_SHOW_BANNER': 1,	# Show "CCP" on startup
+				#'CCP_SHOW_BANNER': 1,	# Show "CCP" on startup
 			}
 		)
 		
 		### Extract CCP code area as stand-alone CP/M .COM binary (starting at transient area 0x100...)
 		# Beware of file offsets! File offset 0x5F00 corresponds to memory 0x6000, because only the transient area is included in the .com file!
-		ccp_data = ccp_data[ccp_loc_code - loc_transient:]	# Note! The file data does not start at memory location 0x0000, but 0x100 (CP/M program transient area!)
+		#ccp_data = ccp_data[ccp_loc_code - loc_transient:]	# Note! The file data does not start at memory location 0x0000, but 0x100 (CP/M program transient area!)
+		ccp_data = ccp_data[ccp_loc_code:]	# Extract only the code
 		ccp_code_size = len(ccp_data)	# Determine the actually generated binary size
 		if ccp_code_size > ccp_code_size_estimate:
 			put('Compiled CCP code size (%d bytes / 0x%04X) is larger than estimated size "ccp_code_size_estimate" (%d bytes / 0x%04X). Code blocks will likely collide/overlap. Please adjust!' % (ccp_code_size,ccp_code_size, ccp_code_size_estimate,ccp_code_size_estimate))
 			sys.exit(1)
 		#hexdump(ccp_data, ccp_loc_code)
+		# Save to .COM file
+		put('Saving CCP code to "%s"...' % ccp_com_filename)
+		with open(ccp_com_filename, 'wb') as h:
+			h.write(ccp_data)
 		
 		if ccp_merge_into_rom:
 			### Merge CCP binary into CP/M image
@@ -521,30 +529,31 @@ def cpm_make():
 		# Start bdos_host in MAME mode...
 		
 		# Chose a driver
-		if 'BDOS_HOST_DRIVER_MAME' in cpm_defines:
+		if 'HOST_DRIVER_MAME' in cpm_defines:
 			mame_roms_dir = rom_out_path	# Use the newly created sysrom
 			#mame_roms_dir = None	# Use stock ROM
 			
 			driver = bdos_host.Driver_MAME(rompath=mame_roms_dir, emusys=mame_sys, cart_file=cpm_cart_filename)
-		elif 'BDOS_HOST_DRIVER_SOFTUART' in cpm_defines:
+		elif 'HOST_DRIVER_SOFTUART' in cpm_defines:
 			driver = bdos_host.Driver_serial(baud=softuart_baud, stopbits=2)	# More stopbits = more time to process?
-		elif 'BDOS_HOST_DRIVER_SOFTSERIAL' in cpm_defines:
+		elif 'HOST_DRIVER_SOFTSERIAL' in cpm_defines:
 			driver = bdos_host.Driver_serial(baud=9600, stopbits=1)
 		else:
 			driver = bdos_host.Driver()
 		
 		# Chose a protocol
-		if 'BDOS_HOST_PROTOCOL_BINARY' in cpm_defines:
+		if 'HOST_PROTOCOL_BINARY' in cpm_defines:
 			protocol = bdos_host.Protocol_binary()
-		elif 'BDOS_HOST_PROTOCOL_BINARY_SAFE' in cpm_defines:
+		elif 'HOST_PROTOCOL_BINARY_SAFE' in cpm_defines:
 			protocol = bdos_host.Protocol_binary_safe()
-		elif 'BDOS_HOST_PROTOCOL_HEX' in cpm_defines:
+		elif 'HOST_PROTOCOL_HEX' in cpm_defines:
 			protocol = bdos_host.Protocol_hex()
 		else:
 			protocol = bdos_host.Protocol()
 		
 		# Start host
-		host = bdos_host.Host(driver=driver, protocol=protocol, mounts=BDOS_MOUNTS)
+		put('Host driver=%s, protocol=%s' % (str(driver.__class__.__name__), str(protocol.__class__.__name__)))
+		host = bdos_host.BDOS_Host(driver=driver, protocol=protocol, mounts=BDOS_MOUNTS)
 		host.open()
 		
 		if not host.is_open:
@@ -638,7 +647,7 @@ def compile(
 	
 	#cmd += ' --verbose'	# Show stages of compilation
 	#cmd += ' --vc'	# vc = messages are compatible with Micro$oft visual studio
-	cmd += ' -V'	# V = Show actual commands
+	#cmd += ' -V'	# V = Show actual commands that are run by the compiler
 	
 	cmd += ' -o %s' % output_hex_file
 	cmd += ' %s %s' % (crt_rel_file, ' '.join(source_files))	# .rel, .c, .c ...

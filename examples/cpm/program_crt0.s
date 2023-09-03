@@ -5,15 +5,15 @@
 	.area	_HEADER (ABS)
 	
 
-; Resulting binary file will have on byte 0 address 0x100!
-;.org 0x0000
-;;; First executed instructions (usually "jp 0xf200" on CP/M)
+; Create some markers in binary. Those should be skipped when extracting the .COM file
+.org 0x0000
 ;	;di
 ;	;im 1
-;	jp init
+	jp init
+	.asciz	'[keep the lowstorage 0x0000-0x0100 free for CP/M!]'
 
 
-;; Init - actual CRT init/life cycle procedure
+;; Init - Default entry point (and first bytes) in a CP/M .COM file
 .org	0x0100
 init:
 	;; Call main() function (C entry point)

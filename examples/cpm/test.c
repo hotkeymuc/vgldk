@@ -4,12 +4,13 @@ This is a test program for CP/M
 
 */
 
-#include "program.c"
+#include "program.h"
+#include "program_stdio.h"
 
 //void main() __naked {
 void main() {
 	
-	printf("Hello world");
+	puts("Hello world");
 	
 	//getchar();
 	
@@ -27,5 +28,5 @@ void main() {
 	__endasm;
 	*/
 	
-	//exit();
+	exit();
 }
