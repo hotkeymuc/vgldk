@@ -325,10 +325,6 @@
 
 
 
-
-
-
-
 void softuart_tx_delay() {
 	// Delay between bits for sending
 	
@@ -413,8 +409,6 @@ void softuart_sendByte(byte d) {
 }
 
 
-
-
 void softuart_rx_delay() {
 	// Delay between bits for receiving
 	
@@ -452,6 +446,7 @@ void softuart_rx_delayEdge() {
 	// Delay between edge and middle of bit while receiving (usually a single nop)
 	
 	byte i;
+	// Ignore compiler warnings about "comparison is always false" / "unreachable code"
 	for(i = 0; i < SOFTUART_RX_DELAY_EDGE; i++) {
 		__asm
 			nop
@@ -482,7 +477,8 @@ int softuart_receiveByte() {
 	SOFTUART_MARK;
 	
 	// Receive all bits
-	b = 0;
+	b = 0x00;
+	
 	for(i = 0; i < 8; i++) {
 		
 		b >>= 1;

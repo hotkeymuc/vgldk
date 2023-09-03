@@ -13,7 +13,7 @@ byte hexDigit(byte c) {
 }
 
 
-//#include "hex.h"
+//#include "stdiomin.h"	// for putchar
 void printf_x2(byte b) {
 	//putchar(hexdigit[b >> 4]); putchar(hexdigit[b & 0x0f]);
 	putchar(hexDigit(b >> 4)); putchar(hexDigit(b & 0x0f));
