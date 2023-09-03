@@ -307,10 +307,10 @@ void keyboard_update() {
 		//printf("KeyDown%02X", scancode);
 		//putchar('D'); printf_x2(scancode);
 		switch(keycode) {
-		case KEY_LEFT_SHIFT:  keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
-		case KEY_RIGHT_SHIFT: keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
-		case KEY_ALT:         keyboard_modifiers |= KEYBOARD_MODIFIER_ALT;
-		case KEY_SYMBOL:      keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL;
+		case KEY_LEFT_SHIFT:  keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
+		case KEY_RIGHT_SHIFT: keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
+		case KEY_ALT:         keyboard_modifiers |= KEYBOARD_MODIFIER_ALT; break;
+		case KEY_SYMBOL:      keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL; break;
 		default:
 			
 			// Normal key
