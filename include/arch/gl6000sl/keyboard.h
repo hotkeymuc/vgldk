@@ -61,6 +61,7 @@ __endasm;
 
 // Key codes
 #define KEY_CHARCODE_NONE 0
+#define KEY_NONE	0	// key code for "not a valid key"
 
 #define KEY_MOUSE_LMB 1
 #define KEY_MOUSE_RMB 2
@@ -128,6 +129,23 @@ const keycode_t KEY_CODES[8*8*2] = {
 };
 
 
+// Translation when pressing SHIFT. Translates keycodes to charcodes
+#define KEY_MAP_SHIFT_SIZE 17
+// German
+const keycode_t KEY_MAP_SHIFT_FROM[KEY_MAP_SHIFT_SIZE] = {
+	'1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+	',', '.', '-', 'ä', 'ü', 'ö',
+	//KEY_CURSOR_LEFT,	KEY_CURSOR_RIGHT,
+	KEY_ENTER,
+};
+const char KEY_MAP_SHIFT_TO[KEY_MAP_SHIFT_SIZE] = {
+	'!', '"', 'ß', '$', '%', '&', '/', '(', ')', '=',
+	';', ':', '_', 'Ä', 'Ü', 'Ö',
+	//'<', '>',
+	'\n',
+};
+
+
 #define KEYBOARD_PRESSED_MAX 6
 #define KEYBOARD_BUFFER_MAX 8
 #define KEYBOARD_SCANCODE_INVALID 0xff
@@ -145,6 +163,13 @@ byte keyboard_buffer_in;
 byte keyboard_buffer_out;
 char keyboard_buffer[KEYBOARD_BUFFER_MAX];
 
+
+byte keyboard_find(byte *haystack, byte needle, byte len) {
+	while(len-- > 0) {
+		if (*haystack++ == needle) return 1;
+	}
+	return 0;
+}
 
 void keyboard_init() {
 	byte i;
@@ -202,28 +227,30 @@ void keyboard_update() {
 		// Scan the keyboard matrix
 		
 		for (my = 0; my < 8; my++) {
-			keyboard_matrix_out(0xff - (1 << my));
+			keyboard_matrix_out(0xff - (1 << my));	// Active LOW
 			
 			// Check matrix input 1
 			b1 = keyboard_matrix_in1();
 			// if (b2 != 0xff) ...
 			for (mx = 0; mx < 8; mx++) {
-				if (!(b1 & (1 << mx))) {
+				if ((b1 & 1) == 0) {
 					// Store scan code
 					if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
 						keyboard_pressed_new[keyboard_num_pressed_new++] = my*8 + mx;
 				}
+				b1 >>= 1;
 			}
 			
 			// Check matrix input 2
 			b2 = keyboard_matrix_in2();
 			// if (b2 != 0xff) ...
 			for (mx = 0; mx < 8; mx++) {
-				if (!(b2 & (1 << mx))) {
+				if ((b2 & 1) == 0) {
 					// Store scan code
 					if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
 						keyboard_pressed_new[keyboard_num_pressed_new++] = (8*8) + my*8 + mx;
 				}
+				b2 >>= 1;
 			}
 		}
 	}
@@ -233,98 +260,103 @@ void keyboard_update() {
 	// Check for key releases (i.e. scancodes in keyboard_pressed[] that are not in keyboard_pressed_new[] any more)
 	for (i = 0; i < keyboard_num_pressed; i++) {
 		scancode = keyboard_pressed[i];
+		//if (scancode == KEYBOARD_SCANCODE_INVALID) continue;
 		
-		// See if it is still pressed...
-		for (j = 0; j < keyboard_num_pressed_new; j++) {
-			if (keyboard_pressed_new[j] == scancode) {
-				// Key is still pressed
-				scancode = KEYBOARD_SCANCODE_INVALID;
-				break;
-			}
+		// See if key is still included in new scan array (i.e. still pressed)
+		if (keyboard_find(&keyboard_pressed_new[0], scancode, keyboard_num_pressed_new) != 0)
+			continue;
+		
+		// Key was released
+		keycode = KEY_CODES[scancode];
+		//if (keycode == KEY_NONE) continue;
+		
+		//printf("KeyUp%02X", scancode);
+		//bdos_putchar('U'); bdos_printf_x2(scancode);
+		
+		// Update modifier status
+		switch (keycode) {
+			case KEY_LEFT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
+			case KEY_RIGHT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
+			case KEY_ALT:			keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_ALT); break;
+			case KEY_SYMBOL:		keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SYMBOL); break;
 		}
-		if (scancode != KEYBOARD_SCANCODE_INVALID) {
-			// Key was released
-			
-			keycode = KEY_CODES[scancode];
-			//printf("KeyUp%02X", scancode);
-			//putchar('U'); putchar(scancode);
-			
-			// Update modifier status
-			switch (keycode) {
-				case KEY_LEFT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
-				case KEY_RIGHT_SHIFT:	keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SHIFT); break;
-				case KEY_ALT:			keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_ALT); break;
-				case KEY_SYMBOL:		keyboard_modifiers &= (0xff - KEYBOARD_MODIFIER_SYMBOL); break;
-			}
-			
-			// Remove (copy last element there)
-			keyboard_pressed[i] = keyboard_pressed[--keyboard_num_pressed];
-			i--;
-		}
+		
+		// Remove (copy last element there)
+		keyboard_pressed[i] = keyboard_pressed[--keyboard_num_pressed];
+		i--;
+		
 	}
 	
 	// Check for key presses (i.e. scancodes in keyboard_pressed_new[] that are not in keyboard_pressed[])
 	for (i = 0; i < keyboard_num_pressed_new; i++) {
 		scancode = keyboard_pressed_new[i];
-		for (j = 0; j < keyboard_num_pressed; j++) {
-			if (keyboard_pressed[j] == scancode) {
-				// Key was already pressed
-				scancode = KEYBOARD_SCANCODE_INVALID;
-				break;
-			}
+		//if (scancode == KEYBOARD_SCANCODE_INVALID) continue;
+		
+		// See if this new key was already known before (i.e. was pressed before and is still pressed)
+		if (keyboard_find(&keyboard_pressed[0], scancode, keyboard_num_pressed) != 0) {
+			//@TODO: Typematic code here!
+			continue;
 		}
-		if (scancode != KEYBOARD_SCANCODE_INVALID) {
-			// Key was previously unknown
+		
+		// Key was freshly pressed
+		
+		// Handle key press
+		keycode = KEY_CODES[scancode];
+		if (keycode == KEY_NONE) continue;
+		
+		//printf("KeyDown%02X", scancode);
+		//putchar('D'); printf_x2(scancode);
+		switch(keycode) {
+		case KEY_LEFT_SHIFT:  keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
+		case KEY_RIGHT_SHIFT: keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
+		case KEY_ALT:         keyboard_modifiers |= KEYBOARD_MODIFIER_ALT;
+		case KEY_SYMBOL:      keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL;
+		default:
 			
-			// Handle key press
-			keycode = KEY_CODES[scancode];
-			//printf("KeyDown%02X", scancode);
-			//putchar('D'); putchar(scancode);
+			// Normal key
+			charcode = keycode;
 			
-			switch (keycode) {
-				case KEY_LEFT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
-				case KEY_RIGHT_SHIFT:	keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
-				case KEY_ALT:			keyboard_modifiers |= KEYBOARD_MODIFIER_ALT; break;
-				case KEY_SYMBOL:		keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL; break;
-				
-				default:
-					// Normal key
-					charcode = keycode;
-					
-					
-					if (keyboard_modifiers & KEYBOARD_MODIFIER_SYMBOL > 0) {
-						// Symbol
-						charcode = keycode - 'a' + 0x01;
-					} else
-					if (keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT > 0) {
-						// Shift
-						if ((keycode >= 'a') && (keycode <= 'z')) {
-							charcode = 'A' + (keycode - 'a');
-						}
-						if ((keycode >= '1') && (keycode <= '9')) {
-							charcode = '!' + (keycode - '1');
-						}
-					} else
-					if (keycode == KEY_ENTER) {
-						// ENTER to NewLine
-						charcode = '\n';
-					} else {
-						// Char code equals key code
-						charcode = keycode;
+			if ((keyboard_modifiers & KEYBOARD_MODIFIER_SYMBOL) > 0) {
+				// Symbol
+				charcode = keycode - 'a' + 0x01;
+			} else
+			if ((keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT) > 0) {
+				// Shift
+				if ((keycode >= 'a') && (keycode <= 'z')) {
+					charcode = 'A' + (keycode - 'a');
+				} else {
+					/*
+					if ((keycode >= '1') && (keycode <= '9')) {
+						charcode = '!' + (keycode - '1');
 					}
-					
-					// Store CHARCODE to buffer
-					keyboard_buffer[keyboard_buffer_in] = charcode;
-					keyboard_buffer_in = (keyboard_buffer_in + 1) % KEYBOARD_BUFFER_MAX;
-					// if (keyboard_buffer_in == keyboard_buffer_out) { FULL! }
+					*/
+					// Check and apply KEY_MAP_SHIFT
+					for (j = 0; j < KEY_MAP_SHIFT_SIZE; j++) {
+						if (keycode == KEY_MAP_SHIFT_FROM[j]) {
+							charcode = KEY_MAP_SHIFT_TO[j];
+							break;
+						}
+					}
+				}
+			} else
+			if (keycode == KEY_ENTER) {
+				// ENTER to NewLine
+				charcode = '\n';
+			} else {
+				// Char code equals key code
+				charcode = keycode;
 			}
 			
-			
-			// Store SCANCODE as "pressed"
-			if (keyboard_num_pressed < KEYBOARD_PRESSED_MAX)
-				keyboard_pressed[keyboard_num_pressed++] = scancode;
-			
+			// Store CHARCODE to buffer
+			keyboard_buffer[keyboard_buffer_in] = charcode;
+			keyboard_buffer_in = (keyboard_buffer_in + 1) % KEYBOARD_BUFFER_MAX;
+			// if (keyboard_buffer_in == keyboard_buffer_out) { FULL! }
 		}
+		
+		// Store SCANCODE as "pressed"
+		if (keyboard_num_pressed < KEYBOARD_PRESSED_MAX)
+			keyboard_pressed[keyboard_num_pressed++] = scancode;
+		
 	}
 	
 }

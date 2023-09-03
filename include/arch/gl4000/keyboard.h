@@ -297,7 +297,7 @@ void keyboard_update() {
 		
 		// Key was released
 		keycode = KEY_CODES[scancode];
-		if (keycode == KEY_NONE) continue;
+		//if (keycode == KEY_NONE) continue;
 		
 		//printf("KeyUp%02X", scancode);
 		//putchar('U'); printf_x2(scancode);
@@ -318,9 +318,11 @@ void keyboard_update() {
 	for (i = 0; i < keyboard_num_pressed_new; i++) {
 		scancode = keyboard_pressed_new[i];
 		
-		// See if this new key was already known before (i.e. was pressed before)
-		if (keyboard_find(&keyboard_pressed[0], scancode, keyboard_num_pressed) != 0)
+		// See if this new key was already known before (i.e. was pressed before and is still pressed)
+		if (keyboard_find(&keyboard_pressed[0], scancode, keyboard_num_pressed) != 0) {
+			//@TODO: Typematic code here!
 			continue;
+		}
 		
 		// Key was freshly pressed
 		
@@ -332,44 +334,50 @@ void keyboard_update() {
 		//putchar('D'); printf_x2(scancode);
 		
 		// Set modifier status
-		if (keycode == KEY_SHIFT)	{ keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; continue; }
-		if (keycode == KEY_ALT)		{ keyboard_modifiers |= KEYBOARD_MODIFIER_ALT; continue; }
-		
-		// Normal key (not a modifier)
-		
-		// Map keycode to charcode
-		charcode = keycode;
-		
-		if ((keyboard_modifiers & KEYBOARD_MODIFIER_ALT) > 0) {
-			// Alt + Key
+		if      (keycode == KEY_SHIFT) keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
+		else if (keycode == KEY_ALT)   keyboard_modifiers |= KEYBOARD_MODIFIER_ALT;
+		else {
+			// Normal key (not a modifier)
 			
-			if (keycode == KEY_ENTER)
-				charcode = '\r';	// Force CR
-			else
-				charcode = 1 + (keycode - 'a');	// Handle it like Ctrl on PC: "A" becomes chr(1), "B" becomes chr(2), ...
+			// Map keycode to charcode
+			charcode = keycode;
 			
-		} else
-		if ((keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT) > 0) {
-			// Shift + Key
-			
-			if ((keycode >= 'a') && (keycode <= 'z')) {
-				// Upper case
-				charcode = 'A' + (keycode - 'a');
-			} else {
-				// Check and apply KEY_MAP_SHIFT
-				for (j = 0; j < KEY_MAP_SHIFT_SIZE; j++) {
-					if (keycode == KEY_MAP_SHIFT_FROM[j]) {
-						charcode = KEY_MAP_SHIFT_TO[j];
-						break;
+			if ((keyboard_modifiers & KEYBOARD_MODIFIER_ALT) > 0) {
+				// Alt + Key
+				
+				if (keycode == KEY_ENTER)
+					charcode = '\r';	// Force CR
+				else
+					charcode = 1 + (keycode - 'a');	// Handle it like Ctrl on PC: "A" becomes chr(1), "B" becomes chr(2), ...
+				
+			} else
+			if ((keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT) > 0) {
+				// Shift + Key
+				
+				if ((keycode >= 'a') && (keycode <= 'z')) {
+					// Upper case
+					charcode = 'A' + (keycode - 'a');
+				} else {
+					/*
+					if ((keycode >= '1') && (keycode <= '9')) {
+						charcode = '!' + (keycode - '1');
+					}
+					*/
+					// Check and apply KEY_MAP_SHIFT
+					for (j = 0; j < KEY_MAP_SHIFT_SIZE; j++) {
+						if (keycode == KEY_MAP_SHIFT_FROM[j]) {
+							charcode = KEY_MAP_SHIFT_TO[j];
+							break;
+						}
 					}
 				}
 			}
+			
+			// Store CHARCODE in buffer
+			keyboard_buffer[keyboard_buffer_in] = charcode;
+			keyboard_buffer_in = (keyboard_buffer_in + 1) % KEYBOARD_BUFFER_MAX;
+			// if (keyboard_buffer_in == keyboard_buffer_out) { FULL! }
 		}
-		
-		// Store CHARCODE in buffer
-		keyboard_buffer[keyboard_buffer_in] = charcode;
-		keyboard_buffer_in = (keyboard_buffer_in + 1) % KEYBOARD_BUFFER_MAX;
-		// if (keyboard_buffer_in == keyboard_buffer_out) { FULL! }
 		
 		// Store SCANCODE as "pressed"
 		if (keyboard_num_pressed < KEYBOARD_PRESSED_MAX)
