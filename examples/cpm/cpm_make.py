@@ -59,8 +59,8 @@ How to start up CP/M:
 """
 
 # Have a look at these settings:
-VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
-#VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
+#VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
+VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
 COMPILE_CPM = True	# Compile BINT/BIOS/BDOS (main)
 COMPILE_CCP = True	# Compile CCP (command line processor)
 EMULATE_CCP_IN_YAZE = False	# Run the CCP in YAZE emulator to test cross-compatibility
@@ -132,14 +132,18 @@ def cpm_make():
 	loc_cart = 0x8000
 	loc_internal_ram = 0xc000
 	loc_transient = 0x0100	# Start of CP/M transient area (defined as being at 0x0100. Do not change.)
-	loc_transient_top = 0x7FFF	# Last byte of transient area
+	loc_transient_top = 0x7FFF	# Last byte of transient area (low 32KB)
+	
+	#@FIXME: I cannot mount the upper 16kb (0x4000-7FFF) in MAME at the moment...
+	if vgldk_series == 6000:
+		loc_transient_top = 0x3FFF	# Last byte of transient area (low 16KB)
 	
 	# Set-up CP/M layout
 	cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
 	#cpm_code_size_estimate = 0x1440	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
 	#cpm_code_size_estimate = 0x1800	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
 	cpm_code_size_estimate = 0x1FE0	# Approx size of the generated CP/M code segment (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size.
-	cpm_data_size_estimate = 0x0800	# Approx size of CPM RAM usage
+	cpm_data_size_estimate = 0x0a00	# Approx size of CPM RAM usage
 	#cpm_loc_code = 0x8000 - cpm_code_size_estimate	# Put CP/M as far up as possible in lower RAM bank
 	#cpm_loc_code = 0xc000 - cpm_code_size_estimate	# Put CP/M as far up in cartridge space (0x8000-BFFF) as possible
 	#cpm_loc_code = loc_cart + cart_eeprom_size - cpm_code_size_estimate	# Put CP/M as far up in cartridge EPROM (0x8000-BFFF) as possible
@@ -150,7 +154,7 @@ def cpm_make():
 	ccp_code_size_estimate = 0x0b80	# Approx size of generated CCP code data (to determine optimal layout). Must be LARGER OR EQUAL to actual binary size
 	#ccp_data_size_estimate = 0x0600	# Don't know... Just a guess...
 	ccp_merge_into_rom = False	# Merge CCP binary into ROM, so BDOS can jump to it without loading
-	ccp_loc_code = 0x0100 + 0x10	# Regular transient COM file (add some bytes for CRT0 header)
+	ccp_loc_code = 0x0100 + 0x20	# Regular transient COM file (add some bytes for CRT0 header)
 	#ccp_loc_code = 0x4000	# Arbitrary location in transient area (must be in cartridge area if it should be merged into ROM)
 	#ccp_loc_code = loc_transient_top - ccp_data_size_estimate	# At top of transient area
 	#ccp_loc_code = cpm_loc_code - ccp_code_size_estimate	# Put CCP below BDOS
@@ -172,7 +176,7 @@ def cpm_make():
 		
 		## Configure BIOS
 		#'BIOS_SCROLL_WAIT': 1,	# Wait after 1 page of text	#@TODO: Make this runtime-changable!
-		'BIOS_SHOW_BANNER': 1,	# Show CP/M text banner and version on reset
+		#'BIOS_SHOW_BANNER': 1,	# Show CP/M text banner and version on reset
 		
 		#@TODO: Make aux device changable at runtime (using the "iobyte"!)
 		#'BIOS_SHOW_PAPER_TAPE_MAPPING': 1,	# Print the configured paper tape configuration on boot
@@ -186,8 +190,12 @@ def cpm_make():
 		#'BDOS_SHOW_BANNER': 1,	# Show "BDOS" on boot (helpful for debugging)
 		'BDOS_WAIT_FOR_RAM': 1,	# Wait until RAM is writable before proceeding (recommended)
 		'BDOS_RESTORE_LOWSTORAGE': 1,	# Restore/fix the lower memory area on each start
+		'BDOS_RESTORE_BDOS_VECTOR': 1,	# Restore/fix BDOS vector at 0x0005 on each start
 		'BDOS_RESTORE_BINT_VECTORS': 1,	# Restore/fix the interrupt vectors 0x0008...0x0038 on each start
+		
+		#@FIXME: Currently 0x4000-0x7FFF are not writable on GL6000SL (in emulation). "loc_transient_top" must be set to 0x3FFF... :-(
 		'BDOS_PATCHED_ENTRY_ADDRESS': (loc_transient_top+1 - 3),	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
+		#'BDOS_PATCHED_ENTRY_ADDRESS': 0x3ffd,	# Patch the BDOS vector at 0x0005 to point to the highest usable RAM bytes in transient area
 		
 		# CCP handling
 		'BDOS_AUTOSTART_CCP': 1,	# Start CCP on BDOS startup without asking the user (disable for debugging)
@@ -208,8 +216,6 @@ def cpm_make():
 	#	'BDOS_HOST_PROTOCOL_BINARY_SAFE': 1,	# Send using binary, but with checksum and retransmission (e.g. for SoftUART)
 		#'BDOS_HOST_PROTOCOL_HEX': 1,	# Send using hex text (e.g. when serial host does not support 8bit data)
 		
-		## Configure CCP
-		'CCP_LOC_CODE': '0x%04X'%ccp_loc_code	# Tell BDOS where to find CCP. Mandatory.
 	}
 	
 	
@@ -221,10 +227,10 @@ def cpm_make():
 	
 	
 	### Compile CP/M (CRT0, BIOS, BDOS, BINT)
-	cpm_hex_filename = '%s/cpm.hex' % out_path
-	cpm_bin_filename = '%s/cpm.bin' % out_path
-	cpm_ram_filename = '%s/cpm_ram.bin' % out_path
-	cpm_cart_filename = '%s/cpm_cart.bin' % out_path
+	cpm_hex_filename = '%s/cpm_%d.hex' % (out_path, vgldk_series)
+	cpm_bin_filename = '%s/cpm_%d.bin' % (out_path, vgldk_series)
+	cpm_ram_filename = '%s/cpm_%d_ram.bin' % (out_path, vgldk_series)
+	cpm_cart_filename = '%s/cpm_%d_cart.bin' % (out_path, vgldk_series)
 	
 	put('Compiling CP/M (CRT0, BINT, BIOS, BDOS) for entry at 0x%04X...' % cpm_loc_code)
 	cpm_data = compile(
@@ -233,6 +239,7 @@ def cpm_make():
 			#'%s/cpm_crt0.s' % src_path
 			'%s/cpm_crt0_%d.s' % (src_path, vgldk_series)
 		],
+		#crt_rel_file = '%s/cpm_crt0.rel' % out_path,
 		crt_rel_file = '%s/cpm_crt0.rel' % out_path,
 		
 		source_files = [
@@ -251,8 +258,8 @@ def cpm_make():
 	)
 	
 	# Check for overflow (code too big)
-	check_before = 8	# Check some bytes before actual end
-	check_after = 4	# Check some bytes after (for overflow)
+	check_before = 0	# Check some bytes before actual end
+	check_after = 8	# Check some bytes after (for overflow)
 	for a in range(cpm_loc_code + cpm_code_size_estimate - check_before, cpm_loc_code + cpm_code_size_estimate + check_after):
 		if cpm_data[a] != 0x00:
 			put('CPM seems quite big: It should fill 0x%04X...0x%04X, but around the end (0x%04X) it is not empty. Please adjust memory layout, code estimate or reduce code size.' % (cpm_loc_code, cpm_loc_code+cpm_code_size_estimate, a))
@@ -268,6 +275,14 @@ def cpm_make():
 					put('I am guessing the CPM binary is %d bytes (0x%04X) in size, instead of the estimated %d bytes (0x%04X).' % (s, s, cpm_code_size_estimate, cpm_code_size_estimate))
 					break
 			sys.exit(5)
+	
+	# Estimate actual size
+	a = cpm_code_size_estimate
+	while a > 0:
+		if cpm_data[cpm_loc_code + a] != 0:
+			break
+		a -= 1
+	put('CPM size is estimated to be %d bytes (0x%04X)' % (a, a))
 	
 	#hexdump(cpm_data[:0x0120], 0x0000)
 	#hexdump(cpm_data[cpm_loc_code:0x8000], cpm_loc_code)

@@ -19,6 +19,10 @@ init_size .equ (init_end - init)	; Store how big the init code is
 ;.asciz '[init_end]'
 
 
+.org 0x7fee
+.asciz '[end_of_transient]'
+
+
 ;; ----------------------------------------
 ;; Also do the VTech cartridge auto-start header
 

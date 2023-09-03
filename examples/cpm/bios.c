@@ -134,8 +134,11 @@ void bios_boot() __naked {
 	
 	// Init VGL hardware
 	lcd_init();
+	
 	keyboard_init();
+	
 	sound_off();
+	
 	
 	#ifdef BIOS_SCROLL_WAIT
 		// Add "wait" while scrolling callback
@@ -342,10 +345,6 @@ void bios_setdma(byte *a) {
 	/*
 	printf("bios_setdma=");
 	printf_x4((word)a);
-	putchar('0' + (((word)a) >> 12));
-	putchar('0' + ((((word)a) >> 8) & 0x0f));
-	putchar('0' + ((((word)a) >> 4) & 0x0f));
-	putchar('0' + (((word)a) & 0x0f       ));
 	*/
 	bios_dma = a;
 }
@@ -404,7 +403,7 @@ void bios() __naked {
 		jp _bios_read
 		jp _bios_write
 		
-	; CP/M 2
+	; CP/M 2:
 		jp _bios_listst
 		jp _bios_sectran
 		

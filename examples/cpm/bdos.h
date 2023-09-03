@@ -17,19 +17,18 @@
 
 //#define BODS_WAIT_FOR_RAM	// Wait until RAM is writable before proceeding
 //#define BDOS_RESTORE_LOWSTORAGE	// Restore the lower memory addresses for next cold-start
-//#define BDOS_RESTORE_BINT_VECTORS	// Re-set the interrupt vectors 0x0010...0x0038
+//#define BDOS_RESTORE_BDOS_VECTOR	// Restore vector at 0x0005 to point to BDOS
+//#define BDOS_RESTORE_BINT_VECTORS	// Re-set the interrupt vectors 0x0008...0x0038
 
 // Compatibility patch: Make the BDOS vector at 0x0005 a jump to the top of user-usable RAM. This allows BDOS to live anywhere in address space, while still marking the end of usable transient area.
 //#define BDOS_PATCHED_ENTRY_ADDRESS (0x7fff - 2)	// Address of the "virtual BDOS entry", i.e. the limit of usable transient area, after which BDOS/CPM/CCP/ROM etc. start.
 //#define BDOS_AUTOSTART_CCP	// Start CCP automatically, do not ask
 //#define BDOS_LOAD_CCP_FROM_DISK	// Do not assume CCP is in ROM (always present), but load it from disk
+//#define BDOS_CCP_LOAD_ADDRESS 0x100	// Where to load the CPM binary to
+//#define BDOS_CCP_JUMP_ADDRESS 0x100	// Where to jump to
 
 //#define BDOS_USE_HOST	// Re-direct file operations to a host computer (which acts like an external drive). See bdos_host.h for more config!
 
-#ifndef CCP_LOC_CODE
-	//#define CCP_LOC_CODE	0x4000	// Entry address of CCP binary
-	#error Please set CCP_LOC_CODE so that BDOS knows where to start it.
-#endif
 
 #include <basictypes.h>	// byte, word, true, false, NULL, ...
 

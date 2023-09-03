@@ -35,7 +35,7 @@
 void main() __naked {
 	__asm
 		jp _ccp
-		;.asciz '[<- CCP entry]'	; Marker in binary to see if this is actually the first byte, jumping to CCP
+		;.asciz '[<- CCP entry jump]'	; Marker in binary to see if this is actually the first byte, jumping to CCP
 	__endasm;
 }
 
@@ -877,45 +877,15 @@ void handle(char *input) {
 	}
 }
 
-/*
-void test_zork() {
-	byte i;
-	byte r;
-	
-	printf("Opening...");
-	r = ccp_fopen("ZORK1.DAT");
-	printf_x2(r);
-	ccp_print_ok();
-	
-	dump((word)&def_fcb, 36);
-	//dump((word)&ccp_dma[0], 128);
-	
-	printf("ReadRand...");
-	r = ccp_freadrand(0,0,0);
-	printf_x2(r);
-	ccp_print_ok();
-	
-	for(i = 0; i < 6; i++) {
-		printf("Reading...");
-		printf_x2(r);
-		r = ccp_fread();
-		printf_x2(r);
-		ccp_print_ok();
-		
-		dump((word)&def_fcb, 36);
-		//dump((word)&ccp_dma[0], 128);
-	}
-}
-*/
 
 void ccp() __naked {
 	
+	#ifdef CCP_SHOW_BANNER
 	//putchar('!');
-	//puts("CCP");
+	puts("CCP");
 	//printf("CCP!"); getchar();
+	#endif
 	
-	
-	//test_zork();	// Test ZORK1 compatibility
 	
 	memset(&ccp_input[0], 0, CCP_MAX_INPUT);	// Zero out the input buffer
 	

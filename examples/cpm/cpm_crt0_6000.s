@@ -12,8 +12,8 @@
 	
 	
 	ld sp, #0xff87	; GL6000: ld sp, #0xff87 - leave just a little bit more
-	ld a, #0
-	ld i, a
+	;ld a, #0
+	;ld i, a
 	
 	; LCD
 	;ld a, #3
@@ -24,57 +24,63 @@
 	;; e.g. OUT 0x52, 0x20	-> maps CART:0x0000 to CPU:0x8000
 	ld a, #0
 	out (0x55), a
-	
 	out (0x50), a
+	
 	ld a, #1
 	out (0x51), a
 	
-	;ld a, #2
-	;out (0x52), a
+	ld a, #2
+	out (0x52), a
+	
+	
 	; Map cart to 0x8000 (found by trial and error)
 	ld a, #0x0e
 	out (0x55), a
 	ld a, #0x20
 	out (0x52), a
 	
+	
+	; Next one is needed for VRAM to function properly (first scan lines)
 	ld a, #1
 	out (0x53), a
+	
 	; 0x54 = 0xe000 = vram
 	ld a, #0
 	out (0x54), a
 	
-	; ?
-	;ld a, #0
-	;out (0x22), a
-	;ld a, #0xe0
-	;out (0x21), a
-	;ld a, #0x60
-	;out (0x23), a
+;	; ?
+;	;ld a, #0
+;	;out (0x22), a
+;	;ld a, #0xe0
+;	;out (0x21), a
+;	;ld a, #0x60
+;	;out (0x23), a
 	
 	
-	;	; Trial and error... Trying to find the port-combination to mount cart at 0x8000
-	;	ld h, #0x80
-	;	ld l, #0x00
-	;	
-	;	ld b, #0x00
-	;	ld c, #0xff
-	;loop_outer_start:
-	;	inc c
-	;	ld a, c
-	;	;out(0x13), a
-	;	out(0x55), a
-	;loop_start:
-	;	ld a, b
-	;	out(0x13), a
-	;	out(0x52), a
-	;	
-	;	; Check for cartridge header
-	;	ld a, (hl)
-	;	cp a, #0x55
-	;	jr z, found
-	;	inc b
-	;	jr c, loop_outer_start
-	;	jr loop_start
-	;found:
+;		; Trial and error... Trying to find the port-combination to mount cart at 0x8000
+;		ld h, #0x7F
+;		ld l, #0xF0
+;		
+;		ld b, #0x00
+;		ld c, #0xff
+;	;loop_outer_start:
+;	;	inc c
+;	;	ld a, c
+;	;	;out(0x13), a
+;	;	out(0x55), a
+;	loop_start:
+;		ld a, b
+;		out(0x13), a
+;		out(0x53), a
+;		
+;		; Check for cartridge header
+;		ld a, (hl)
+;		cp a, #0x6e
+;		jr z, found
+;		inc b
+;	;	jr c, loop_outer_start
+;		jr loop_start
+;	found:
 	
+
 .include "cpm_crt0_outro.inc"

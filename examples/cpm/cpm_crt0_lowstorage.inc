@@ -73,11 +73,12 @@ bdos_call:
 
 ;; BIOS workarea
 .org 0x40
+	.asciz '[bios_work]'
 
 ;; Default FCB
 .org 0x5c
 ;default_fcb:
-	.asciz '[fcb]'
+	.asciz '[default_fcb]'
 
 ;; Workarea / DMA
 .org 0x80
@@ -97,7 +98,10 @@ bdos_call:
 .org 0x40	; Fit it between vector table and working area (Must keep it short or it will interfere with default_fcb at 0x5c!)
 ;.org 0x150	; Fit it somewhere in the transient area
 ;.area _CODE	; Fit it in _CODE area
-;.asciz '[init:]'	; Just a marker inside the binary
 init:
 	;; Bare minimum VTech hardware init
 	;; Note: This depends on the model..
+	
+	; continue here with arch specific init
+	; ...then continue with cpm_crt0_outro.inc
+	

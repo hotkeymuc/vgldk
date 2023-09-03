@@ -29,32 +29,13 @@
 // The jump at CRT0 0x0005 should point here.
 // Its address marks the end of the transient memory area (e.g. ZORK checks 0x0005 for that address to determine maximum RAM usage).
 void bdos() __naked {
-	/*
-	// Dump call
-	__asm
-		; Skip lower calls
-		ld a, c
-		cp a, #5
-		jr c, 0$
-		
-		; Dump
-		push hl
-		push de
-		push bc
-		call _bdos_printf_x2
-		pop bc
-		pop de
-		pop hl
-	0$:
-	__endasm;
-	*/
-	
 	__asm
 		
 		; Jump into table...
 		ld hl, #_bdos_funcs	; BDOS function jump table
 		
-		; Function number is stored in C
+		; Function number is stored in C.
+	
 		; Add it to the address (as BC, so just zero out B and we are fine)
 		ld b, #0
 		; Table consists of "JP xxxx" (3 bytes) entries. So add BC 3 times.
@@ -276,7 +257,9 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 		word checks;
 		
 		// Address to perform write check
-		check_addr = (byte *)0x0100;
+		//check_addr = (byte *)0x0100;	// Check transient start
+		//check_addr = (byte *)0x7fff;	// Check 32KB top
+		check_addr = (byte *)0x3fff;	// Check 16KB top
 		
 		bdos_printf("RAM check...");
 		//@TODO: Maybe throttle this (in case there is FLASH installed)
@@ -321,20 +304,22 @@ void bdos_init() __naked {	// BDOS_FUNC_P_TERMCPM:	// 0: System Reset
 	/*
 	// Restore/set the cold boot vector (if not known at compile time)
 	// It is assumed to be the last 3 bytes in lowstorage cold boot code...
-	*((byte *)(0x0059)) = 0xc3;	// JMP ...
+	*((byte *)(0x0059)) = 0xc3;	// JP ...
 	*((word *)(0x005a)) = (word)&bios_boot;	// to bios_boot
 	*/
 	
-	// Restore BDOS vector at 0x0005 (if corrupted / fresh boot)
-	*((byte *)(0x0005)) = 0xc3;	// JP ...
-	*((word *)(0x0006)) = (word)&bdos;	// to BDOS
+	#ifdef BDOS_RESTORE_BDOS_VECTOR
+		// Restore BDOS vector at 0x0005 (if corrupted / fresh boot)
+		*((byte *)(0x0005)) = 0xc3;	// JP ...
+		*((word *)(0x0006)) = (word)&bdos;	// to BDOS
+	#endif
 	
 	#ifdef BDOS_RESTORE_BINT_VECTORS
 		// Restore BINT interrupt vector(s)
 		word a;
-		for (a = 0x0010; a < 0x0040; a += 0x0008) {
+		for (a = 0x0008; a <= 0x0038; a += 0x0008) {
 			*((byte *)(a)) = 0xc3;	// JP ...
-			*((word *)(a+1)) = (word)&bint;	// to BDOS
+			*((word *)(a+1)) = (word)&bint;	// to BINT
 		}
 	#endif
 	
@@ -1455,10 +1440,16 @@ void bdos_start_ccp() {
 	byte *a;
 	const char *filename;
 	
+	// Load data into CCP_LOC_CODE
+	//addr = (byte *)0x0100;	// cpm_transient
+	//addr = (byte *)CCP_LOC_CODE;	//0x0100;	// cpm_transient
+	a = (byte *)BDOS_CCP_LOAD_ADDRESS;
+	
 	filename = "CCP     COM\0";
+	//filename = "ZORK1   COM\0";
 	
 	bdos_printf("Load CCP @ ");
-	bdos_printf_x4(CCP_LOC_CODE);
+	bdos_printf_x4((word)a);
 	//bdos_printf((char *)filename);
 	bdos_printf("...");
 	
@@ -1471,44 +1462,46 @@ void bdos_start_ccp() {
 	
 	// Open file
 	r = bdos_f_open_(&bdos_fcb);
+	/*
 	if (r != 0x00) {
 		bdos_puts("Error!");
 		bdos_getchar();
 	}
+	*/
 	
-	// Load data into CCP_LOC_CODE
-	a = (byte *)0x0100;	// cpm_transient
-	//a = (byte *)CCP_LOC_CODE;	//0x0100;	// cpm_transient
-	do {
-		//printf(".");	// Progress
+	while (r == 0) {
+		//bdos_putchar('.');	// Progress
 		
 		// Read next record
 		r = bdos_f_read_(&bdos_fcb);
 		// 0 = OK, 1 = EOF, 9 = invalid FCB, 10 = media changed/checksum error, 11 = unlocked/verification error, 0xff = hardware error
-		if (r != 0)
-			break;
+		if (r != 0) break;
 		
 		// Copy from DMA area to destination
 		bdos_memcpy(a, (byte *)0x0080, 128);
 		a += 128;
 		
-	} while(r == 0x00);
-	bdos_puts("OK");
+	}	// while(r == 0x00);
+	bdos_puts("OK");	//@TODO: 0=OK, 1=EOF, else=ERROR
 	r = bdos_f_close_(&bdos_fcb);
 	#endif
 	
-	// Clear DMA area (contains CCP command line arguments)
-	// You could also provide some start-up arguments (will be run by CCP)
+	// Clear DMA area at 0x0080 (contains CCP command line arguments)
+	// You could also provide some start-up arguments (will be run by CCP as input, start with a space character)
 	bdos_memset((byte *)0x0080, 0, 128);
 	//*((byte *)0x0080) = 0;	// Clear CCP argl (dma area)
 	//*((byte *)0x0081) = 0;	// Clear CCP args (dma area+1)
 	
+	// Verify what has been loaded
+	//bdos_dump(BDOS_CCP_LOAD_ADDRESS, 32);
+	
 	// Invoke CCP entry point (must match LOC_CODE of ccp.c compilation!)
-	//bdos_printf_x4(CCP_LOC_CODE); bdos_printf("...");
+	bdos_printf("Run CCP @ ");	bdos_printf_x4((word)BDOS_CCP_JUMP_ADDRESS);	bdos_printf("...");
 	__asm
-		//jp CCP_LOC_CODE
-		jp 0x0100
+		jp BDOS_CCP_JUMP_ADDRESS
+		;call BDOS_CCP_JUMP_ADDRESS
 	__endasm;
+	//bdos_puts("END");
 }
 
 

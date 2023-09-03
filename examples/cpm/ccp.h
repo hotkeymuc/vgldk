@@ -12,6 +12,7 @@
 
 //#include <basictypes.h>	// byte, word, true, false, NULL, ...
 
+//#define CCP_SHOW_BANNER	// Show "CCP" on startup
 //#define CCP_MAX_INPUT 128	//32
 #define CCP_MAX_INPUT PROGRAM_GETS_MAX_SIZE
 

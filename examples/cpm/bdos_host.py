@@ -968,7 +968,7 @@ class Driver:
 class Driver_MAME(Driver):
 	"""MAME Emulator driver (using stdin/stdout for communication)"""
 	
-	def __init__(self, emusys='gl4000', rompath='./roms', cart_file=None, buffer_size=3):
+	def __init__(self, emusys='gl4000', rompath=None, cart_file=None, buffer_size=3):
 		Driver.__init__(self)
 		
 		#@FIXME: Use tools/mame.py to handle the MAME communication
@@ -1014,6 +1014,7 @@ class Driver_MAME(Driver):
 		cmd += ' -speed %.2f' % 1.0	#2.0
 		cmd += ' -nomouse'
 		
+		put('Running "%s"...' % cmd)
 		#self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
 		### https://stackoverflow.com/questions/1606795/catching-stdout-in-realtime-from-subprocess
 		#self.proc = subprocess.Popen('stdbuf -o0 '+ cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)

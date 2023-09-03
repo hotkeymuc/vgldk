@@ -10,11 +10,6 @@
 	im 1	; Only call 0x38
 	;ei
 	
-	
-	;; Bare minimum VTech hardware init
-	;; Note: This depends on the model...
-	;; GL4000
-	
 	ld sp, #0xdff0	; GL4000: ld sp, #0xdff0 - leave just a little bit more
 	
 	; Parallel port reset
