@@ -17,8 +17,8 @@
 .org	0x0100
 init:
 	;; Call main() function (C entry point)
-	;jp	_main
-	call _main
+	jp	_main
+	;call _main
 	
 	;; Invoke BDOS shutdown function
 	jp	_exit
