@@ -213,8 +213,7 @@ byte keyboard_ispressed() {
 
 
 void keyboard_update() {
-	byte ix, iy;	// matrix iterators
-	byte m, m2;	// bit masks
+	byte ix, iy, m;	// matrix iterators
 	byte b1;
 	byte b2;
 	char i, j;	// Iterators
@@ -256,30 +255,27 @@ void keyboard_update() {
 			
 			// Check matrix input 1
 			if (b1 != 0xff) {
-				m2 = 0x01;	// Bit mask
 				for (iy = 0; iy < KEY_MATRIX1_ROWS; iy++) {
-					if ((b1 & m2) == 0) {
+					if ((b1 & 1) == 0) {
 						// Store scan code
 						if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
 							keyboard_pressed_new[keyboard_num_pressed_new++] = iy*KEY_MATRIX1_ROWS + ix;
 					}
-					m2 = m2 << 1;
+					b1 >>= 1;
 				}
 			}
 			
 			#ifdef KEYBOARD_MATRIX2
 			// Check matrix input 2
 			if (b2 != 0x5f) {	// idle: 0x40 + 0x1F
-				m2 = 0x01;	// Bit mask
-				
 				// Caution: Matrix 2 has only 5 rows (bits 0..4, for a total of 40 activity buttons, including "ON" and "OFF")
 				for (iy = 0; iy < KEY_MATRIX2_ROWS; iy++) {
-					if ((b2 & m2) == 0) {
+					if ((b2 & 1) == 0) {
 						// Store scan code
 						if (keyboard_num_pressed_new < KEYBOARD_PRESSED_MAX)
 							keyboard_pressed_new[keyboard_num_pressed_new++] = (KEY_MATRIX1_ROWS*KEY_MATRIX1_COLS) + iy*KEY_MATRIX2_COLS + ix;
 					}
-					m2 = m2 << 1;
+					b2 >>= 1;
 				}
 			}
 			#endif
@@ -295,22 +291,11 @@ void keyboard_update() {
 	for (i = 0; i < keyboard_num_pressed; i++) {
 		scancode = keyboard_pressed[i];
 		
-		// See if it is still pressed...
-		/*
-		for (j = 0; j < keyboard_num_pressed_new; j++) {
-			if (keyboard_pressed_new[j] == scancode) {
-				// Key is still pressed, ignore.
-				scancode = KEYBOARD_SCANCODE_INVALID;
-				break;
-			}
-		}
-		if (scancode == KEYBOARD_SCANCODE_INVALID) continue;
-		*/
+		// See if old button is still included in new scan array (i.e. still pressed)
 		if (keyboard_find(&keyboard_pressed_new[0], scancode, keyboard_num_pressed_new) != 0)
 			continue;
 		
 		// Key was released
-		
 		keycode = KEY_CODES[scancode];
 		if (keycode == KEY_NONE) continue;
 		
@@ -333,17 +318,7 @@ void keyboard_update() {
 	for (i = 0; i < keyboard_num_pressed_new; i++) {
 		scancode = keyboard_pressed_new[i];
 		
-		// See if it was pressed before...
-		/*
-		for (j = 0; j < keyboard_num_pressed; j++) {
-			if (keyboard_pressed[j] == scancode) {
-				// Key was already pressed, ignore.
-				scancode = KEYBOARD_SCANCODE_INVALID;
-				break;
-			}
-		}
-		if (scancode == KEYBOARD_SCANCODE_INVALID) continue;
-		*/
+		// See if this new key was already known before (i.e. was pressed before)
 		if (keyboard_find(&keyboard_pressed[0], scancode, keyboard_num_pressed) != 0)
 			continue;
 		
@@ -372,6 +347,7 @@ void keyboard_update() {
 				charcode = '\r';	// Force CR
 			else
 				charcode = 1 + (keycode - 'a');	// Handle it like Ctrl on PC: "A" becomes chr(1), "B" becomes chr(2), ...
+			
 		} else
 		if ((keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT) > 0) {
 			// Shift + Key
