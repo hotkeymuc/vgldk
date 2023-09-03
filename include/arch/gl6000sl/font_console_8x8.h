@@ -2,7 +2,7 @@
 #define __FONT_CONSOLE_8X8_H
 
 // Font from https://github.com/idispatch/raster-fonts/blob/master/font-8x8.c
-const byte font_console_8x8[255][8] = {
+const byte console_font_8x8[255][8] = {
 	/*
 	 * code=0, hex=0x00, ascii="^@"
 	 */
