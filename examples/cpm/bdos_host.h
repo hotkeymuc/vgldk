@@ -14,75 +14,32 @@ In the long run, this might migrate into the BIOS instead of the BDOS.
 2023-08-22 Bernhard "HotKey" Slawik
 */
 
-// Hardware to use for communication (byte-level) - select ONE
-//#define BDOS_HOST_DRIVER_PAPER_TAPE	// Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
-//#define BDOS_HOST_DRIVER_SOFTUART	// Re-direct to SoftUART (for real hardware)
-//#define BDOS_HOST_DRIVER_SOFTSERIAL	// Re-direct to SoftSerial (for real hardware)
-//#define BDOS_HOST_DRIVER_MAME	// Re-direct to MAME (for emulation)
-
-// Protocol to use for communication (frame level) - select ONE
-//#define BDOS_HOST_PROTOCOL_BINARY	// Send using 8bit binary data (e.g. for MAME driver or reliable serial)
-//#define BDOS_HOST_PROTOCOL_BINARY_SAFE	// Send using binary, but with checksum and retransmission (e.g. SoftUART)
-//#define BDOS_HOST_PROTOCOL_HEX	// Send using hex text (if communication is not binary-proof)
-
 //#define BDOS_HOST_ACTIVITY_LED	// Light up the LED on disk access (if available on current architecture)
+//#define HOST_DRIVER_PAPER_TAPE	// Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
 
-#define BDOS_HOST_MAX_DATA 144	//128	// To dismiss too large frames
+// also check include/driver/host.h for more options!
+
+#include "bdos.h"	// Need some numbers and functions
+#include "fcb.h"	// FCB struct
+#include <stringmin.h>	// memcpy, memset, strlen
+
 #define BDOS_HOST_DMA_MAX_DATA 128	// Buffer size for DMA data
-
-#define BDOS_HOST_CHECK_INIT 0x55
-#define BDOS_HOST_STATUS_ACK 0xAA
-#define BDOS_HOST_STATUS_NAK 0x99
-#define BDOS_HOST_STATUS_OK 0x00
 #define BDOS_HOST_STATUS_DMA_EOF 0x1A
 #define BDOS_HOST_STATUS_DMA_DATA 0x20
 
 
-#include "bdos.h"	// Need some numbers and functions
-
-#include "fcb.h"
-
-#include <stringmin.h>	// memcpy, memset, strlen
-
-// Device setup (byte level)
-#ifdef BDOS_HOST_DRIVER_PAPER_TAPE
+// CP/M also offers paper tape
+#ifdef HOST_DRIVER_PAPER_TAPE
 	// Use BIOS paper tape functions
-	#define bdos_host_send_byte	bios_punch
-	#define bdos_host_receive_byte	bios_reader	// bios_reader is blocking by spec.
+	#define host_send_byte	bios_punch
+	#define host_receive_byte	bios_reader	// bios_reader is blocking by spec.
 #endif
-#ifdef BDOS_HOST_DRIVER_SOFTUART
-	// Use SoftUART functions
-	#include <driver/softuart.h>
-	#define bdos_host_send_byte	softuart_sendByte
-	#define bdos_host_receive_byte	softuart_receiveByte	// non-blocking
-#endif
-#ifdef BDOS_HOST_DRIVER_SOFTSERIAL
-	// Use SoftUART functions
-	#include <softserial.h>	// Comes bespoke for each architecture
-	#define bdos_host_send_byte	serial_putchar
-	#define bdos_host_receive_byte	serial_getchar_nonblocking	// non-blocking
-	//#define bdos_host_receive_byte	serial_getchar	// blocking
-#endif
-#ifdef BDOS_HOST_DRIVER_MAME
-	// Use MAME functions
-	#include <driver/mame.h>
-	#define bdos_host_send_byte	mame_putchar
-	#define bdos_host_receive_byte	mame_getchar	// mame_getchar is blocking
-#endif
+#include <driver/host.h>	// Abstract host functionality
 
-// Make sure one driver is selected
-#ifndef BDOS_HOST_DRIVER_PAPER_TAPE
-	#ifndef BDOS_HOST_DRIVER_SOFTUART
-		#ifndef BDOS_HOST_DRIVER_SOFTSERIAL
-			#ifndef BDOS_HOST_DRIVER_MAME
-				#error One BDOS_HOST_DRIVER must be set (paper tape, SoftUART, SoftSerial or MAME)!
-			#endif
-		#endif
-	#endif
-#endif
+
 
 // Error trace for protocols
-//#define bdos_host_error(s)	bdos_printf(s)
+//#define host_error(s)	bdos_printf(s)
 #define bdos_host_error(s)	;	// Be quiet!
 
 
@@ -94,501 +51,13 @@ In the long run, this might migrate into the BIOS instead of the BDOS.
 		#define bdos_host_activity_on	led_on
 		#define bdos_host_activity_off	led_off
 	#else
-		#error LED is currently not available on this architecture, but BDOS_HOST_ACTIVITY_LED is set.
+		#error LED is currently not available on this architecture, but HOST_ACTIVITY_LED is set.
 	#endif
 #else
 	// Disable activity LED
 	#define bdos_host_activity_on()	;
 	#define bdos_host_activity_off()	;
 #endif
-
-// Protocol (frame level)
-#ifdef BDOS_HOST_PROTOCOL_BINARY
-	// Send using simple binary data
-	
-	void bdos_host_send_frame(const byte *data, byte len) {
-		byte i;
-		
-		// Send length
-		bdos_host_send_byte(len);
-		
-		// Send data
-		for (i = 0; i < len; i++) {
-			bdos_host_send_byte(*data++);
-		}
-		
-	}
-	
-	int bdos_host_receive_frame(byte *data) {
-		int l;
-		byte i;
-		//byte c;
-		
-		// Wait for non-zero byte, receive length
-		//bdos_printf("RX=");
-		do {
-			l = bdos_host_receive_byte();
-		} while (l <= 0);
-		//bdos_printf_x2(l);
-		//bdos_printf("..."); //bdos_getchar();
-		
-		// No buffer-overflow, please!
-		if (l > BDOS_HOST_MAX_DATA) {
-			return -1;
-		}
-		
-		// Receive data
-		for (i = 0; i < l; i++) {
-			
-			//c = bdos_host_receive_byte();
-			//bdos_printf_x2(c);
-			//*data++ = c;
-			
-			*data++ = bdos_host_receive_byte();
-		}
-		
-		return l;
-	}
-#endif
-
-
-#ifdef BDOS_HOST_PROTOCOL_BINARY_SAFE
-	// Send using binary data and checksum+retransmission
-	
-	void bdos_host_send_frame(const byte *data, byte len) {
-		byte i;
-		byte b;
-		//byte check;
-		word check;
-		const byte *p;
-		int r;
-		
-		do {	// Retransmission
-			
-			//bdos_printf("re");
-			check = BDOS_HOST_CHECK_INIT;	// Initial checksum
-			p = data;	// Re-wind data pointer
-			
-			// Send length
-			bdos_host_send_byte(len);
-			
-			// Send data
-			for (i = 0; i < len; i++) {
-				b = *p++;
-				bdos_host_send_byte(b);
-				
-				//check ^= b;	// XOR it
-				check = (check << 1) ^ b;	// shl and XOR it
-			}
-			
-			// Send Checksum
-			//bdos_host_send_byte(check);	// 8 bit checksum
-			bdos_host_send_byte(check >> 8);	// 16 bit checksum, MSB first
-			bdos_host_send_byte(check & 0xff);
-			
-			// Wait for ACK/NACK
-			r = -1;
-			while (r <= 0) {
-				r = bdos_host_receive_byte();
-			}
-			
-		} while (r != BDOS_HOST_STATUS_ACK);	// Repeat until "AA" is received
-		
-	}
-	
-	int bdos_host_receive_frame(byte *data) {
-		int l;
-		byte c;
-		byte i;
-		byte *p;
-		//byte check;
-		//byte check_received;	// or int to handle timeout
-		word check;
-		word check_received;	// or int to handle timeout
-		
-		do {	// Retransmission
-			
-			// Wait for non-zero byte, receive length
-			do {
-				l = bdos_host_receive_byte();
-			} while (l <= 0);
-			//bdos_printf_x2(l);
-			
-			// No buffer-overflow, please!
-			if (l > BDOS_HOST_MAX_DATA) {
-				//bdos_host_error("Rmax!");
-				
-				// Flush?
-				
-				// Continue to "NAK"
-				
-			} else {
-				// Receive data
-				
-				check = BDOS_HOST_CHECK_INIT;	// Initial checksum
-				p = data;
-				for (i = 0; i < l; i++) {
-					//bdos_printf_x2(i);
-					c = bdos_host_receive_byte();
-					*p++ = c;
-					
-					//check ^= c;	// XOR onto checksum
-					check = (check << 1) ^ c;	// shl and XOR it
-				}
-				
-				// Receive checksum
-				//do {
-				check_received = bdos_host_receive_byte();
-				check_received = (check_received << 8) | bdos_host_receive_byte();	// 16 bit
-				
-				//} while (check_received < 0);
-				
-				// Check
-				//if ((byte)check_received == check) {
-				if (check_received == check) {
-					// OK! Send ACK
-					
-					//bdos_printf("ACK");
-					bdos_host_send_byte(BDOS_HOST_STATUS_ACK);
-					//bdos_printf("ed");
-					
-					// And return bytes received
-					return l;
-				}
-				
-				bdos_host_error("Rc!");
-			}
-			
-			// Checksum mismatch! Send NAK (anything but 0xAA)
-			//bdos_printf("NAK");
-			bdos_host_send_byte(BDOS_HOST_STATUS_NAK);	// Send NAK
-			//bdos_printf("ed");
-			
-		} while (1);	//check_received != check);
-		
-	}
-#endif
-
-
-#ifdef BDOS_HOST_PROTOCOL_HEX
-	
-	#define BDOS_HOST_MAX_LINE 255	// Maximum length of one incoming line
-	#define BDOS_HOST_RECEIVE_TIMEOUT 8192	// Counter to determine timeouts
-	
-	//#define bdos_host_debug(s)	printf(s)
-	#define bdos_host_debug(s)	;
-	
-	// Helper for sending a whole "blob"
-	void bdos_host_send_data(byte *data, word l) {
-		for (word i = 0; i < l; i++) {
-			bdos_host_send_byte(*data++);
-		}
-	}
-	
-	// Receive one text line
-	byte *bdos_host_receive_line(byte *get_buf) {
-		int c;
-		byte *b;
-		
-		b = get_buf;
-		while(1) {
-			c = bdos_host_receive_byte();	// Non-blocking would be good
-			if (c <= 0) continue;	// < 0 means "no data"
-			
-			// Check for end-of-line character(s)
-			if ((c == 0x0a) || (c == 0x0d)) break;
-			
-			// Store in given buffer
-			*b++ = c;
-		}
-		
-		// Terminate string
-		*b = 0;
-		
-		//return (word)b - (word)serial_get_buf;	// Return length
-		return get_buf;	// Return buf (like stdlib gets())
-	}
-	
-	
-	// We need some HEX functions. Preferably from the already included "hex.h" (vgldk/includes/hex.h)
-	//#include <hex.h>	// for hexDigit, parse_hexDigit, hextown, hextob
-	#ifndef __HEX_H
-		/*
-		byte hexDigit(byte c) {
-			if (c < 10)
-				return ('0'+c);
-			return 'A' + (c-10);
-		}
-		*/
-		#define hexDigit bdos_hexDigit	// Since this is part of BDOS we can re-use its version
-		
-		byte parse_hexDigit(byte c) {
-			if (c > 'f') return 0;
-			
-			if (c < '0') return 0;
-			if (c <= '9') return (c - '0');
-			
-			if (c < 'A') return 0;
-			if (c <= 'F') return (10 + c - 'A');
-			
-			if (c < 'a') return 0;
-			return (10 + c - 'a');
-		}
-		
-		word hextown(const char *s, byte n) {
-			byte i;
-			word r;
-			char c;
-			
-			r = 0;
-			for(i = 0; i < n; i++) {
-				c = *s++;
-				if (c < '0') break;	// Break at zero char and any other non-ascii
-				r = (r << 4) + (word)parse_hexDigit(c);
-			}
-			return r;
-		}
-		
-		byte hextob(const char *s) {
-			return (byte)hextown(s, 2);
-		}
-	#endif
-	
-	int bdos_host_receive_byte_with_timeout() {
-		// Get char, return -1 on timeout
-		int c;
-		word timeout;
-		
-		timeout = BDOS_HOST_RECEIVE_TIMEOUT;
-		
-		c = -1;
-		while (c <= 0) {
-			c = bdos_host_receive_byte();	// non-blocking
-			timeout --;
-			if (timeout == 0) return -1;
-		}
-		return c;
-	}
-	
-	int bdos_host_receive_hex_with_timeout() {
-		// Receive two digits of hex, return -1 on timeout
-		//byte r;
-		int c;
-		int c2;
-		
-		do {
-			c = bdos_host_receive_byte_with_timeout();
-			if (c < 0) return -1;
-		} while (c == 'U');
-		
-		//c2 = bdos_host_receive_byte_with_timeout();
-		c2 = bdos_host_receive_byte_with_timeout();
-		
-		if (c < 0) return -1;
-		if (c2 < 0) return -1;
-		//putchar(c2);
-		//printf_x2(c); printf_x2(c2);	//@FIXME: Bit debugging
-		
-		return (parse_hexDigit(c) << 4) + parse_hexDigit(c2);
-	}
-	
-	void bdos_host_send_frame(const byte *data, byte ldata) {
-		byte line[BDOS_HOST_MAX_LINE];
-		const byte *pdata;
-		byte *pline; 
-		byte lline;
-		byte b;
-		byte i;
-		byte checkactual;
-		byte checkgiven;
-		int c;
-		
-		// Build HEX packet
-		pline = &line[0];
-		lline = 0;
-		
-		// Pad
-		//line[0] = (byte)'U'; line[1] = (byte)'U'; line[2] = (byte)'U'; line[3] = (byte)'U'; lline = 4; pline = &line[4];
-		line[0] = (byte)'U'; lline = 1; pline = &line[lline];
-		
-		// Len
-		*pline++ = hexDigit(ldata >> 4);
-		*pline++ = hexDigit(ldata & 0x0f);
-		lline += 2;
-		
-		// Data
-		checkactual = ldata;
-		pdata = &data[0];
-		for (i = 0; i < ldata; i++) {
-			b = *pdata++;
-			*pline++ = hexDigit(b >> 4);
-			*pline++ = hexDigit(b & 0x0f);
-			lline += 2;
-			checkactual ^= b;
-		}
-		
-		// Check
-		*pline++ = hexDigit(checkactual >> 4);
-		*pline++ = hexDigit(checkactual & 0x0f);
-		lline += 2;
-		
-		// EOL
-		*pline++ = '\n';
-		lline++;
-		
-		*pline++ = 0;	// Zero-terminate
-		
-		//printf(line);
-		
-		while(1) {
-			bdos_host_debug("TX");
-			//__asm
-			//	di
-			//__endasm;
-			
-			// Send synchronization
-			//serial_puts("UUUUUUUU");
-			
-			// Send line
-			//serial_put(line, lline);
-			bdos_host_send_data(line, lline);
-			
-			c = bdos_host_receive_hex_with_timeout();
-			
-			//__asm
-			//	ei
-			//__endasm;
-			
-			if (c < 0) {
-				bdos_host_error("TT!");
-				continue;
-			}
-			
-			checkgiven = c;
-			
-			if (checkgiven == checkactual) {
-				// OK!
-				//printf("OK\n");
-				break;
-			} else {
-				bdos_host_error("Tc!");
-				//bdos_printf("C! g=");
-				//bdos_printf_x2(checkgiven);
-				//bdos_printf(",a=");
-				//bdos_printf_x2(checkactual);
-				//bdos_printf("!\n");
-			}
-		}
-		bdos_host_debug("OK\n");
-	}
-	
-	int bdos_host_receive_frame(byte *data) {
-		char line[BDOS_HOST_MAX_LINE];
-		byte l;
-		char *pline;
-		byte *pdata;
-		byte linel;
-		byte b;
-		byte i;
-		byte checkgiven;
-		byte checkactual;
-		//int r;
-		
-		bdos_host_debug("RX");
-		while(1) {
-			
-			// Send synchronization pad / request to answer
-			//serial_put("GGGG", 4);
-			//serial_puts("GG\n");
-			//printf(".");
-			
-			//@TODO: Use non-blocking get to detect timeouts?
-			bdos_host_receive_line(&line[0]);
-			linel = strlen(&line[0]);
-			//printf(line);
-			
-			pline = &line[0];
-			
-			// Strip sync header
-			while(*pline == 'U') {
-				linel--;
-				pline++;
-				if (linel < 4) break;
-			}
-			if (linel < 4) {
-				// Too small to have length and check
-				bdos_host_error("Rs!");
-				//bdos_printf("S!");
-				//bdos_printf_x2(linel);
-				//bdos_printf("<4!\n");
-				//continue;
-				return -1;
-			}
-			
-			// Get length
-			l = hextob(pline); pline += 2;
-			if (((2 + l*2 + 2) != linel) || (l > BDOS_HOST_MAX_DATA)) {
-				// Error in length! Given length > actual length
-				bdos_host_error("Rl!");
-				//bdos_printf("L! g=");
-				//bdos_printf_x2(l);
-				//bdos_printf(",a=");
-				//bdos_printf_x2((linel-4) >> 1);
-				//bdos_printf("!\n");
-				//continue;
-				return -1;
-			}
-			
-			// Get data
-			checkactual = l;
-			pdata = data;
-			for(i = 0; i < l; i++) {
-				b = hextob(pline); pline+=2;
-				*pdata++ = b;
-				checkactual ^= b;
-			}
-			
-			// Get checksum
-			checkgiven = hextob(pline);	pline+= 2;
-			
-			if (checkgiven != checkactual) {
-				// Checksums mismatch
-				bdos_host_error("Rc!");
-				//bdos_printf("C! g=");
-				//bdos_printf_x2(checkgiven);
-				//bdos_printf(",a=");
-				//bdos_printf_x2(checkactual);
-				//bdos_printf("!\n");
-				//continue;
-				return -1;
-				
-			} else {
-				// ACK
-				line[0] = 'U';
-				line[1] = 'U';
-				line[2] = 'U';
-				line[3] = hexDigit(checkactual >> 4);
-				line[4] = hexDigit(checkactual & 0x0f);
-				line[5] = '\n';
-				bdos_host_send_data(&line[0], 6);
-				
-				return l;
-			}
-		}
-		
-	}
-#endif
-
-// Make sure one protocol is selected
-#ifndef BDOS_HOST_PROTOCOL_BINARY
-	#ifndef BDOS_HOST_PROTOCOL_BINARY_SAFE
-		#ifndef BDOS_HOST_PROTOCOL_HEX
-			#error One BDOS_HOST_PROTOCOL has to be selected (binary, binary_safe or hex)!
-		#endif
-	#endif
-#endif
-
-
 
 // For debugging: Trace calls
 #ifdef BDOS_TRACE_CALLS
@@ -670,8 +139,7 @@ In the long run, this might migrate into the BIOS instead of the BDOS.
 
 // Protocol agnostic functions
 
-
-void host_sendfcb(byte num, struct FCB *fcb) {
+void bdos_host_sendfcb(byte num, struct FCB *fcb) {
 	byte data[1+1+2+36 + 4];	// +4 extra
 	byte *pdata;
 	byte *pfcb;
@@ -696,17 +164,17 @@ void host_sendfcb(byte num, struct FCB *fcb) {
 	}
 	
 	bdos_host_activity_on();
-	bdos_host_send_frame(&data[0], 1+1+2+36);
+	host_send_frame(&data[0], 1+1+2+36);
 	bdos_host_activity_off();
 	
 	// Use host_receivefcb() to receive result and altered FCB
 }
 
 
-byte host_receive_byte() {
+byte bdos_host_receive_byte() {
 	byte data[4];
 	byte l;
-	l = bdos_host_receive_frame(&data[0]);
+	l = host_receive_frame(&data[0]);
 	if (l != 1) {
 		bdos_host_error("Rb!");
 		return 0xff;
@@ -715,9 +183,9 @@ byte host_receive_byte() {
 	return data[0];
 }
 
-byte host_receivefcb(struct FCB *fcb) {
+byte bdos_host_receivefcb(struct FCB *fcb) {
 	//byte data[1 + 36 + 16];	// Leave some extra to be sure
-	byte data[BDOS_HOST_MAX_DATA + 4];
+	byte data[HOST_MAX_DATA + 4];
 	byte l;
 	byte r;
 	
@@ -725,7 +193,7 @@ byte host_receivefcb(struct FCB *fcb) {
 	bdos_host_activity_on();
 	
 	// Receive result and FCB as one data frame
-	l = bdos_host_receive_frame(&data[0]);
+	l = host_receive_frame(&data[0]);
 	
 	// L must be 32 or 36 for a proper FCB (32 for dir listing) plus 1 byte for the return value. Return error if not.
 	if (l > (1+36)) {
@@ -750,7 +218,7 @@ byte host_receivefcb(struct FCB *fcb) {
 	return r;
 }
 
-word host_receivedma() {
+word bdos_host_receivedma() {
 	byte data[BDOS_HOST_DMA_MAX_DATA + 4];	// 128 + headers
 	byte l;
 	byte *p;
@@ -766,7 +234,7 @@ word host_receivedma() {
 	while(l_total < BDOS_HOST_DMA_MAX_DATA) {
 		
 		// Receive one DMA chunk
-		l = bdos_host_receive_frame(&data[0]);
+		l = host_receive_frame(&data[0]);
 		
 		if (l == 0) {
 			// Empty DMA frame! Where is the status byte? Error!
@@ -798,6 +266,7 @@ word host_receivedma() {
 		// Unknown status!
 		//bdos_puts("DMA-Err!");
 		bdos_printf("DMAe:"); bdos_printf_x2(r);
+		bdos_getchar();
 		return 0;	 // Return total length = 0
 		
 	}
