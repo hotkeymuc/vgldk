@@ -1,13 +1,15 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-Serial companion for the VGL CP/M BDOS
+BDOS Host for VGL CP/M
+======================
 
-This script communicates with a VTech Genius Leader notebook.
+This script communicates with a VTech Genius Leader notebook and serves files to its CP/M system.
+It can be a real computer connected via serial cable or a virtual computer (running in a modified version of MAME).
 
 see tools/host.py for more info
 
-2019-11-15 Bernhard "HotKey" Slawik
+2019-11-15 - 2023-09-04 Bernhard "HotKey" Slawik
 """
 
 

@@ -52,7 +52,8 @@ void main() __naked {
 #include <strcmpmin.h>	// For strcmp
 
 #include "program.h"
-#include "program_stdio.h"
+//#include "program_stdio.h"
+#include "program_stdiomin.h"
 #include "program_fileio.h"
 
 #include "ccp.h"
@@ -747,10 +748,11 @@ void ccp() __naked {
 	#endif
 	
 	
-	memset(&ccp_input[0], 0, CCP_MAX_INPUT);	// Zero out the input buffer
+	// Zero out the input buffer
+	memset(&ccp_input[0], 0, CCP_MAX_INPUT);
 	
+	// Handle our own args as command line input...
 	if (ccp_argl > 0) {
-		// Handle command line input...
 		// Copy args over to input (or they would be overwritten by handle()!)
 		memcpy(&ccp_input[0], &ccp_args[1], CCP_MAX_INPUT);	// Skip initial space (which is included at ccp_args[0])
 		
@@ -766,8 +768,6 @@ void ccp() __naked {
 		ccp_running = 1;
 	}
 	
-	
-	//input[0] = 0;
 	while(ccp_running) {
 		
 		/*
@@ -775,20 +775,16 @@ void ccp() __naked {
 		vgl_lcd_scroll_cb = &myscroll;
 		*/
 		
-		// Prompt
+		// Show prompt
 		putchar('A' + bios_curdsk);
 		putchar('>');
 		
 		// Zero out the input buffer
 		memset(&ccp_input[0], 0x00, CCP_MAX_INPUT);
-	
-		//arg[0] = CCP_MAX_INPUT;
-		//arg[1] = 0;
-		gets(&ccp_input[0]);
 		
-		//printf("You said: \"%s\"\n", input);
+		// Get new line
+		gets(&ccp_input[0]);
 		//printf("You said: \""); printf(&ccp_input[0]); printf("\"...");
-		//putchar('\n');	// Input ends in "\r"
 		
 		handle(ccp_input);
 	}

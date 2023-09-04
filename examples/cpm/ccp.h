@@ -10,11 +10,8 @@
 	
 */
 
-//#include <basictypes.h>	// byte, word, true, false, NULL, ...
-#include "fcb.h"
-
 //#define CCP_SHOW_BANNER	// Show "CCP" on startup
-//#define CCP_MAX_INPUT 128	//32
+//#define CCP_MAX_INPUT 64	//128	//32
 #define CCP_MAX_INPUT PROGRAM_GETS_MAX_SIZE
 
 //#define CCP_CMD_PORT	// Port access
@@ -47,6 +44,10 @@
 	//#include "data_sysgen.h"	// DATA_SYSGEN[]
 	#include CCP_TEST_PROGRAM_FILENAME
 #endif	// CCP_INCLUDE_TEST_PROGRAM
+
+
+//#include <basictypes.h>	// byte, word, true, false, NULL, ...
+#include "fcb.h"	// for FCB struct
 
 
 struct FCB __at(0x005c) def_fcb;	// Default FCB at 0x005c

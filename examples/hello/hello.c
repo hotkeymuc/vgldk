@@ -7,6 +7,8 @@
 #include <vgldk.h>
 #include <stdiomin.h>
 
+//#include <stdio.h>
+
 void main() __naked {
 	
 	printf("Hello World!");

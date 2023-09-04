@@ -5,17 +5,27 @@
 */
 
 #include <vgldk.h>
+
+//#include <stdiomin.h>
+
+int getchar(void) {
+	return VGLDK_STDIN_GETCHAR();
+}
+int putchar(int c) {
+	VGLDK_STDOUT_PUTCHAR(c);
+}
 #include <stdio.h>
 
 
 void main() __naked {
 	char c;
-	char s[64];
+	//char s[64];
 	
 	//lcd_init();
 	//vgl_sound_off();
 	
-	printf("Testing printf!");
+	printf("Testing printf!\n");
+	printf("printf: 0x%04X", 0x1234);
 	//beep();
 	
 	#ifdef VGLDK_SERIES
@@ -30,10 +40,11 @@ void main() __naked {
 	
 	while(1) {
 		
-		
+		/*
 		printf(">");
 		gets(s);
 		printf(s);
+		*/
 	}
 	
 	

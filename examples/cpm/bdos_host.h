@@ -5,19 +5,18 @@
 BDOS Host
 =========
 
-This file contains functions to allow sending and receiving files from an external host.
+This file contains functions to allow sending and receiving files from/to an external host machine.
 The host might be a PC connected via serial (SoftUART / SoftSerial) or a (modified) MAME emulator
 running inside bdos_host.py
 
-In the long run, this might migrate into the BIOS instead of the BDOS.
+(this might migrate into the BIOS instead of the BDOS)
 
 2023-08-22 Bernhard "HotKey" Slawik
 */
 
 //#define BDOS_HOST_ACTIVITY_LED	// Light up the LED on disk access (if available on current architecture)
 //#define HOST_DRIVER_PAPER_TAPE	// Re-direct to BIOS paper tape routines (and let BIOS decide what to do)
-
-// also check include/driver/host.h for more options!
+// ...also check include/driver/host.h for more options!
 
 #include "bdos.h"	// Need some numbers and functions
 #include "fcb.h"	// FCB struct

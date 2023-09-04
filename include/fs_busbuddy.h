@@ -15,7 +15,7 @@ Implementation of fs.h usingthe "Bus Buddy"/"Bus Ficker" cartridge
 
 #include "file.h"
 
-#include <busbuddy.h>
+#include <driver/busbuddy.h>
 
 // Implementation
 
