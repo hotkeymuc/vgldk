@@ -8,9 +8,6 @@ It contains wrappers for BDOS function calls.
 
 */
 
-//#define PROGRAM_GETS_LOCAL_ECHO	// Should gets() have local echo?
-#define PROGRAM_GETS_MAX_SIZE 127
-
 #include "program.h"
 
 
@@ -65,7 +62,11 @@ char _getchar() __naked {
 	//return getchar_tmp;
 }
 
-/*
+
+
+//#define PROGRAM_GETS_LOCAL_ECHO	// Should gets() have local echo?
+#define PROGRAM_GETS_MAX_SIZE 127
+
 volatile char *gets_tmp;
 //char *gets(char *pc) {
 //void gets(char *pc, byte max_size) {
@@ -111,7 +112,7 @@ void gets(char *pc) {
 	
 	//return pc;	// Return original pointer
 }
-*/
+
 
 
 // Make compatible to stdio

@@ -123,12 +123,6 @@ void bdos_printf(char *pc) {
 	while(*pc) bios_conout(*pc++);
 }
 
-// Helper to write "not implemented"
-void bdos_not_implemented(char *t) {
-	bdos_printf("bdos_");
-	bdos_printf(t);
-	bdos_puts(" n/i!");
-}
 
 // Publish as stdio
 //@FIXME: Use stdlib! Only define getchar/putchar!
@@ -200,6 +194,13 @@ void bdos_dump(word a, byte len) {
 }
 */
 
+
+// Helper to write "not implemented"
+void bdos_not_implemented(char *t) {
+	bdos_printf("bdos_");
+	bdos_printf(t);
+	bdos_puts(" n/i!");
+}
 
 // String Helpers
 #include <stringmin.h>

@@ -42,10 +42,25 @@ In CP/M 3 and later, the rest also follows.
 
 #include <vgldk.h>	// For hardware specific stuff
 
-//#include <stdio.h>	// for puts() putchar() gets() getchar()
-#include <stdiomin.h>	// for puts() putchar() gets() getchar()
 
+// Use own stdiomin
+//#include <stdiomin.h>	// for puts() putchar() gets() getchar()
 //#include <hex.h>	// for printf_x2/x4
+
+// Use SDCC's stdio
+//#define VGLDK_STDOUT_PUTCHAR lcd_putchar
+//#define VGLDK_STDIN_GETCHAR keyboard_getchar
+//#define putchar VGLDK_STDOUT_PUTCHAR
+//#define getchar VGLDK_STDIN_GETCHAR
+int getchar(void) {
+	return VGLDK_STDIN_GETCHAR();
+}
+int putchar(int c) {
+	VGLDK_STDOUT_PUTCHAR(c);
+	return 1;
+}
+#include <stdio.h>
+
 
 #ifdef BIOS_PAPER_TAPE_TO_SOFTUART
 	#include <driver/softuart.h>

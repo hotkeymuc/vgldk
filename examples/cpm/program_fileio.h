@@ -1,6 +1,5 @@
 #ifndef __PROGRAM_FILEIO_H
 #define __PROGRAM_FILEIO_H
-
 /*
 
 Include this to create a simple CP/M program.
@@ -8,9 +7,9 @@ It contains wrappers for BDOS function calls.
 
 */
 
-#include "program.h"
+#include "program.h"	// for byte/word
 
-#include "fcb.h"
+#include "fcb.h"	// for FCB struct
 
 struct FCB __at(0x005c) def_fcb;	// Default FCB at 0x005c
 
@@ -20,6 +19,7 @@ byte fread();
 byte freadrand(byte r0, byte r1, byte r2);
 
 
+volatile byte ret_a;
 
 // BDOS File I/O
 byte fopen(char *filename) {

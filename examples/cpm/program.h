@@ -1,6 +1,5 @@
 #ifndef __PROGRAM_H
 #define __PROGRAM_H
-
 /*
 
 Include this to create a simple CP/M program.
@@ -8,8 +7,6 @@ It contains wrappers for BDOS function calls.
 
 */
 
-//#define PROGRAM_GETS_LOCAL_ECHO	// Should gets() have local echo?
-#define PROGRAM_GETS_MAX_SIZE 127
 
 //#include <basictypes.h>
 #ifndef __BASICTYPES_H__
@@ -17,7 +14,6 @@ typedef unsigned char byte;
 typedef unsigned short word;
 #endif
 
-volatile byte ret_a;
 
 // BDOS Essentials
 void exit();
