@@ -31,10 +31,6 @@ import subprocess
 
 PYTHON3 = True
 
-# MAME
-#MAME_CMD = '../../../mame.git/mame64'
-MAME_CMD = '/z/data/_code/_c/mame.git/mame64'
-
 # FTDI
 SERIAL_PORT = '/dev/ttyUSB0'
 SERIAL_BAUD = 9600	#19200	# 9600 or 19200
@@ -476,6 +472,7 @@ class Driver:
 		pass
 
 
+# Re-use mame.py - no need to re-implement running MAME in sub-process *again*...
 import mame
 class Driver_MAME(Driver):
 	"""MAME Emulator driver (using stdin/stdout for communication)"""
@@ -499,7 +496,7 @@ class Driver_MAME(Driver):
 			# Do not hang
 			self.mame.mame_keep_alive()
 			
-			s = self.mame.read()
+			s = self.mame.read()	# Reads a line from stdout (blocking!)
 			#put('read="%s"' % str(s))
 			try:
 				v = int(s, 16)
