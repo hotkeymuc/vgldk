@@ -47,6 +47,8 @@ const word lcd_addr = LCD_ADDR;
 //#define LCD_FONT_6x8	// Allows 40x12 text mode
 //#define LCD_FONT_8x8	// Allows 30x12 text mode
 
+//#define FONT_FULL_ASCII	// Include all 256 instead of only 128 chars
+
 #ifndef LCD_FONT_4x6
 #ifndef LCD_FONT_4x7
 #ifndef LCD_FONT_5x8
@@ -333,7 +335,8 @@ void lcd_draw_string_at(byte x, byte y, char *s) {
 */
 
 //#define LCD_SCROLL_AMOUNT 1
-#define LCD_SCROLL_AMOUNT 8	// font_char_height
+//#define LCD_SCROLL_AMOUNT 8
+#define LCD_SCROLL_AMOUNT font_char_height
 void lcd_scroll(int dy) {
 	//byte x;	// Enough for one line
 	word x;	// For more than one line
