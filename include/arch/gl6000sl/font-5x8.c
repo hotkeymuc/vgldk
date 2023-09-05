@@ -18,13 +18,18 @@ extern const font_t console_fonts[];
 
 #endif /* FONT_H_ */
 #endif
-const byte console_font_5x8_char_width = 5;
-const byte console_font_5x8_char_height = 8;
-const byte console_font_5x8_first_char = 0;
-const byte console_font_5x8_last_char = 255;
+#ifdef FONT_FULL_ASCII
+	#define FONT_NUMCHARS 256
+#else
+	#define FONT_NUMCHARS 128
+#endif
+#define console_font_5x8_char_width 5
+#define console_font_5x8_char_height 8
+#define console_font_5x8_first_char 0
+#define console_font_5x8_last_char (FONT_NUMCHARS-1)
 
 //unsigned char console_font_5x8[] = {
-const byte console_font_5x8_font_bitmap[256][8] = {
+const byte console_font_5x8_font_bitmap[FONT_NUMCHARS][8] = {
   {
     /*
      * code=0, hex=0x00, ascii="^@"
@@ -1689,6 +1694,7 @@ const byte console_font_5x8_font_bitmap[256][8] = {
     0xF8,  /* 11111 */
     0x00,  /* 00000 */
   },
+  #ifdef FONT_FULL_ASCII
   {
     /*
      * code=128, hex=0x80, ascii="!^@"
@@ -3353,5 +3359,6 @@ const byte console_font_5x8_font_bitmap[256][8] = {
     0x00,  /* 00000 */
     0x00,  /* 00000 */
   }
+  #endif
 };
 
