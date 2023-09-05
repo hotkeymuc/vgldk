@@ -20,7 +20,10 @@ So I implemented my own minimal one to be used in my "DOS".
 
 #define FILE_PATH_DELIMITER '/'
 
+// Also defined in stdio (as unsigned int)
+#ifndef __SIZE_T_DEFINED
 typedef word size_t;
+#endif
 
 int errno;
 

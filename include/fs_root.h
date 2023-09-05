@@ -115,13 +115,13 @@ int fs_root_indexOf(const char *path, const char **pp) {
 
 void fs_root_mount(const char *options) {
 	int i;
-  const FS *fs;
+	const FS *fs;
 	
 	// Mount all file systems
 	for(i = 0; i < FS_ROOT_MOUNTS_COUNT; i++) {
-    fs = fs_root_mounts[i].fs;
-    if (fs->mount != NULL)
-		  fs->mount(options);
+		fs = fs_root_mounts[i].fs;
+		if (fs->mount != NULL)
+			fs->mount(options);
 	}
 }
 

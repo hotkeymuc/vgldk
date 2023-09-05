@@ -14,6 +14,7 @@ Implementation of fs.h using hard-coded data. Mainly used for testing.
 // Internal fs disk
 
 #include "fs.h"
+#include <strcmpmin.h>	// for strcmp / stricmp
 
 //#define FS_INTERNAL_INCLUDE_TEST_APPS	// For testing: Include external app(s) from "loader" folder as virtual FS
 //#define FS_INTERNAL_CASE_SENSITIVE
@@ -267,6 +268,8 @@ size_t fs_int_fread(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	d = (byte *)ptr;
 	while ((size > 0) && (f->currentPos < f->size)) {
 		b = ((byte *)f->userData)[f->currentPos++];
+		//printf("byte: 0x"); printf_x2(b); printf(", ");
+		
 		*((byte *)d++) = b;
 		l++;
 		size--;

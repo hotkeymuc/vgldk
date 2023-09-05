@@ -309,6 +309,7 @@
 	*/
 	
 	#define softuart_get_LOW() ((softuart_port_status & 0x80) == 0)
+	#define softuart_get_HIGH() ((softuart_port_status & 0x80) != 0)
 	/*
 	void softserial_get_high() {
 		__asm
