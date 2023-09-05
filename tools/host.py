@@ -476,92 +476,30 @@ class Driver:
 		pass
 
 
+import mame
 class Driver_MAME(Driver):
 	"""MAME Emulator driver (using stdin/stdout for communication)"""
 	
 	def __init__(self, emusys='gl4000', rompath=None, cart_file=None, buffer_size=3):
 		Driver.__init__(self)
 		
-		#@FIXME: Use tools/mame.py to handle the MAME communication
-		self.proc = None
-		
-		self.emusys = emusys
-		self.rompath = rompath
-		self.cart_file = cart_file
-		
-		self.buffer_size = buffer_size	# HEX HEX newline = 3 bytes
-	
-	def keep_alive(self):
-		if self.proc is None: return
-		
-		if self.proc.poll() is not None:
-			self.is_open = False
-			self.close()
-			raise Exception('Process closed while polling.')
+		mame.SHOW_TRAFFIC = SHOW_TRAFFIC
+		self.mame = mame.MAME(rompath=rompath, emusys=emusys, cart=cart_file, buffer_size=buffer_size)
 	
 	def open(self):
 		put('Starting MAME...')
-		#@FIXME: Use tools/mame.py to handle the MAME communication!
-		start_new_thread(self._open_thread, ())
-		while self.proc is None:
-			time.sleep(0.1)	# Wait until running
-	
-	def _open_thread(self):
-		self.is_open = False
-		
-		#@FIXME: Use tools/mame.py to handle the MAME communication!
-		cmd = MAME_CMD
-		cmd += ' -nodebug'
-		if self.rompath is not None: cmd += ' -rompath %s' % self.rompath
-		cmd += ' %s' % self.emusys
-		if self.cart_file is not None: cmd += ' -cart %s' % self.cart_file
-		cmd += ' -window'
-		cmd += ' -nomax'
-		cmd += ' -nofilter'
-		cmd += ' -sleep'
-		cmd += ' -volume -24'
-		#cmd += ' -skip_disclaimer'	# When set: process ends immediately :-(
-		cmd += ' -skip_gameinfo'
-		cmd += ' -speed %.2f' % 1.0	#2.0
-		cmd += ' -nomouse'
-		
-		put('Running "%s"...' % cmd)
-		#self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
-		### https://stackoverflow.com/questions/1606795/catching-stdout-in-realtime-from-subprocess
-		#self.proc = subprocess.Popen('stdbuf -o0 '+ cmd, stdout=subprocess.PIPE, shell=True, bufsize=0)
-		self.proc = subprocess.Popen(
-			#cmd,
-			'stdbuf -i%d -o%d %s' % (self.buffer_size, self.buffer_size, cmd),	# use with bufsize=0
-			
-			stdin=subprocess.PIPE,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE,
-			shell=True,
-			
-			#close_fds=False,	# Use close_fds=False on unix, close_fds=True on linux
-			
-			#bufsize=self.buffer_size
-			bufsize=0	# 0=unbuffered, 1=line buffered, n=buffer ~n bytes
-		)
-		put('Start return code: %s' % str(self.proc.returncode))
-		
-		self.is_open = True
-		while self.is_open:
-			# Keep active
-			self.keep_alive()
-			time.sleep(0.01)
+		self.mame.open(run=False)	# Do not "run", because this requests data from emulator and will block/freeze
+		put('MAME is open.')
 	
 	def close(self):
-		if self.proc is not None:
-			self.proc.communicate()	# Close PIPE
+		self.mame.close()
 	
 	def read_byte(self):
 		while True:
 			# Do not hang
-			self.keep_alive()
+			self.mame.mame_keep_alive()
 			
-			#s = self.proc.stdout.read(2)
-			s = self.proc.stdout.readline()	# Read 2-digit HEX with trailing newline
+			s = self.mame.read()
 			#put('read="%s"' % str(s))
 			try:
 				v = int(s, 16)
@@ -575,7 +513,7 @@ class Driver_MAME(Driver):
 	
 	def write_byte(self, b):
 		if SHOW_TRAFFIC_BYTES: put('> 0x%02X' % b)
-		self.proc.stdin.write(bytes('%2X\n' % b, 'ascii'))
+		self.mame.write(bytes('%2X\n' % b, 'ascii'))
 	
 	def finish_frame(self):
 		# Flush STDIN (or else the last byte(s) might not get through to MAME)
@@ -584,24 +522,13 @@ class Driver_MAME(Driver):
 		pass
 	
 	def update(self):
-		#r = self.proc.poll()
+		
+		self.mame.mame_keep_alive()
 		
 		#if (r is None):
-		if self.is_open:
+		if self.mame.is_open:
 			# Still running
 			
-			"""
-			# Handle BINARY protocol (length, data)
-			l = self.mame_read_byte()
-			data = []
-			for i in range(l):
-				data.append(self.mame_read_byte())
-			
-			if (SHOW_TRAFFIC):
-				put('<< Got %d bytes: %s' % (l, ' '.join(['%02X' % b for b in data]) ))
-			
-			self.handle_frame(data)
-			"""
 			# Flush while idle?
 			#for i in range(4): self.write_byte(0)	#@FIXME: Do not do this! Might destroy sync!
 			

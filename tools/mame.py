@@ -80,9 +80,9 @@ class MAME:
 	def put(self, s):
 		put('MAME	%s' % s)
 	
-	def open(self):
+	def open(self, run=True):
 		self.put('Starting MAME...')
-		start_new_thread(self.mame_open, ())
+		start_new_thread(self.mame_open, (run,))
 		while(not self.is_open):
 			time.sleep(0.5)
 	
@@ -96,7 +96,7 @@ class MAME:
 		#self.proc.kill()
 		self.close()
 	
-	def mame_open(self):
+	def mame_open(self, run=True):
 		self.is_open = False
 		
 		cmd = self.command
@@ -147,12 +147,22 @@ class MAME:
 		#self.put('Return code so far: %s' % str(self.proc.returncode))
 		self.is_open = True
 		
-		self.run()
+		if run:
+			self.run()
 		
 	
 	def mame_close(self):
 		if not self.proc is None:
 			self.proc.communicate()	# Close PIPE
+	
+	def mame_keep_alive(self):
+		if self.proc is None: return
+		
+		if self.proc.poll() is not None:
+			#self.is_open = False
+			self.running = False
+			self.mame_close()
+			raise Exception('Process closed while polling.')
 	
 	def run(self):
 		"Main loop"
