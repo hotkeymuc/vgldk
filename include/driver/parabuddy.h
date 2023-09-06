@@ -105,6 +105,8 @@ typedef byte pb_handle;
 	#endif
 #endif
 
+#include <stringmin.h>	// for memcpy
+
 
 //@TODO: Move this selection to softserial instead?
 #ifdef PB_USE_MAME

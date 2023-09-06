@@ -33,6 +33,7 @@ int putchar(int c) {
 #include <fs_null.h>
 */
 
+/*
 // FS: internal
 //#include "../app/out/app_hello.app.0xc800.bin.h"
 #define APP_HELLO_DATA "hellorld!"	//{'h','e','l','l','o','r','l','d','!'}
@@ -40,6 +41,7 @@ int putchar(int c) {
 #define FS_INTERNAL_NAME "hello"
 #define FS_INTERNAL_DATA APP_HELLO_DATA
 #include <fs_internal.h>
+*/
 
 /*
 // FS: parabuddy
@@ -48,9 +50,15 @@ int putchar(int c) {
 //#define PB_USE_SOFTUART	// For running on real hardware
 //#define PB_DEBUG_FRAMES
 //#define PB_DEBUG_PROTOCOL_ERRORS
-#include <parabuddy.h>
+#include <driver/parabuddy.h>
 #include <fs_parabuddy.h>
 */
+
+// FS: host
+#define HOST_DRIVER_MAME
+#define HOST_PROTOCOL_BINARY
+#include <fs_host.h>
+
 
 /*
 // FS: root
@@ -82,8 +90,9 @@ int putchar(int c) {
 */
 
 // Specify which FS to use as the root (usually fs_root, but can be fs_int to save space)
-#define FILEIO_ROOT_FS fs_internal
+//#define FILEIO_ROOT_FS fs_internal
 //#define FILEIO_ROOT_FS fs_root
+#define FILEIO_ROOT_FS fs_host
 #include <fileio.h>
 
 volatile char buf[FILES_BUF_SIZE];
