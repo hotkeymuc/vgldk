@@ -30,7 +30,7 @@ int putchar(int c) {
 
 /*
 // FS:null
-#include <fs_null.h>
+#include <fileio/fs_null.h>
 */
 
 /*
@@ -40,7 +40,7 @@ int putchar(int c) {
 //#define FS_INTERNAL_CASE_SENSITIVE
 #define FS_INTERNAL_NAME "hello"
 #define FS_INTERNAL_DATA APP_HELLO_DATA
-#include <fs_internal.h>
+#include <fileio/fs_internal.h>
 */
 
 /*
@@ -51,13 +51,13 @@ int putchar(int c) {
 //#define PB_DEBUG_FRAMES
 //#define PB_DEBUG_PROTOCOL_ERRORS
 #include <driver/parabuddy.h>
-#include <fs_parabuddy.h>
+#include <fileio/fs_parabuddy.h>
 */
 
 // FS: host
 #define HOST_DRIVER_MAME
 #define HOST_PROTOCOL_BINARY
-#include <fs_host.h>
+#include <fileio/fs_host.h>
 
 
 /*
@@ -86,14 +86,14 @@ int putchar(int c) {
 	FS_ROOT_MOUNT__INT \
 	FS_ROOT_MOUNT__PB  \
 }
-#include <fs_root.h>
+#include <fileio/fs_root.h>
 */
 
 // Specify which FS to use as the root (usually fs_root, but can be fs_int to save space)
 //#define FILEIO_ROOT_FS fs_internal
 //#define FILEIO_ROOT_FS fs_root
 #define FILEIO_ROOT_FS fs_host
-#include <fileio.h>
+#include <fileio/fileio.h>
 
 volatile char buf[FILES_BUF_SIZE];
 

@@ -54,7 +54,7 @@ Implementation of fs.h communicating with host.py
 #define FS_HOST_COMMAND_FILE_AVAILABLE 0x47
 
 
-#define FS_HOST_ERROR_OK 0x00
+#define FS_HOST_OK 0x00
 #define FS_HOST_ERROR_UNKNOWN 0x01
 #define FS_HOST_ERROR_LENGTH 0x02
 #define FS_HOST_ERROR_TIMEOUT 0x03
@@ -118,13 +118,13 @@ void fs_host_send_frame(byte cmd, byte *v, const byte l) {
 	
 	host_send_frame(&tmpFrame[0], 1+1+l);	// 1=len, 1=cmd, x=dataLen
 }
-void fs_host_sendByte(byte cmd, byte v) {
+void fs_host_send_byte(byte cmd, byte v) {
 	fs_host_send_frame(cmd, &v, 1);
 }
-void fs_host_sendWord(byte cmd, word v) {
+void fs_host_send_word(byte cmd, word v) {
 	fs_host_send_frame(cmd, (byte *)&v, 2);
 }
-void fs_host_sendAsciiz(byte cmd, const char *v) {
+void fs_host_send_asciiz(byte cmd, const char *v) {
 	byte l;
 	const char *c;
 	
@@ -137,10 +137,23 @@ void fs_host_sendAsciiz(byte cmd, const char *v) {
 	fs_host_send_frame(cmd, (byte *)v, l);
 }
 
+byte fs_host_receive_byte(byte *v) {
+	//return fs_host_receiveFrame(FS_HOST_COMMAND_RETURN_BYTE, v, 1, NULL);
+	return (host_receive_frame(v) == 1) ? FS_HOST_OK : FS_HOST_ERROR_CORRUPT;
+}
 
-
-
-
+byte fs_host_receive_asciiz(char* v) {
+	//byte r;
+	byte l;
+	
+	//l = FS_HOST_MAX_FILENAME;
+	//r = fs_host_receiveFrame(FS_HOST_COMMAND_RETURN_ASCIIZ, (byte *)v, 0, &l);
+	l = host_receive_frame((byte *)v);
+	*(v+l) = 0x00;	// Zero terminate
+	
+	//return r;
+	return FS_HOST_OK;
+}
 // FS stuff
 
 void fs_host_mount(const char *options) {
@@ -157,10 +170,8 @@ file_DIR *fs_host_opendir(const char *path) {
 	fs_host_handle h;
 	file_DIR * dir;
 	
-	fs_host_sendAsciiz(FS_HOST_COMMAND_FILE_OPENDIR, (char *)path);
-	h = (fs_host_receiveByte(&h) == FS_HOST_ERROR_OK) ? h : FS_HOST_NO_HANDLE;
-	
-	if (h == FS_HOST_NO_HANDLE) {
+	fs_host_send_asciiz(FS_HOST_COMMAND_FILE_OPENDIR, (char *)path);
+	if (fs_host_receive_byte(&h) != FS_HOST_OK) {
 		errno = ERR_FILE_NOT_FOUND;	// Or something
 		return NULL;
 	}
@@ -180,7 +191,9 @@ int fs_host_closedir(file_DIR * dir) {
 	fs_host_handle h;
 	
 	h = (fs_host_handle)dir->userData;
-	fs_host_file_closedir(h);
+
+	//fs_host_file_closedir(h);
+	fs_host_send_byte(FS_HOST_COMMAND_FILE_CLOSEDIR, h);
 	
 	// Invalidate
 	dir->userData = NULL;
@@ -192,14 +205,17 @@ int fs_host_closedir(file_DIR * dir) {
 dirent *fs_host_readdir(file_DIR *dir) {
 	dirent *de;
 	fs_host_handle h;
+	byte l;
 	
 	// Fetch next file info from driver...
 	h = (fs_host_handle)dir->userData;
 	
 	// Request via ParallelBuddy
-	fs_host_file_readdir(h, &fs_host_tmpName[0]);
+	//fs_host_file_readdir(h, &fs_host_tmpName[0]);
+	fs_host_send_byte(FS_HOST_COMMAND_FILE_READDIR, h);
+	l = fs_host_receive_asciiz(&fs_host_tmpName[0]);
 	
-	if (fs_host_tmpName[0] == 0)
+	if (l == 0)	//(fs_host_tmpName[0] == 0)
 		return NULL;
 	
 	// Create a dirent
@@ -219,10 +235,9 @@ file_FILE *fs_host_fopen(const char *path, const char *mode) {
 	fs_host_handle h;	// Remote handle
 	
 	// Actually do the call to BusBuddy
-	h = fs_host_file_open(path, mode);
-	
-	// Invalid handle? File not found?
-	if (h == PB_NO_HANDLE) {
+	//h = fs_host_file_open(path, mode);
+	fs_host_send_asciiz(FS_HOST_COMMAND_FILE_OPEN, (char *)path);
+	if (fs_host_receive_byte(&h) != FS_HOST_OK) {
 		errno = ERR_FILE_NOT_FOUND;	// Maybe a different error
 		return NULL;
 	}
@@ -232,7 +247,7 @@ file_FILE *fs_host_fopen(const char *path, const char *mode) {
 	
 	f->name = path;
 	f->mode = mode;
-	f->fs = &fs_parabuddy;
+	f->fs = &fs_host;
 	f->userData = (void *)h;	// Store remote handle
 	//f->size = dirf->size;
 	f->currentPos = 0;
@@ -245,7 +260,9 @@ int fs_host_fclose(file_FILE *f) {
 	
 	// Close remote file handle
 	h = (fs_host_handle)f->userData;
-	fs_host_file_close(h);
+	
+	//fs_host_file_close(h);
+	fs_host_send_byte(FS_HOST_COMMAND_FILE_CLOSE, h);
 	
 	// Invalidate
 	f->userData = NULL;
@@ -257,13 +274,17 @@ int fs_host_fclose(file_FILE *f) {
 byte fs_host_feof(file_FILE *f) {
 	fs_host_handle h;
 	//byte b;
+	byte r;
 	
 	// Get "bytes available for reading" from remote
 	h = (fs_host_handle)f->userData;
 	//b = fs_host_file_bytesAvailable(h);
 	//if (b <= 0) return 1;
 	//return 0;
-	return fs_host_file_eof(h);
+	
+	//return fs_host_file_eof(h);
+	fs_host_send_byte(FS_HOST_COMMAND_FILE_EOF, h);
+	return (fs_host_receive_byte(&r) == FS_HOST_OK) ? r : 1;
 }
 
 
@@ -280,9 +301,18 @@ int fs_host_fgetc(file_FILE *f) {
 	
 	// Read from remote file handle
 	h = (fs_host_handle)f->userData;
-	l = fs_host_file_read(h, &b, 1);
+	//l = fs_host_file_read(h, &b, 1);
+	//if (l <= 0) return -1;	//EOF;
 	
-	if (l <= 0) return -1;	//EOF;
+	struct {
+		byte h ;
+		byte l;
+	} data;
+	data.h = 0;
+	data.l = 1;
+	fs_host_send_frame(FS_HOST_COMMAND_FILE_READ, (byte *)&data, sizeof(data));
+	l = host_receive_frame(&b);
+	// Ensure l == 1
 	
 	f->currentPos++;
 	
@@ -300,14 +330,21 @@ size_t fs_host_fread(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	
 	// Read from remote file handle
 	h = (fs_host_handle)f->userData;
-	l = fs_host_file_read(h, (byte *)ptr, size);
-	
+	//l = fs_host_file_read(h, (byte *)ptr, size);
+	struct {
+		byte h ;
+		byte l;
+	} data;
+	data.h = h;
+	data.l = size;
+	fs_host_send_frame(FS_HOST_COMMAND_FILE_READ, (byte*)&data, sizeof(data));
+	l = host_receive_frame((byte *)ptr);
 	return l;
 }
 
 size_t fs_host_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	fs_host_handle h;
-	byte l;
+	byte r;
 	byte *b;
 	
 	size *= nmemb;	//@FIXME: This can/will overflow
@@ -318,9 +355,10 @@ size_t fs_host_fwrite(void *ptr, size_t size, size_t nmemb, file_FILE *f) {
 	h = (fs_host_handle)f->userData;
 	
 	b = (byte *)ptr;
-	l = fs_host_file_write(h, b, size);
-	
-	return l;
+	//l = fs_host_file_write(h, b, size);
+	fs_host_send_frame(FS_HOST_COMMAND_FILE_WRITE, b, size);
+	fs_host_receive_byte(&r);
+	return r;
 }
 
 #endif

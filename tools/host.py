@@ -34,7 +34,7 @@ PYTHON3 = True
 # FTDI
 SERIAL_PORT = '/dev/ttyUSB0'
 SERIAL_BAUD = 9600	#19200	# 9600 or 19200
-SHOW_TRAFFIC = not True
+SHOW_TRAFFIC = True
 SHOW_TRAFFIC_BYTES = not True
 
 
@@ -503,7 +503,7 @@ class Driver_MAME(Driver):
 				if SHOW_TRAFFIC_BYTES: put('< 0x%02X' % v)
 				return v
 			except ValueError:
-				put('Got non-hex data from stdout: %s' % str_hex(s))
+				put('Got non-hex data from stdout: %s' % str(s))
 			#
 			time.sleep(0.01)
 		#
