@@ -1,6 +1,22 @@
 #!/usr/bin/python3
 """
-Host for files example
+fs_host Host Implementation
+===========================
+
+This is a host (extends vgldk/tools/host.py) to handle commands
+from fs_host.h in order to access files stored on a remote host.
+The commands are 1:1 based on the previously used parabuddy and fs_parabuddy/fs_busbuddy.
+
+"Host" is a more general concept than busbuddy/parabuddy. Instead of
+having the filesystem pick which host protocol to use, host.h does all of that.
+The actual hardware driver on the device, as well as the low-level protocol
+can be chosen at compile time without toughing the actual program.
+
+In contrast to "bdos_host.py" this is more "modern" and does not
+require to send a FCB structure back and forth. So there is no
+"current record" etc., just simple wrappers for fopen, fclose, ...
+
+2023-09-07 Bernhard "HotKey" Slawik
 """
 
 import time
@@ -211,7 +227,7 @@ if __name__ == '__main__':
 	#host.SHOW_TRAFFIC = True	# Debug traffic
 	#host.SHOW_TRAFFIC_BYTES = True	# Debug traffic byte by byte
 	
-	# Start bdos_host in MAME mode...
+	# Start host in MAME mode...
 	put('Starting host...')
 	mame_roms_dir = None	# Use stock ROM
 	driver = Driver_MAME(rompath=mame_roms_dir, emusys=mame_sys, cart_file=cart_filename)
