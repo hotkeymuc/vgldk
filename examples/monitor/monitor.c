@@ -5,6 +5,7 @@
 */
 
 #define VGLDK_VARIABLE_STDIO	// Allow changing putchar/getchar at runtime. Needed for serial I/O functions and app loading
+//#define FONT_FULL_ASCII	// Include all 256 instead of only 128 chars
 #include <vgldk.h>
 
 
@@ -29,7 +30,7 @@ char cmd_arg[MAX_INPUT];
 	//#define SOFTUART_BAUD 9600	// Solid and stable
 	#define SOFTUART_BAUD 19200	// Experimental
 
-//#define MONITOR_FILES	// Include file system stuff
+#define MONITOR_FILES	// Include file system stuff
 	//#define MONITOR_FILES_FS_NULL	// Include FS driver for NULL filesystem
 	//#define MONITOR_FILES_FS_INTERNAL	// Include FS driver for "internal" ROM data
 	//#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
@@ -47,7 +48,7 @@ char cmd_arg[MAX_INPUT];
 #define MONITOR_CMD_PEEKPOKE	// Required for uploading via serial
 #define MONITOR_CMD_CALL
 #define MONITOR_CMD_PORT
-#define MONITOR_CMD_VER	// ~54 bytes
+//#define MONITOR_CMD_VER	// ~54 bytes
 //#define MONITOR_CMD_LOAD	// Requires MONITOR_FILES
 //#define MONITOR_CMD_RUN	// Requires MONITOR_CMD_LOAD and MONITOR_CMD_CALL
 

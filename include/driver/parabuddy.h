@@ -36,7 +36,7 @@ TODO:
 //#define PB_USE_SOFTUART // Use SoftUART as physical layer (actual hardware)
 //#define PB_USE_SOFTSERIAL // Use SoftSerial as physical layer (actual hardware)
 //#define PB_USE_MAME	// Use MAME port traps (link to host) as a physical layer (running in emulation)
-//#define PB_USE_ARDUINO  // Provide a custom physical layer (ParallelBuddy Arduino Sketch)
+//#define PB_USE_ARDUINO  // Provide a custom physical layer (when running ParallelBuddy Arduino Sketch)
 
 #define PB_MAX_FRAME_SIZE 64  // Length of a command frame
 #define PB_MAX_FILENAME 32

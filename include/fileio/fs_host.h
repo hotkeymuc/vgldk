@@ -6,7 +6,8 @@
 fs.h compatible File System using Host.py
 ================================================
 
-Implementation of fs.h communicating with host.py
+Implementation of fs.h communicating with host.py.
+It is mainly based on fs_parabuddy.h/parabuddy.h
 
 2023-09-05 Bernhard "HotKey" Slawik (vgldk.git)
 
@@ -129,6 +130,7 @@ void fs_host_send_asciiz(byte cmd, const char *v) {
 	const char *c;
 	
 	// Get length of zero-terminated string
+	//@TODO: Use string.h:strlen()
 	c = v;
 	l = 0;
 	while(*c++ != 0) l++;
@@ -138,7 +140,6 @@ void fs_host_send_asciiz(byte cmd, const char *v) {
 }
 
 byte fs_host_receive_byte(byte *v) {
-	//return fs_host_receiveFrame(FS_HOST_COMMAND_RETURN_BYTE, v, 1, NULL);
 	return (host_receive_frame(v) == 1) ? FS_HOST_OK : FS_HOST_ERROR_CORRUPT;
 }
 
@@ -147,11 +148,9 @@ byte fs_host_receive_asciiz(char* v) {
 	byte l;
 	
 	//l = FS_HOST_MAX_FILENAME;
-	//r = fs_host_receiveFrame(FS_HOST_COMMAND_RETURN_ASCIIZ, (byte *)v, 0, &l);
 	l = host_receive_frame((byte *)v);
 	*(v+l) = 0x00;	// Zero terminate
 	
-	//return r;
 	return FS_HOST_OK;
 }
 // FS stuff
@@ -191,8 +190,6 @@ int fs_host_closedir(file_DIR * dir) {
 	fs_host_handle h;
 	
 	h = (fs_host_handle)dir->userData;
-
-	//fs_host_file_closedir(h);
 	fs_host_send_byte(FS_HOST_COMMAND_FILE_CLOSEDIR, h);
 	
 	// Invalidate
@@ -211,7 +208,6 @@ dirent *fs_host_readdir(file_DIR *dir) {
 	h = (fs_host_handle)dir->userData;
 	
 	// Request via ParallelBuddy
-	//fs_host_file_readdir(h, &fs_host_tmpName[0]);
 	fs_host_send_byte(FS_HOST_COMMAND_FILE_READDIR, h);
 	l = fs_host_receive_asciiz(&fs_host_tmpName[0]);
 	
@@ -235,7 +231,6 @@ file_FILE *fs_host_fopen(const char *path, const char *mode) {
 	fs_host_handle h;	// Remote handle
 	
 	// Actually do the call to BusBuddy
-	//h = fs_host_file_open(path, mode);
 	fs_host_send_asciiz(FS_HOST_COMMAND_FILE_OPEN, (char *)path);
 	if (fs_host_receive_byte(&h) != FS_HOST_OK) {
 		errno = ERR_FILE_NOT_FOUND;	// Maybe a different error
@@ -261,7 +256,6 @@ int fs_host_fclose(file_FILE *f) {
 	// Close remote file handle
 	h = (fs_host_handle)f->userData;
 	
-	//fs_host_file_close(h);
 	fs_host_send_byte(FS_HOST_COMMAND_FILE_CLOSE, h);
 	
 	// Invalidate
@@ -282,11 +276,11 @@ byte fs_host_feof(file_FILE *f) {
 	//if (b <= 0) return 1;
 	//return 0;
 	
-	//return fs_host_file_eof(h);
 	fs_host_send_byte(FS_HOST_COMMAND_FILE_EOF, h);
-	return (fs_host_receive_byte(&r) == FS_HOST_OK) ? r : 1;
+	//return (fs_host_receive_byte(&r) == FS_HOST_OK) ? r : 1;
+	fs_host_receive_byte(&r);
+	return r;
 }
-
 
 
 int fs_host_fgetc(file_FILE *f) {
@@ -301,14 +295,13 @@ int fs_host_fgetc(file_FILE *f) {
 	
 	// Read from remote file handle
 	h = (fs_host_handle)f->userData;
-	//l = fs_host_file_read(h, &b, 1);
-	//if (l <= 0) return -1;	//EOF;
 	
+	// Same as fread, but with only 1 byte
 	struct {
 		byte h ;
 		byte l;
 	} data;
-	data.h = 0;
+	data.h = h;
 	data.l = 1;
 	fs_host_send_frame(FS_HOST_COMMAND_FILE_READ, (byte *)&data, sizeof(data));
 	l = host_receive_frame(&b);

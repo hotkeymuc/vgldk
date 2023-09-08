@@ -2,7 +2,8 @@
 #NAME = app_hello
 #NAME = app_tests
 #NAME = app_cserial
-NAME = app_test_softuart
+#NAME = app_test_softuart
+NAME = app_test_keyboard
 
 # To see the result on serial terminal and recover quickly
 #SEND2MONITOR_KEEP_SIO = 1
@@ -16,8 +17,8 @@ NAME = app_test_softuart
 
 # For small loadable apps (without their own I/O):
 VGLDK_SERIES = 0
-LOC_CODE = 0xc800
-LOC_DATA = 0xc200
+LOC_CODE = 0xc400
+LOC_DATA = 0xc080
 
 
 all: upload
