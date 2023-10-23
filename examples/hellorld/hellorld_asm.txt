@@ -1,0 +1,97 @@
+; "Hellorld!" for VTech Genius Leader 4000 Quadro aka. PreComputer
+org	08000h
+
+; VTech cartridge header
+	.db	#0x55
+	.db	#0xaa
+	
+	; "Normal" signature (i.e. non-autostart program cartridge)
+	;.db #0x47 ; "G"
+	;.db #0x41 ; "A"
+	
+	; "Auto-start" signature for PreComputer1000
+	;.db #0x33  ; 0x33 = autostart jump to 0x8010
+	;.db #0x00  ; Dont care
+	
+	; "Auto-start" signature for GL2000/4000/6000
+	.db	#0x59	; "Y"
+	.db	#0x45	; "E"
+	
+	; End of cartridge header
+	di	; Disable interrupts
+	ld	sp, #0xdff0	; Load StackPointer to 0xdff0
+	jp main
+
+
+; LCD support functions
+lcd_delay:
+	push hl
+	ld hl,0010fh	; Delay length
+loop_lcd_delay:
+	dec l
+	jr nz,loop_lcd_delay
+	dec h
+	jr nz,loop_lcd_delay
+	pop hl
+	ret
+lcd_write_control:
+	out (00ah),a	; Write to LCD control register/port
+	call lcd_delay	; Delay long...
+	call lcd_delay	; ...by delaying twice
+	ret
+lcd_write_data:
+	out (00bh),a	; Write to LCD data register/port
+	call lcd_delay	; Delay a bit
+	ret
+lcd_init:
+	; Initialize the HD44780 LCD controller
+	
+	; Enter 8 bit mode by sending 0x38 four times
+	ld a,038h	; 0x38 = Function set: 2 Line, 8-bit, 5x7 dots
+	call lcd_write_control
+	call lcd_write_control
+	call lcd_write_control
+	call lcd_write_control
+	
+	; Clear screen
+	ld a,001h
+	call lcd_write_control
+	
+	; Set cursor/insert mode
+	ld a,00fh		; LCD_DISPLAYCONTROL | LCD_DISPLAYON | LCD_CURSORON | LCD_BLINKON
+	call lcd_write_control
+	ld a,006h		; LCD_ENTRYMODESET | LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT
+	call lcd_write_control
+	ret
+
+
+; Main function
+main:
+	call lcd_init
+	
+	; Start output at a continuous part of VRAM around the center of the screen
+	ld a,0c8h		; LCD_SETDDRAMADDR | 72
+	call lcd_write_control
+	
+	; Start at beginning of string
+	ld hl,str_hello
+	
+	; Print loop
+loop_print:
+	ld a,(hl)	; Load next char
+	or a	; Check if it is zero
+	jr z,loop_halt	; If it is: Jump to end of loop
+	
+	call lcd_write_data
+	inc hl
+	jr loop_print
+	; End of print loop
+loop_halt:
+	jr loop_halt	; Loop forever
+
+
+; Data
+str_hello:
+	.ascii "Hellorld!"
+	.db 0x00	; Zero-termination
+
