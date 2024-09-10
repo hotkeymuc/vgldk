@@ -36,7 +36,7 @@ SERIAL_TIMEOUT_SHORT = 0.05
 # Keep it < monitor's MAX_INPUT-10/2
 #UPLOAD_BUFFER_SIZE = 56	# Used to work fine, but doesn't any more
 #UPLOAD_BUFFER_SIZE = 32
-UPLOAD_BUFFER_SIZE = 24
+#UPLOAD_BUFFER_SIZE = 24
 #UPLOAD_BUFFER_SIZE = 16	# Should work quite reliably
 DEST_DEFAULT = 0xc800
 
@@ -102,21 +102,40 @@ if __name__ == '__main__':
 	
 	port = SERIAL_PORT
 	baud = SERIAL_BAUD
-	#filename = '../hello/out/hello.app.c800.bin'
-	filename = None
+	
 	dest = DEST_DEFAULT
+	file_offset = 0
+	chunk_size = 56	# monitor.py default: 56
+	
+	skip_trailing = True
+	skip_zeros = False
+	verify = True
+	
 	keep_sio = False
 	reset = False
+	verbose_traffic = False
+	
+	#filename = '../hello/out/hello.app.c800.bin'
+	filename = None
 	
 	parser = OptionParser(
 		description='Upload a binary file to a computer running monitor.c',
 		usage='Usage: %prog [options] filename'
 	)
-	parser.add_option('-p', '--port', dest='port', default=port, action='store', type='string', help='Serial port to use (%s)' % port)
+	parser.add_option('-p', '--port', dest='port', default=port, action='store', type='string', help='Serial port (%s)' % port)
 	parser.add_option('-b', '--baud', dest='baud', default=baud, action='store', type='int', help='Baud rate (%d)' % baud)
+	
 	parser.add_option('-d', '--dest', dest='dest', default=dest, action='store', type='int', help='Destination address (0x%04X)' % dest)
-	parser.add_option('-k', '--keep-sio', dest='keep_sio', default=keep_sio, action='store_true', help='Keep IO on serial when calling')
+	parser.add_option('-o', '--offset', dest='ofs', default=file_offset, action='store', type='int', help='File offset (%d)' % file_offset)
+	parser.add_option('-c', '--chunk', dest='chunk', default=chunk_size, action='store', type='int', help='Chunk size (%d)' % chunk_size)
+	
+	parser.add_option('-t', '--keep-trailing', dest='keep_trailing', default=not skip_trailing, action='store_true', help='Keep trailing 0xFF and 0x00')
+	parser.add_option('-z', '--skip-zeros', dest='skip_zeros', default=skip_zeros, action='store_true', help='Skip zero bytes')
+	parser.add_option('-n', '--no-verify', dest='no_verify', default=not verify, action='store_true', help='Do not verify writes')
+	
+	parser.add_option('-k', '--keep-sio', dest='keep_sio', default=keep_sio, action='store_true', help='Keep serial I/O when calling')
 	parser.add_option('-r', '--reset', dest='reset', default=reset, action='store_true', help='Reset after call')
+	parser.add_option('-v', '--verbose', dest='verbose', default=verbose_traffic, action='store_true', help='Show verbose traffic')
 	
 	#parser.add_option('-f', '--file',
 	#	action='store', type='string', dest='filename', help='Binary file to send')
@@ -124,9 +143,18 @@ if __name__ == '__main__':
 	
 	port = opt.port
 	baud = opt.baud
+	
 	dest = opt.dest
+	file_offset = opt.ofs
+	chunk_size = opt.chunk
+	
+	skip_trailing = not opt.keep_trailing
+	skip_zeros = opt.skip_zeros
+	verify = not opt.no_verify
+	
 	keep_sio = opt.keep_sio
 	reset = opt.reset
+	verbose_traffic = opt.verbose
 	
 	#filename = opt.filename
 	# Positional
@@ -138,12 +166,20 @@ if __name__ == '__main__':
 		parser.print_help()
 		sys.exit(1)
 	
-	put('Uploading "%s" on port "%s" using %d baud to memory 0x%04X...' % (filename, port, baud, dest))
+	optim = ''
+	if (not skip_trailing) and (not skip_zeros) and verify:
+		optim = 'none'
+	else:
+		if skip_trailing: optim += (', ' if len(optim) else '') + 'no trail'
+		if skip_zeros: optim += (', ' if len(optim) else '') + 'no zero'
+		if not verify: optim += (', ' if len(optim) else '') + 'no verify'
+	
+	put('Uploading "%s" to memory 0x%04X on port "%s" at %d baud (opt: %s)...' % (filename, dest, port, baud, optim))
 	comp = monitor.Monitor(port=port, baud=baud)
 	comp.open()
 	
 	# Quiet output
-	monitor.SHOW_TRAFFIC = False
+	monitor.SHOW_TRAFFIC = verbose_traffic	#False
 	
 	# Wait for the monitor logo/prompt
 	comp.wait_for_monitor()
@@ -154,7 +190,7 @@ if __name__ == '__main__':
 	
 	# Upload app binary
 	#comp.upload(filename=filename, dest_addr=dest)
-	comp.upload(filename=filename, dest_addr=dest, verify=True)
+	comp.upload(filename=filename, src_addr=file_offset, skip_zeros=skip_zeros, skip_trailing=skip_trailing, dest_addr=dest, chunk_size=chunk_size, verify=verify)
 	
 	# Wait a bit
 	#time.sleep(0.2)
