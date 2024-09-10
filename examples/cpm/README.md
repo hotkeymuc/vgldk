@@ -38,10 +38,10 @@ Stock memory layout of GL4000:
 	C000 - DFFF	Internal RAM 0000 - 1FFF
 	E000 - FFFF	Internal RAM 0000 - 1FFF copy / unused
 
-In order to get CP/M running, 32KB of additional RAM have to be
-"mounted" to the base of address space, "overshadowing" internal system ROM.
-This can be achieved by connecting the internal ROM's ~CS HIGH while
-connecting its signal to the external SRAM ~CS.
+In order to get CP/M running, we need additional RAM to be "mounted" to the base of address space (0x0000), "overshadowing" the internal system ROM which is hard-wired there.
+This can be achieved by a little hardware modification: Pull the internal ROM's ~CS pin HIGH while routing that signal to the external SRAM's ~CS pin.
+On my 4004 model, the ROM ~CS pin is nicely exposed at the very corner of the mainboard, close to the cartridge port, so you might not even need to unscrew the PCB for the mod. Just cut that trace and solder wires to both sides of the cut and route them to the outside.
+You can use a switch (better: two switches) to comfortably switch the ~CS pins of the ROM and the SRAM ICs between their stock and CP/M configuration.
 
 Modified memory layout for CP/M:
 	Memory Bank	Usage
