@@ -1,0 +1,99 @@
+2024-09-08
+VCFe 2024 is over (vcfe.org).
+Next year (2025) I finally want to present VTech CP/M
+and/or Sierra AGI engine on 6000SL/7007SL...
+
+I think it won't work, because:
+	-> 1 bit color depth might be unplayable! (Show stopper!)
+	-> 240x100 is an odd resolution compared to Sierra's 160x168 (320x168)
+	-> visual and priority buffer require ~24 KB of RAM!
+
+* Shortcuts:
+	/z/data/_code/_python/_api/Sierra_AGI/htkagi
+	/z/data/_code/_c/V-Tech/vgldk.git
+* Terminal (for 7007SL running monitor 6000SL):
+	picocom -b 9600 --imap lfcrlf --echo /dev/ttyUSB0
+
+* !! There *IS* enough RAM available! 32 KiB in total, 29 KB+ freely usable!
+	* GL7007SL (and GL6000SL?) can switch RAM bank at 0xc000-0xdfff via port 0x53!
+		port 0x53: 0xc000 - 0xdfff is usable, bankable memory! (port 0x53 = 0x01, 0x02, 0x03 !!!!)
+		port 0x54: 0xe000 - 0xffff is used for VRAM, should not be banked (port 0x54 = 0x00; when changing it to something else the system crashes)
+					0xe000 - 0xebb7	VRAM (240x100 at 1 bit = 3000 bytes)
+					0xebb8 - 0xffff	can be used as "static heap" (e.g. in monitor)
+	* bank switching ports:
+		0x50 = 0x0000 - 0x3fff
+		0x51 = 0x4000 - 0x7fff
+		0x52 = 0x8000 - 0xbfff
+		0x53 = 0xc000 - 0xdfff
+		0x54 = 0xe000 - 0xffff
+		0x55 = (determine if ROM or cart is mounted et. al.)
+				lowest bit set: Map cartridge at 0x0000 (e.g. "out 55 1d" maps cart to 0x0000 AND 0x8000)
+				2nd    bit set: Map cartridge at 0x4000 (e.g. "out 55 1e" maps cart to 0x4000 AND 0x8000)
+				3rd    bit unset: Reboot loop (e.g. "out 55 18")
+				4th    bit unset: Reboot loop (e.g. "out 55 14")
+				5th    bit unset: nothing, doesn't even gets retained (turns back to 0x1c)
+				!! out 55 0c -> Crash sometimes
+				!! out 55 3c -> Crash with Capslock LED on
+				!! out 55 9c -> nothing, doesn't even gets retained (turns back to 0x1c)
+				!! out 55 fc -> System powers off!
+	* So the onboard RAM seems to be 32 KiB:
+		bank 0	0x0000 - 0x1fff	8KB VRAM (3000 bytes) at 0xe000 - 0xebb7 and RAM (5192 bytes) at 0xebb8 - 0xffff
+		bank 1	0x2000 - 0x3fff	8KB default RAM at 0xc000 - 0xdfff
+		bank 2	0x4000 - 0x5fff	8KB extended RAM at 0xc000 - 0xdfff
+		bank 3	0x6000 - 0x7fff	8KB extended RAM at 0xc000 - 0xdfff
+	* Subtracting the 3000 bytes of VRAM results in 5192 + 3*8192 = 29768 bytes (29.07 KiB) of available RAM
+	
+
+* Idea on how to decode and scale AGI pictures:
+	* Decode visual and priority frames SEQUENCIALLY:
+		* They don't quite fit at once (26880 bytes > 24KB, there would be no byte left for anything else!)
+		* Once a frame is processed (cropped / scaled), it will fit in one of the banks and the next frame can be processed
+	* Crop, scale and scroll the frames:
+		* Only show 160 x 100 pixel at once, scroll down if necessary
+		* Stretch to fullscreen 240x100 on-the-fly while actually rendering to VRAM, if desired.
+	1. Decode the visual frame in full AGI resolution to 2 extended RAM banks (temporarily)
+		160x168 pixels at 4 bit = 26880/2 = 13440 bytes = 8192 + 5248 bytes across 2 banks
+	2. Crop and scale to usable resolution (e.g. 160x100 at 4 bit = 8000 bytes) to 3rd extended bank (or temporarily to VRAM)
+	3. Decode priority frame in full AGI resolution to 2 extended RAM banks (overwriting the old temporary full-frame)
+	4. Crop and scale in-place inside 1st extended bank
+	5. Do pixel-by-pixel rendering to VRAM
+
+------
+OLD:
+
+But: How much RAM can I access on 6000SL/7007SL?
+	* AGI has 160x168 = 26880 pixels for visual pixel (16 colors) and priority (16 steps)
+	* This requires 26880 bytes of total RAM for the buffers (when using 4+4 bit per byte).
+	* VRAM is 0xe000 + ((240 * 100) / 8) = 0xe000 - 0xebb7
+	* Free: 0xc000-0xdfff, 0xebb8-0xffff = 0x3448 bytes = 13'384 bytes
+	!! (see above) 0xc000-0xdfff can be bank-switched! There is a total of 32 KB - VRAM = 29 KB!
+
+Check for RAM:
+	;	0x50 = 0x0000 - 0x3fff
+	;	0x51 = 0x4000 - 0x7fff
+	;	0x52 = 0x8000 - 0xbfff
+	;	0x53 = 0xc000 - 0xdfff
+	;	0x54 = 0xe000 - 0xffff
+	;
+	;	0x55: (usually 0x1C = 0b00011100)
+	;		lowest bit set: Map cartridge at 0x0000 (e.g. "out 55 1d" maps cart to 0x0000 AND 0x8000)
+	;		2nd    bit set: Map cartridge at 0x4000 (e.g. "out 55 1e" maps cart to 0x4000 AND 0x8000)
+	;		3rd    bit unset: Reboot loop (e.g. "out 55 18")
+	;		4th    bit unset: Reboot loop (e.g. "out 55 14")
+	;		5th    bit unset: nothing, doesn't even gets retained (turns back to 0x1c)
+	;		!! out 55 0c -> Crash sometimes
+	;		!! out 55 3c -> Crash with Capslock LED on
+	;		!! out 55 9c -> nothing, doesn't even gets retained (turns back to 0x1c)
+	;		!! out 55 fc -> System powers off!
+	Show current map:
+		in 55;in 56;in 50;dump 0000 16;in 51;dump 4000 16;in 52;dump 8000 16;in 53;dump c000 16
+
+	* try: remap VRAM and check if there are multiple RAM pages available
+		in 54;peek e000 24
+		out 54 01;in 54;peek e000 24
+
+	RAM 0xC000:	in 53; out 53 01;in 53;peek c100 16;poke c100 aa;peek c100 16
+	VRAM 0xE000: in 54; out 54 00;in 54;peek e100 16;poke e100 aa;peek e100 16
+
+	Accessing 0x55 / 0x56 will crash the system spectacularly (re-maps RAM/VRAM?)
+	in 54; out 54 01;in 54;peek e100 16;poke e100 aa;peek e100 16

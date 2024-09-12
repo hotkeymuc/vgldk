@@ -1,0 +1,30 @@
+NAME = vagi
+
+# To see the result on serial terminal and recover quickly
+#SEND2MONITOR_KEEP_SIO = 1
+#SEND2MONITOR_RESET = 1
+
+# For Emu:
+# For targeting a specific model:
+#VGLDK_SERIES = 1000
+#VGLDK_SERIES = 2000
+#VGLDK_SERIES = 4000
+VGLDK_SERIES = 6000
+LOC_DATA = 0xec00
+
+# For real hardware running MONITOR cart:
+#	# For small loadable apps (without their own I/O):
+#	VGLDK_SERIES = 0
+#	#LOC_CODE = 0xc000
+#	#LOC_DATA = 0xc800
+#	LOC_CODE = 0xee00
+#	LOC_DATA = 0xec00
+#	SEND2MONITOR_OPTIONS = --baud=9600
+
+all: upload
+#all: app
+#all: cart
+#all: emu
+
+include ../../tools/Makefile.mk
+
