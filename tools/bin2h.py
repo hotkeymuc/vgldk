@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """
 BIN2H
-Convert a .h file to be used for static testing
+Convert a binary file to a .h file to be used for static testing.
 2020-09-06 Bernhard "HotKey" Slawik
 """
 

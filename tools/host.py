@@ -108,12 +108,14 @@ class Host:
 		self.protocol.send_frame(data)
 	
 	def handle_frame(self, data):
-		"Handle one complete FRAME of data"
+		"""Handle one complete FRAME of data. Override by your own implementation."""
 		
 		#put('frame: %s' % (str(data)))
 		if SHOW_TRAFFIC: put('<< frame: (%d) [%s]' % (len(data), ' '.join([ '0x%02X'%b for b in data])))
 		if (len(data) == 0): return False
 		
+		
+		# Some example functions
 		realm = data[0]
 		if realm == ord('L'):
 			# Load

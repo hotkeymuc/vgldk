@@ -145,17 +145,18 @@ ifeq ($(CART_SIZE_KB),32)
 endif
 
 # Upload/debug options
-# Keep serial I/O after upload
+# TODO: Add option for baud etc.
+# Keep serial I/O after upload?
 #SEND2MONITOR_KEEP_SIO ?= 0
 #SEND2MONITOR_RESET ?= 0
-SEND2MONITOR_OPTIONS =
+SEND2MONITOR_OPTIONS ?=
 ifeq ($(SEND2MONITOR_KEEP_SIO),1)
 	SEND2MONITOR_OPTIONS_KEEP_SIO = --keep-sio
 endif
 ifeq ($(SEND2MONITOR_RESET),1)
 	SEND2MONITOR_OPTIONS_RESET = --reset
 endif
-SEND2MONITOR_OPTIONS = $(SEND2MONITOR_OPTIONS_KEEP_SIO) $(SEND2MONITOR_OPTIONS_RESET)
+SEND2MONITOR_OPTIONS += $(SEND2MONITOR_OPTIONS_KEEP_SIO) $(SEND2MONITOR_OPTIONS_RESET)
 
 # Directories
 OUT_DIR = out
@@ -301,7 +302,7 @@ burn: $(OUTPUT_FILE_CART)
 	@# Show size analysis
 	@$(CALCSIZE) $(OUTPUT_FILE_CART)
 	@# Use -s = no warning for file size mismatch
-	$(MINIPRO) -p "$(CART_PART)" -w $(OUTPUT_FILE_CART)
+	$(MINIPRO) -p "$(CART_PART)" -w $(OUTPUT_FILE_CART) -s
 
 upload: $(OUTPUT_FILE_APP)
 	@# Show size analysis
