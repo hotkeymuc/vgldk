@@ -50,6 +50,7 @@
 	// Note: We need to ceck for bank switches at EACH SINGLE pixel operation...
 	#define AGI_FRAME_BANK_LO 1
 	#define AGI_FRAME_BANK_HI 2
+	
 	void frame_clear(byte b) {
 		// Clear banked frame buffers
 		bank_0xc000_port = AGI_FRAME_BANK_LO;	// Mount bank 1 to 0xc000
@@ -60,8 +61,10 @@
 	
 	void frame_banked_set_pixel_4bit(byte x, byte y, byte c) {
 		// Set 4 bit color value of banked buffer at 0xc000
+		
 		//word a = y * (AGI_FRAME_WIDTH >> 1) + (x >> 1);
 		word a = ((y * AGI_FRAME_WIDTH) + x) >> 1;
+		
 		// Do the bank switching
 		if (a < 0x2000) {
 			bank_0xc000_port = AGI_FRAME_BANK_LO;	// Map lower bank to 0xc000
@@ -69,6 +72,7 @@
 			bank_0xc000_port = AGI_FRAME_BANK_HI;	// Map upper bank to 0xc000
 			a &= (0xFFFF - 0x2000);	// Clear high bit
 		}
+		
 		// Map to RAM address
 		a |= AGI_FRAME_ADDR;
 		
@@ -83,15 +87,16 @@
 	
 	byte frame_banked_get_pixel_4bit(byte x, byte y) {
 		// Get 4 bit color value from banked buffer at 0xc000
+		
 		//word a = y * (AGI_FRAME_WIDTH >> 1) + (x >> 1);
 		word a = ((y * AGI_FRAME_WIDTH) + x) >> 1;
 		
-		// Do the bank switching
+		// Do the bank switch
 		if (a < 0x2000) {
 			bank_0xc000_port = AGI_FRAME_BANK_LO;	// Map lower bank to 0xc000
 		} else {
 			bank_0xc000_port = AGI_FRAME_BANK_HI;	// Map upper bank to 0xc000
-			a &= (0xFFFF - 0x2000);	// Clear high bit
+			a &= 0xdfff;	//(0xFFFF - 0x2000);	// Clear high bit (it's the bank number)
 		}
 		
 		// Map to RAM address

@@ -3,6 +3,8 @@ AGI PIC drawing
 based on scummvm's agi implementation 2024-09-14
 */
 
+//#define AGI_PIC_FILL_CASES	// Optimize fill by pre-selecting a "draw_FillCheck_case" function to use throughout the fill
+
 #define CLIP(v,vmin,vmax) ((v >= vmax) ? vmax : ( (v <= vmin) ? vmin : v  ) )
 #define SWAP(a,b) {tmp=b;b=a;a=tmp;}
 
@@ -28,7 +30,7 @@ enum AgiPictureFlags {
 	kPicFStep      = (1 << 2),
 	kPicFf3Stop    = (1 << 3),
 	kPicFf3Cont    = (1 << 4),
-	kPicFTrollMode = (1 << 5)
+	//kPicFTrollMode = (1 << 5)
 };
 
 // PictureMgr
@@ -76,10 +78,8 @@ void putVirtPixel(int x, int y) {
 	
 	_gfx->putPixel(x, y, drawMask, _scrColor, _priColor);
 	*/
-	//printf_d(_scrOn);	putchar('=');	printf_d(_scrColor);	putchar('\n');
 	
-	//@TODO: Do the _step checking on a higher level (e.g. line or flood fill)
-	// ... this would save a lot of superfluous compare operations
+	//@TODO: Do the _step checking on a higher level (e.g. line or flood fill)! This would save a lot of superfluous compare operations
 	if ((vagi_drawing_step == VAGI_STEP_VIS) && (_scrOn))
 		frame_set_pixel_4bit(x, y, _scrColor);
 	
@@ -470,54 +470,87 @@ typedef struct {
 #define FILL_STACK_MAX 128
 
 
-int draw_FillCheck(int16 x, int16 y) {
-	/*
-	byte screenColor;
-	byte screenPriority;
+#ifdef AGI_PIC_FILL_CASES
+	// Speed up be pre-selecting the right case (that won't change throuout the fill!)
+	typedef bool (draw_FillCheck_t)(int16, int16);
 	
-	if (x < 0 || x >= _width || y < 0 || y >= _height)
-		return false;
-	
-	//x += _xOffset;
-	//y += _yOffset;
-	
-	screenColor = _gfx->getColor(x, y);
-	screenPriority = _gfx->getPriority(x, y);
-	
-	if (_flags & kPicFTrollMode)
-		return ((screenColor != 11) && (screenColor != _scrColor));
-	
-	if (!_priOn && _scrOn && _scrColor != 15)
-		return (screenColor == 15);
-	
-	if (_priOn && !_scrOn && _priColor != 4)
-		return screenPriority == 4;
-	
-	return (_scrOn && screenColor == 15 && _scrColor != 15);
-	*/
-	
-	byte c;
-	
-	if (x < 0 || x >= _width || y < 0 || y >= _height)
-		return false;
-	
-	//x += _xOffset;
-	//y += _yOffset;
-	
-	c = frame_get_pixel_4bit(x, y);
-	
-	if (_flags & kPicFTrollMode)
-		return ((c != 11) && (c != _scrColor));
-	
-	if (!_priOn && _scrOn && _scrColor != 15)
+	bool draw_FillCheck_case1(int16 x, int16 y) {
+		if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		//if (!_priOn && _scrOn && _scrColor != 15)
+		return (frame_get_pixel_4bit(x, y) == 15);
+	}
+	bool draw_FillCheck_case2(int16 x, int16 y) {
+		if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		//if (_priOn && !_scrOn && _priColor != 4)
+		return (frame_get_pixel_4bit(x, y) == 4);
+	}
+	bool draw_FillCheck_case3(int16 x, int16 y) {
+		if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		//return (_scrOn && frame_get_pixel_4bit(x, y) == 15 && _scrColor != 15);
+		return (frame_get_pixel_4bit(x, y) == 15);
+	}
+	#define draw_FillCheck(x,y) ((*p_draw_FillCheck)(x, y))
+#else
+	// Working but slow (because it checks things that don't change throughout the fill!)
+	bool inline draw_FillCheck(int16 x, int16 y) {
+		//	Original:
+		//		byte screenColor;
+		//		byte screenPriority;
+		//		
+		//		if (x < 0 || x >= _width || y < 0 || y >= _height)
+		//			return false;
+		//		
+		//		//x += _xOffset;
+		//		//y += _yOffset;
+		//		
+		//		screenColor = _gfx->getColor(x, y);
+		//		screenPriority = _gfx->getPriority(x, y);
+		//		
+		//		if (_flags & kPicFTrollMode)
+		//			return ((screenColor != 11) && (screenColor != _scrColor));
+		//		
+		//		if (!_priOn && _scrOn && _scrColor != 15)
+		//			return (screenColor == 15);
+		//		
+		//		if (_priOn && !_scrOn && _priColor != 4)
+		//			return screenPriority == 4;
+		//		
+		//		return (_scrOn && screenColor == 15 && _scrColor != 15);
+		
+		byte c;
+		
+		if (x < 0 || x >= _width || y < 0 || y >= _height)
+			return false;
+		
+		//x += _xOffset;
+		//y += _yOffset;
+		
+		c = frame_get_pixel_4bit(x, y);
+		
+		// ScummVM:
+		//if (_flags & kPicFTrollMode)
+		//	return ((c != 11) && (c != _scrColor));
+		/*
+		// case 1
+		if (!_priOn && _scrOn && _scrColor != 15)
+			return (c == 15);
+		
+		// case 2
+		if (_priOn && !_scrOn && _priColor != 4)
+			return c == 4;
+		
+		// case 3
+		return (_scrOn && c == 15 && _scrColor != 15);
+		*/
+		
+		// Naive case: Looks like ScummVM (fills too less)
+		//if (_scrOn) return (c == 15);
+		//return (c == 4);
+		
+		if (_priOn) return (c == 4);
 		return (c == 15);
-	
-	if (_priOn && !_scrOn && _priColor != 4)
-		return c == 4;
-	
-	return (_scrOn && c == 15 && _scrColor != 15);
-}
-
+	}
+#endif
 
 void _draw_Fill(int16 x, int16 y) {
 	fill_stack_t stack[FILL_STACK_MAX];
@@ -525,12 +558,25 @@ void _draw_Fill(int16 x, int16 y) {
 	//fill_stack_t p;
 	int16 px, py;
 	
-	if (!_scrOn && !_priOn)
-		return;
+	if (!_scrOn && !_priOn) return;
 	
 	// Quick reject
 	if ((vagi_drawing_step == VAGI_STEP_VIS) && (!_scrOn)) return;
 	if ((vagi_drawing_step == VAGI_STEP_PRI) && (!_priOn)) return;
+	
+	#ifdef AGI_PIC_FILL_CASES
+	// Pre-select the appropriate checking function (we can decide these things IN ADVANCE before entering the flood fill)
+	draw_FillCheck_t *p_draw_FillCheck;
+	if (!_priOn && _scrOn && _scrColor != 15)
+		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case1;
+	else if (_priOn && !_scrOn && _priColor != 4)
+		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case2;
+	else {
+		if (!_scrOn) return;
+		if (_scrColor == 15) return;
+		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case3;
+	}
+	#endif
 	
 	// For testing: Draw a cross
 	//const byte b = 4;
@@ -566,6 +612,7 @@ void _draw_Fill(int16 x, int16 y) {
 		newspanUp = newspanDown = true;
 		for (c++; draw_FillCheck(c, py); c++) {
 			putVirtPixel(c, py);
+			
 			if (draw_FillCheck(c, py - 1)) {
 				if (newspanUp) {
 					//stack.push(Common::Point(c, p.y - 1));
@@ -866,10 +913,10 @@ void drawPictureV2() {
 				_priOn = false;
 				break;
 			case 0xf4:
-				draw_yCorner(true);	//false);	//@FIXME: true or false?
+				draw_yCorner(false);	//@FIXME: true or false?
 				break;
 			case 0xf5:
-				draw_xCorner(true);	//false);	//@FIXME: true or false?
+				draw_xCorner(false);	//@FIXME: true or false?
 				break;
 			case 0xf6:
 				draw_LineAbsolute();
@@ -936,10 +983,15 @@ void drawPictureV2() {
 		if (status == 0) {
 			// Status bar
 			// 240 pixels with 8 pixel chunks = 30 chunks
-			word a = LCD_ADDR;
-			//byte progress = ((word)_dataOffset * 30) / _dataSize;
-			byte progress = ((word)_dataOffset * 3) / (_dataSize / 10);
-			for(byte i = 0; i < 4; i++) {
+			const byte bar_height = 4;
+			//word a = LCD_ADDR;	// At top
+			word a = LCD_ADDR + (LCD_HEIGHT*LCD_WIDTH/8) - bar_height*(LCD_WIDTH/8);	// At bottom
+			
+			//byte progress = ((word)_dataOffset * 30) / _dataSize;	// Leads to overflow while multiplying
+			byte progress = ((word)_dataOffset * 3) / (_dataSize / 10);	// Must work with smaller numbers
+			
+			// Draw bar
+			for(byte i = 0; i < bar_height; i++) {
 				if (progress > 0) memset((byte *)a, 0xff, progress);
 				if (progress < 30) memset((byte *)(a + progress), 0x00, 30-progress);
 				a += 30;
