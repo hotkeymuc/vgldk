@@ -7,6 +7,12 @@
 #define BUFFER_HEIGHT 100
 #define BUFFER_ADDR 0xc000	// Will always be banked there
 
+//#define RGB_TO_LCD_4BPP(r,g,b) (0xf - ((r+g+b)/(3*0x11)))
+//#define RGB_TO_LUMA_4BPP(r,g,b) ((r+g+b)/(3*0x11))
+//#define RGB_TO_LUMA(r,g,b) ((r+g+b) / 3)
+#define RGB_TO_LUMA(r,g,b) (0.299*r + 0.587*g + 0.114*b)
+
+
 void inline buffer_switch(byte bank) {
 	// Mount a different RAM segment to BUFFER_ADDR (0xc000)
 	bank_0xc000_port = bank;
@@ -55,7 +61,7 @@ byte inline buffer_get_pixel_4bit(byte x, byte y) {
 
 
 void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
-	// Crop/scale/scroll full frame into working buffer
+	// Crop/scale/scroll full frame into working buffer (can re-use source bank as destination!)
 	byte x;
 	byte y;
 	byte x2;
@@ -99,6 +105,68 @@ void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
 }
 
 
+
+static const byte AGI_PALETTE_TO_LUMA[16] = {
+	RGB_TO_LUMA(0x00, 0x00, 0x00),
+	RGB_TO_LUMA(0x00, 0x00, 0xa0),
+	RGB_TO_LUMA(0x00, 0x80, 0x00),
+	RGB_TO_LUMA(0x00, 0xa0, 0xa0),
+	RGB_TO_LUMA(0xa0, 0x00, 0x00),
+	RGB_TO_LUMA(0x80, 0x00, 0xa0),
+	RGB_TO_LUMA(0xa0, 0x50, 0x00),
+	RGB_TO_LUMA(0xa0, 0xa0, 0xa0),
+	RGB_TO_LUMA(0x50, 0x50, 0x50),
+	RGB_TO_LUMA(0x50, 0x50, 0xff),
+	RGB_TO_LUMA(0x00, 0xff, 0x50),
+	RGB_TO_LUMA(0x50, 0xff, 0xff),
+	RGB_TO_LUMA(0xff, 0x50, 0x50),
+	RGB_TO_LUMA(0xff, 0x50, 0xff),
+	RGB_TO_LUMA(0xff, 0xff, 0x50),
+	RGB_TO_LUMA(0xff, 0xff, 0xff)
+};
+
+void draw_pixel_luma(byte x, byte y, byte c) {
+	// Draw pixel with tone mapping / dithering
+	
+	//	// 3 shades:
+	//	if (c < 6) c = 0;
+	//	else if (c < 12) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );
+	//	else c = 1;
+	
+	
+	//	// 5 shades:
+	//	     if (c <  3) c = 0;	// 0=white (unset)
+	//	else if (c <  7) c = ((x + y) & 3) ? 0 : 1;	// Mostly white
+	//	else if (c < 11) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );	// 50% gray
+	//	else if (c < 14) c = ((x + y) & 3) ? 1 : 0;	// Mostly black
+	//	else             c = 1;	// 1=black (set)
+	//	lcd_set_pixel_1bit(x, y, c);
+	/*
+	switch(c >> 5) {
+		case 0: c = 1; break;
+		case 1: c = ((x + y) & 7) ? 1 : 0; break;	// Mostly 1 (black)
+		case 2: c = ((x + y) & 3) ? 1 : 0;	// Mostly 1 (black)
+		case 3: c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) ); break;
+		case 4: c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) ); break;
+		case 5: c = ((x + y) & 3) ? 0 : 1; break;	// Mostly 0 (white)
+		case 6: c = ((x + y) & 7) ? 0 : 1; break;	// Mostly 0 (white)
+		case 7: c = 0; break;
+	}
+	*/
+	
+	// 7 shades
+	     if (c <  36) c = 1;	// 1=black (set)
+	else if (c <  72) c = ((x + y) & 7) ? 1 : 0;	// Mostly 1 (black)
+	else if (c < 108) c = ((x + y) & 3) ? 1 : 0;	// Mostly 1 (black)
+	else if (c < 141) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );	// 50% gray
+	else if (c < 182) c = ((x + y) & 3) ? 0 : 1;	// Mostly 0 (white)
+	else if (c < 218) c = ((x + y) & 7) ? 0 : 1;	// Mostly 0 (white)
+	else              c = 0;	// 0=white (unset)
+	
+	lcd_set_pixel_1bit(x, y, c);
+}
+
+
 void draw_buffer(byte bank, byte x_ofs, byte y_ofs, byte x_scale) {	//, byte y_scale) {
 	// Transfer a final buffer to the screen, applying optional scale/translate
 	byte x;
@@ -106,6 +174,10 @@ void draw_buffer(byte bank, byte x_ofs, byte y_ofs, byte x_scale) {	//, byte y_s
 	byte x2;
 	byte y2;
 	byte c;
+	
+	// Dithering
+	int v;
+	int err;
 	
 	// Map working buffer to 0xc000
 	//bank_0xc000_port = bank;
@@ -120,6 +192,7 @@ void draw_buffer(byte bank, byte x_ofs, byte y_ofs, byte x_scale) {	//, byte y_s
 		//else y2 = y + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
+		err = 0;
 		for(x = 0; x < LCD_WIDTH; x++) {
 			// Transform source x-coordinate here!
 			//x2 = x;
@@ -130,9 +203,23 @@ void draw_buffer(byte bank, byte x_ofs, byte y_ofs, byte x_scale) {	//, byte y_s
 			// Get pixel from working buffer
 			c = buffer_get_pixel_4bit(x2, y2);
 			
-			// Draw to VRAM
-			//lcd_set_pixel_1bit(x, y, c);	// With 4-to-1 bpp tone mapping
-			lcd_set_pixel_4bit(x, y, c);	// With 4-to-1 bpp tone mapping
+			// Draw pixel to VRAM
+			//lcd_set_pixel_1bit(x, y, c);	// B/W monochrome (0=white, 1=black)
+			//lcd_set_pixel_4bit(x, y, c);	// With simple 4-to-1 bpp dithering
+			//draw_pixel_luma(x, y, AGI_PALETTE_TO_LUMA[c]);	// Do palette luma tone mapping
+			
+			// Dithering
+			v = AGI_PALETTE_TO_LUMA[c];
+			v += err;
+			if (v < 0x80) {
+				lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+				err = (v - 0x00);
+			} else {
+				lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+				err = (v - 0xff);
+			}
+			
+			
 		}
 	}
 }
@@ -176,11 +263,12 @@ void draw_buffer_combined(byte bank_vis, byte bank_prio, byte thresh, byte x_ofs
 			else c = 0x0;	// Else LCD-white (0x00)
 			
 			// Draw to VRAM
-			//lcd_set_pixel_1bit(x, y, c);	// With 4-to-1 bpp tone mapping
+			//lcd_set_pixel_1bit(x, y, c);	// B/W monochrome
 			lcd_set_pixel_4bit(x, y, c);	// With 4-to-1 bpp tone mapping
 		}
 	}
 }
+
 
 
 #endif

@@ -463,67 +463,11 @@ void draw_LineAbsolute() {
 }
 
 // flood fill
-void _draw_Fill(int16 x, int16 y) {
-	if (!_scrOn && !_priOn)
-		return;
-	
-	// Quick reject
-	if ((vagi_drawing_step == VAGI_STEP_VIS) && (!_scrOn)) return;
-	if ((vagi_drawing_step == VAGI_STEP_PRI) && (!_priOn)) return;
-	
-	//@FIXME: Use a different implementation, using hardware stack!
-	(void)x;
-	(void)y;
-	
-	/*
-	// Push initial pixel on the stack
-	Common::Stack<Common::Point> stack;
-	stack.push(Common::Point(x, y));
-	
-	// Exit if stack is empty
-	while (!stack.empty()) {
-		Common::Point p = stack.pop();
-		unsigned int c;
-		bool newspanUp, newspanDown;
-		
-		if (!draw_FillCheck(p.x, p.y))
-			continue;
-		
-		// Scan for left border
-		for (c = p.x - 1; draw_FillCheck(c, p.y); c--)
-			;
-		
-		newspanUp = newspanDown = true;
-		for (c++; draw_FillCheck(c, p.y); c++) {
-			putVirtPixel(c, p.y);
-			if (draw_FillCheck(c, p.y - 1)) {
-				if (newspanUp) {
-					stack.push(Common::Point(c, p.y - 1));
-					newspanUp = false;
-				}
-			} else {
-				newspanUp = true;
-			}
-			
-			if (draw_FillCheck(c, p.y + 1)) {
-				if (newspanDown) {
-					stack.push(Common::Point(c, p.y + 1));
-					newspanDown = false;
-				}
-			} else {
-				newspanDown = true;
-			}
-		}
-	}
-	*/
-}
-void draw_Fill() {
-	byte x1, y1;
-	
-	while (getNextParamByte(&x1) && getNextParamByte(&y1))
-		_draw_Fill(x1, y1);
-}
-
+typedef struct {
+	byte x;
+	byte y;
+} fill_stack_t;
+#define FILL_STACK_MAX 128
 
 
 int draw_FillCheck(int16 x, int16 y) {
@@ -573,6 +517,90 @@ int draw_FillCheck(int16 x, int16 y) {
 	
 	return (_scrOn && c == 15 && _scrColor != 15);
 }
+
+
+void _draw_Fill(int16 x, int16 y) {
+	fill_stack_t stack[FILL_STACK_MAX];
+	byte stack_pos = 0;
+	//fill_stack_t p;
+	int16 px, py;
+	
+	if (!_scrOn && !_priOn)
+		return;
+	
+	// Quick reject
+	if ((vagi_drawing_step == VAGI_STEP_VIS) && (!_scrOn)) return;
+	if ((vagi_drawing_step == VAGI_STEP_PRI) && (!_priOn)) return;
+	
+	// For testing: Draw a cross
+	//const byte b = 4;
+	//draw_Line(x-b, y-b, x+b, y+b);
+	//draw_Line(x-b, y+b, x+b, y-b);
+	
+	
+	// Push initial pixel on the stack
+	//stack.push(Common::Point(x, y));
+	stack[0].x = x;
+	stack[0].y = y;
+	stack_pos++;
+	
+	// Exit if stack is empty
+	//while (!stack.empty()) {
+	while (stack_pos > 0) {
+		//Common::Point p = stack.pop();
+		//p = &stack[stack_pos--];
+		stack_pos--;
+		px = stack[stack_pos].x;
+		py = stack[stack_pos].y;
+		
+		byte c;	//unsigned int c;
+		bool newspanUp, newspanDown;
+		
+		if (!draw_FillCheck(px, py))
+			continue;
+		
+		// Scan for left border
+		for (c = px - 1; draw_FillCheck(c, py); c--)
+			;
+		
+		newspanUp = newspanDown = true;
+		for (c++; draw_FillCheck(c, py); c++) {
+			putVirtPixel(c, py);
+			if (draw_FillCheck(c, py - 1)) {
+				if (newspanUp) {
+					//stack.push(Common::Point(c, p.y - 1));
+					stack[stack_pos].x = c;
+					stack[stack_pos].y = py-1;
+					stack_pos++;
+					newspanUp = false;
+				}
+			} else {
+				newspanUp = true;
+			}
+			
+			if (draw_FillCheck(c, py + 1)) {
+				if (newspanDown) {
+					//stack.push(Common::Point(c, p.y + 1));
+					stack[stack_pos].x = c;
+					stack[stack_pos].y = py+1;
+					stack_pos++;
+					newspanDown = false;
+				}
+			} else {
+				newspanDown = true;
+			}
+		}
+	}
+	
+}
+void draw_Fill() {
+	byte x1, y1;
+	
+	while (getNextParamByte(&x1) && getNextParamByte(&y1))
+		_draw_Fill(x1, y1);
+}
+
+
 
 /**************************************************************************
 ** xCorner
@@ -650,19 +678,19 @@ void draw_yCorner(bool skipOtherCoords) {
 /*
 void drawPictureC64() {
 	byte curByte;
-
+	
 	//debugC(8, kDebugLevelMain, "Drawing C64 picture");
-
+	
 	_scrColor = 0x0;
-
+	
 	while (_dataOffset < _dataSize) {
 		curByte = getNextByte();
-
+		
 		if ((curByte >= 0xF0) && (curByte <= 0xFE)) {
 			_scrColor = curByte & 0x0F;
 			continue;
 		}
-
+		
 		switch (curByte) {
 		case 0xe0:  // x-corner
 			draw_xCorner();
@@ -788,9 +816,10 @@ void drawPictureV15() {
 
 void drawPictureV2() {
 	byte curByte;
-	bool nibbleMode = false;	// SQ2 uses bytes, not nibbles.
+	bool nibbleMode = false;	// false for SQ2, it uses separate bytes for color value of 0xf0 / 0xf2
 	//bool mickeyCrystalAnimation = false;
 	//int  mickeyIteration = 0;
+	byte status = 0;	// Status countdown
 	
 	//debugC(8, kDebugLevelMain, "Drawing V2/V3 picture");
 	//@FIXME: Ignored:
@@ -806,8 +835,8 @@ void drawPictureV2() {
 	*/
 	
 	while (_dataOffset < _dataSize) {
-		
-		//printf_d(_dataOffset); printf(" / "); printf_d(_dataSize);
+		// Draw status
+		//lcd_text_col = 0; lcd_text_row = 0; printf_d(_dataOffset); printf(" / "); printf_d(_dataSize);
 		
 		curByte = getNextByte();	// Get next byte
 		
@@ -850,6 +879,7 @@ void drawPictureV2() {
 				break;
 			case 0xf8:
 				draw_Fill();
+				status = 0;	// Force status
 				break;
 			case 0xf9:
 				// TODO: should this be getNextParamByte()?
@@ -866,6 +896,7 @@ void drawPictureV2() {
 				draw_SetColor();
 				draw_SetPriority();
 				draw_Fill();
+				status = 0;	// Force status
 				break;
 			case 0xff: // end of data
 				return;
@@ -894,6 +925,27 @@ void drawPictureV2() {
 			mickeyIteration++;
 		}
 		*/
+		
+		/*
+		//@FIXME: For debugging!
+		// Intermediate draw after each step
+		buffer_switch(AGI_FRAME_BANK_LO);
+		draw_buffer(AGI_FRAME_BANK_LO, 0,0, false);
+		*/
+		
+		if (status == 0) {
+			// Status bar
+			// 240 pixels with 8 pixel chunks = 30 chunks
+			word a = LCD_ADDR;
+			//byte progress = ((word)_dataOffset * 30) / _dataSize;
+			byte progress = ((word)_dataOffset * 3) / (_dataSize / 10);
+			for(byte i = 0; i < 4; i++) {
+				if (progress > 0) memset((byte *)a, 0xff, progress);
+				if (progress < 30) memset((byte *)(a + progress), 0x00, 30-progress);
+				a += 30;
+			}
+		}
+		status++;
 	}
 }
 
