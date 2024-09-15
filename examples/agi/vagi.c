@@ -7,17 +7,38 @@
 	The RAM is bank-switchable to mount one of the four 8 kilobyte segments to 0xC000 - 0xDFFF.
 	
 	So, just in order to parse the PIC resources, we have to be inventive to fit the data into RAM:
-		
+		* Process each frame (visual / priority) separately, because only one can fit in full res 4 bpp
+		* Crop an area out of the full frame, so the result fits into one RAM bank (8192 bytes)
+		* Scroll & redraw to allow viewing the whole picture
+		* PIC resources must be kept at 4bpp (or more), while the resulting LCD pixel will be 1bpp. Dither!
 	
 	2024-09-11 Bernhard "HotKey" Slawik
 */
 
-// VGLDK_SERIES=0 defines VGLDK_VARIABLE_STDIO to use run-time provided putchar/getchar
-#include <vgldk.h>
-#include <stdiomin.h>	// for gets/puts/printf/printf_d. Will be auto-included on VGLDK_SERIES=0
+
+//#define VAGI_MINIMAL	// Squeeze all as much space as possible. No stdio!
+
+#ifdef VAGI_MINIMAL
+	#include <vgldk.h>
+	#define printf(s) ((void)s)
+	#define putchar(c) ((void)c)
+	#define getchar() 0
+	//#define unit8_t char
+	//#define byte unit8_t
+	//#define word int
+	//#define true 1
+	//#define false 0
+#else
+	// VGLDK_SERIES=0 defines VGLDK_VARIABLE_STDIO to use run-time provided putchar/getchar
+	#include <vgldk.h>
+	#include <stdiomin.h>	// for gets/puts/printf/printf_d. Will be auto-included on VGLDK_SERIES=0
+	
+	//#define HEX_USE_DUMP	// For dump(addr, count)
+	//#define HEX_DUMP_WIDTH 16	// Usually 4 for 20-character screens
+	//#include <hex.h>	// provides printf_x2
+#endif
 
 #include <stringmin.h>	// for memcpy()
-#include <hex.h>	// provides printf_x2
 
 
 // Define GL6000SL bank switching ports:
@@ -38,330 +59,234 @@ __sfr __at 0x54 bank_0xe000_port;
 //	bank 2	0x4000 - 0x5fff	8KB extended RAM at 0xc000 - 0xdfff
 //	bank 3	0x6000 - 0x7fff	8KB extended RAM at 0xc000 - 0xdfff
 
-#define LCD_WIDTH 240
-#define LCD_HEIGHT 100
-#define LCD_ADDR 0xe000
 
-// Size of AGI internal data (at 4 bit)
-#define AGI_WIDTH 160
-#define AGI_HEIGHT 168
-#define AGI_FRAME_ADDR 0xc000	// Will be mapped there
-//#define AGI_FRAME_CONTIGUOUS	// Use one contiguous buffer (which WILL cross VRAM and maybe heap!)
-//#define AGI_FRAME_CONTIGUOUS_BANK 1	// Bank number to use for lower part of contiguous RAM segment
-
-// Size of our internal working buffers (at 4 bit)
-#define BUFFER_WIDTH 160
-#define BUFFER_HEIGHT 100
-#define BUFFER_ADDR 0xc000	// Will always be mapped there
+//	0x55: (usually 0x1C = 0b00011100)
+//		lowest bit set: Map cartridge at 0x0000 (e.g. "out 55 1d" maps cart to 0x0000 AND 0x8000)
+//		2nd    bit set: Map cartridge at 0x4000 (e.g. "out 55 1e" maps cart to 0x4000 AND 0x8000)
+//		3rd    bit unset: Reboot loop (e.g. "out 55 18")
+//		4th    bit unset: Reboot loop (e.g. "out 55 14")
+//		5th    bit unset: nothing, doesn't even gets retained (turns back to 0x1c)
+//		!! out 55 0c -> Crash sometimes
+//		!! out 55 3c -> Crash with Capslock LED on
+//		!! out 55 9c -> nothing, doesn't even gets retained (turns back to 0x1c)
+//		!! out 55 fc -> System powers off!
+__sfr __at 0x55 bank_type_port;	// This controls whether a bank is internal ROM or cartridge ROM
 
 
-// LCD functions
-/*
-void lcd_clear() {
-	memset((byte *)LCD_ADDR, 0x00, (LCD_HEIGHT * (LCD_WIDTH >> 3)));
-}
-*/
+#define VAGI_STEP_VIS 0
+#define VAGI_STEP_PRI 1
+byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which type of frame to process)
 
-const byte lcd_pixel_mask_set[8] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
-const byte lcd_pixel_mask_clear[8] = {0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xfe};
-void inline lcd_set_pixel_1bit(byte x, byte y, byte c) {
-	// Draw to LCD VRAM (1bpp)
-	/*
-	word a = LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3);
-	if (c)	*(byte *)a |= 1 << (7 - x & 0x07);
-	else	*(byte *)a &= 0xff - (1 << (7 - x & 0x07));
-	*/
-	// Use look-up for more speed
-	if (c)	*(byte *)(LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3)) |= lcd_pixel_mask_set[x & 0x07];
-	else	*(byte *)(LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3)) &= lcd_pixel_mask_clear[x & 0x07];
-}
+#include "vagi_lcd.h"
 
-void lcd_set_pixel_4bit(byte x, byte y, byte c) {
-	// Draw pixel with tone mapping / dithering
-	// 3 scales:
-	//if (c < 6) c = 0;
-	//else if (c < 12) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );
-	//else c = 1;
-	
-	// 5 scales
-	     if (c <  3) c = 0;
-	else if (c <  7) c = ((x + y) & 3) ? 0 : 1;
-	else if (c < 11) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );
-	else if (c < 14) c = ((x + y) & 3) ? 1 : 0;
-	else             c = 1;
-	lcd_set_pixel_1bit(x, y, c);
-}
+#include "vagi_frame.h"	// this handles the full-size AGI frame
 
+#include "vagi_buffer.h"	// this handles the working buffer(s)
 
-// Frame functions (handling one full resolution AGI frame)
-#ifdef AGI_FRAME_CONTIGUOUS
-	// For performance reasons we should create a contiguous area of RAM, so that we do not need to switch banks during intense geometric operations (flood fills / lines).
-	// Since VRAM is always at 0xe000 we will HAVE to cross it up until address 0xe000 + 5248 = 0xf480
-	// !!! This leaves almost no RAM for the vagi runtime! Must set LOC_CODE/LOC_DATA in Makefile carefully!
-	
-	void frame_clear() {
-		// Create contiguous area of RAM at 0xc000 - 0xffff, crossing VRAM!
-		bank_0xc000_port = AGI_FRAME_CONTIGUOUS_BANK;	// Mount low bank to 0xc000
-		bank_0xe000_port = 0;	// Mount high bank 0 to 0xe000 (default case)
-		
-		// Clear contiguous buffer
-		memset((byte *)AGI_FRAME_ADDR, 0x00, (AGI_HEIGHT * (AGI_WIDTH >> 1)));
-	}
-	
-	void frame_contiguous_set_pixel_4bit(byte x, byte y, byte c) {
-		// Set 4 bit color value of contiguous buffer at 0xc000
-		word a;
-		// Calculate the contiguous address
-		a = AGI_FRAME_ADDR + y * (AGI_WIDTH >> 1) + (x >> 1);
-		// Add (OR) the 4bpp nibble (Note: the buffer must have ben null'ed beforehand!)
-		if ((x & 1) == 0)	*(byte *)a |= c;
-		else				*(byte *)a |= c << 4;
-	}
-	
-	byte frame_contiguous_get_pixel_4bit(byte x, byte y) {
-		// Get 4 bit color value from contiguous buffer at 0xc000
-		word a;
-		// Calculate the contiguous address
-		a = AGI_FRAME_ADDR + y * (AGI_WIDTH >> 1) + (x >> 1);
-		// Return desired 4bpp nibble
-		if ((x & 1) == 0)	return (*(byte *)a) & 0x0f;
-		else				return (*(byte *)a) >> 4;
-	}
-#else
-	// Alternatively: Work across two different banks
-	// Note: We need to ceck for bank switches at EACH SINGLE pixel operation...
-	
-	void frame_clear() {
-		// Clear banked frame buffers
-		bank_0xc000_port = 1;	// Mount bank 1 to 0xc000
-		memset((byte *)BUFFER_ADDR, 0x00, 0x2000);	// Clear whole first buffer
-		bank_0xc000_port = 2;	// Mount bank 2 to 0xc000
-		memset((byte *)BUFFER_ADDR, 0x00, (AGI_HEIGHT * (AGI_WIDTH >> 1)) - 0x2000);	// Clear remainder inside second buffer
-	}
-	
-	void frame_banked_set_pixel_4bit(byte x, byte y, byte c) {
-		// Set 4 bit color value of banked buffer at 0xc000
-		//word a = y * (AGI_WIDTH >> 1) + (x >> 1);
-		word a = ((y * AGI_WIDTH) + x) >> 1;
-		// Do the bank switching
-		if (a < 0x2000) {
-			bank_0xc000_port = 1;	// Map lower bank to 0xc000
-		} else {
-			bank_0xc000_port = 2;	// Map upper bank to 0xc000
-			a &= (0xFFFF - 0x2000);	// Clear high bit
-		}
-		// Map to RAM address
-		a |= AGI_FRAME_ADDR;
-		
-		// Add (OR) the 4bpp nibble (Note: the buffer must have ben null'ed beforehand!)
-		if ((x & 1) == 0)	*(byte *)a |= c;
-		else				*(byte *)a |= c << 4;
-	}
-	byte frame_banked_get_pixel_4bit(byte x, byte y) {
-		// Get 4 bit color value from banked buffer at 0xc000
-		//word a = y * (AGI_WIDTH >> 1) + (x >> 1);
-		word a = ((y * AGI_WIDTH) + x) >> 1;
-		
-		// Do the bank switching
-		if (a < 0x2000) {
-			bank_0xc000_port = 1;	// Map lower bank to 0xc000
-		} else {
-			bank_0xc000_port = 2;	// Map upper bank to 0xc000
-			a &= (0xFFFF - 0x2000);	// Clear high bit
-		}
-		
-		// Map to RAM address
-		a |= AGI_FRAME_ADDR;
-		
-		// Return desired 4bpp nibble
-		if ((x & 1) == 0)	return (*(byte *)a) & 0x0f;
-		else				return (*(byte *)a) >> 4;
-	}
-#endif
-
-
-// Working buffer functions (holding one reduced frame in a single RAM bank, ready for the engine to access it)
-void buffer_clear() {
-	memset((byte *)BUFFER_ADDR, 0x00, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
-}
-void inline buffer_set_pixel_4bit(byte x, byte y, byte c) {
-	// Set 4 bit color value of working buffer at 0xc000
-	/*
-	word a;
-	a = BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1);
-	if ((x & 1) == 0)	*(byte *)a |= c;
-	else				*(byte *)a |= c << 4;
-	*/
-	/*
-	if ((x & 1) == 0)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
-	else				*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
-	*/
-	if (x & 1)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
-	else		*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
-}
-byte inline buffer_get_pixel_4bit(byte x, byte y) {
-	// Set 4 bit color value of working buffer at 0xc000
-	/*
-	word a;
-	a = BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1);
-	if ((x & 1) == 0)	return (*(byte *)a) & 0x0f;
-	else				return (*(byte *)a) >> 4;
-	*/
-	/*
-	if ((x & 1) == 0)	return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) & 0x0f;
-	else				return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) >> 4;
-	*/
-	if (x & 1)	return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) >> 4;
-	else		return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) & 0x0f;
-}
-
-
-void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
-	// Crop/scale/scroll full frame into working buffer
+// Draw something to the frame buffer
+// This is where the original AGI engine should hook into!
+void render_frame_spirals_small() {
 	byte x;
 	byte y;
-	byte x2;
-	byte y2;
-	byte c;
-	
-	// Clear destination buffer
-	bank_0xc000_port = dest_bank;	// Map destination working buffer to 0xc000
-	buffer_clear();
-	
-	// Copy (and transform) pixels from full frame to reduced buffer
-	for(y = 0; y < BUFFER_HEIGHT; y++) {
-		// Transform y coordinate here!
-		//y2 = y;
-		y2 = y + y_src;
-		for(x = 0; x < BUFFER_WIDTH; x++) {
-			// Transform x coordinate here!
-			//x2 = x;
-			x2 = x + x_src;
-			
-			#ifdef AGI_FRAME_CONTIGUOUS
-				// Get pixel from contiguous frame
-				bank_0xc000_port = AGI_FRAME_CONTIGUOUS_BANK;	// Map contiguous lower bank to 0xc000
-				c = frame_contiguous_get_pixel_4bit(x2, y2);
-			#else
-				// Get pixel from banked frame
-				c = frame_banked_get_pixel_4bit(x2, y2);
-			#endif
-			
-			// Write to final working buffer
-			bank_0xc000_port = dest_bank;	// Map destination working buffer to 0xc000
-			buffer_set_pixel_4bit(x, y, c);
-		}
-	}
-}
-
-
-void render_frame() {
-	// Draw something to the frame buffer
-	// This is where the original AGI engine should hook into!
-	
-	word x;
-	word y;
-	byte c;
 	
 	frame_clear();
 	
 	// Draw a nice pattern across the whole frame buffer
-	for(y = 0; y < AGI_HEIGHT; y++) {
-		#ifdef AGI_FRAME_CONTIGUOUS
-			// Pre-calculate row address (only once for each row)
-			word a_row = 0xc000 + y * (AGI_WIDTH >> 1);
-		#endif
-		
-		for(x = 0; x < AGI_WIDTH; x++) {
+	for(y = 0; y < AGI_FRAME_HEIGHT; y++) {
+		for(x = 0; x < AGI_FRAME_WIDTH; x++) {
 			
 			// Draw something in 4 bit color (0..15)
 			//c = (x * 3) & 0x0f;	// Garbage
 			//c = (x / 10) & 0x0f;	// Horizontal gradient (with weird aliasing...)
-			c = ((x >> 2) * (y >> 2)) & 0x0f;	// Spirals
+			//c = ((x >> 2) * (y >> 2)) & 0x0f;	// Spirals
 			//c = ((x >> 1) * (y >> 1)) & 0x0f;	// Small Spirals
-			
-			#ifdef AGI_FRAME_CONTIGUOUS
-				// Naive contiguous mode:
-				//a = 0xc000 + y * (AGI_WIDTH >> 1) + (x >> 1);
-				
-				// Faster: Use pre-calculated row address
-				//word a = a_row + (x >> 1);
-				//if ((x & 1) == 0)	*(byte *)a |= c;
-				//else				*(byte *)a |= c << 4;
-				
-				// Clean via function:
-				frame_contiguous_set_pixel_4bit(x, y, c);
-			#else
-				frame_banked_set_pixel_4bit(x, y, c);
-			#endif
+			//frame_set_pixel_4bit(x, y, ((x >> 1) * (y >> 1)) & 0x0f);		// Small Spirals
+			frame_set_pixel_4bit(x, y, ((x * y) >> 1) & 0x0f);		// Small Spirals
 		}
 	}
 }
-
-void draw_buffer(byte bank, byte x_ofs, byte x_scale) {	//, byte x_ofs, byte y_ofs) {
+void render_frame_spirals_large() {
 	byte x;
 	byte y;
-	byte x2;
-	byte y2;
-	byte c;
 	
-	// Map working buffer to 0xc000
-	bank_0xc000_port = bank;
+	frame_clear();
 	
-	// Transfer (and optionally scale) all pixels to screen
-	for(y = 0; y < LCD_HEIGHT; y++) {
-		// Transform source y-coordinate here!
-		y2 = y;	// + y_ofs;
-		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
-		
-		for(x = 0; x < LCD_WIDTH; x++) {
-			// Transform source x-coordinate here!
-			//x2 = x;
-			if (x_scale) x2 = (x >> 1) + x_ofs;
-			else x2 = x + x_ofs;
-			if (x2 >= BUFFER_WIDTH) break;	// Beyond buffer
-			
-			// Get pixel from working buffer
-			c = buffer_get_pixel_4bit(x2, y2);
-			
-			// Draw to VRAM
-			//lcd_set_pixel_1bit(x, y, c);	// With 4-to-1 bpp tone mapping
-			lcd_set_pixel_4bit(x, y, c);	// With 4-to-1 bpp tone mapping
+	// Draw a nice pattern across the whole frame buffer
+	for(y = 0; y < AGI_FRAME_HEIGHT; y++) {
+		for(x = 0; x < AGI_FRAME_WIDTH; x++) {
+			// Draw something in 4 bit color (0..15)
+			//c = (x * 3) & 0x0f;	// Garbage
+			//c = (x / 10) & 0x0f;	// Horizontal gradient (with weird aliasing...)
+			//c = ((x >> 2) * (y >> 2)) & 0x0f;	// Spirals
+			//c = ((x >> 1) * (y >> 1)) & 0x0f;	// Small Spirals
+			//frame_set_pixel_4bit(x, y, ((x >> 2) * (y >> 2)) & 0x0f);		// Large Spirals
+			//frame_set_pixel_4bit(x, y, ((x * y) >> 4) & 0x0f);		// Large Spirals
+			frame_set_pixel_4bit(x, y, ((x * y) >> 6) & 0x0f);		// Large Spirals
 		}
 	}
 }
 
 
-void agi_draw_test() {
+
+
+#include "agi_pic.h"
+
+void render_frame_agi(byte drawing_step) {
+	byte i;
+	
+	
+	// Mount our cartridge ROM to address 0x4000 (data must be copied to ROM binary at position 0x4000 * n!)
+	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
+	bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
+	//dump(0x4000, 16);
+	
+	// Tell AGI renderer where the data is located
+	_data = (const byte *)0x4000;
+	_dataSize = 3306;	// Size of SQ2_PIC_5
+	_dataOffset = 0;
+	_dataOffsetNibble = 0;
+	
+	// Prepare drawing state...
+	//vagi_drawing_step = VAGI_STEP_VIS;	// Only perform drawing operations for visual (screen) frame
+	//vagi_drawing_step = VAGI_STEP_PRI;	// Only perform drawing operations for priority frame
+	vagi_drawing_step = drawing_step;	// Only perform drawing operations for either screen OR priority
+	_width = 160;
+	_height = 168;
+	//_patCode = 0;
+	//_patNum = 0;
+	_scrOn = 1;
+	_scrColor = 0xf;
+	
+	//_pictureVersion = AGIPIC_V1;
+	//_pictureVersion = AGIPIC_V15;
+	_pictureVersion = AGIPIC_V2;
+	_minCommand = 0xf0;
+	
+	// Actually call AGI drawing routine...
+	frame_clear();
+	//for(i = 0; i < 10; i++) { draw_Line(0,i*4, 159,167); }	// Test pattern
+	
+	//drawPictureV1();
+	//drawPictureV15();
+	drawPictureV2();
+	
+}
+
+void test_draw_agi() {
+	byte bank_vis = 3;
+	byte bank_pri = 1;
+	byte x_src = 0;
+	byte y_src = 0;
+	byte x_ofs = 0;
+	byte y_ofs = 0;
+	byte i;
+	
+	for(;;) {
+		// Render both frames
+		//printf("VIS...");
+		render_frame_agi(VAGI_STEP_VIS);
+		process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part)
+		draw_buffer(bank_vis, 0,0, false);
+		
+		//printf("PRIO...");
+		render_frame_agi(VAGI_STEP_PRI);
+		process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part)
+		draw_buffer(bank_pri, 0,0, false);
+		
+		// Zoom and scroll horizontally (no re-rendering needed)
+		for(i = 0; i < 2; i++) {
+			//printf("VIS");
+			//draw_buffer(bank_vis, 0,0, true);
+			draw_buffer(bank_vis, x_ofs,y_ofs, true);
+			
+			//printf("PRIO");
+			draw_buffer(bank_pri, x_ofs,y_ofs, true);
+			
+			// Next time: Scroll to the other side (left / right)
+			if (x_ofs == 0) x_ofs = (160 - (240/2));
+			else x_ofs = 0;
+		}
+		
+		// Next time: Crop to the other slice of the frame (upper / lower)
+		if (y_src == 0) y_src = (168 - 100);
+		else y_src = 0;
+	}
+}
+
+void test_draw_combined() {
 	// Test the drawing pipeline
 	byte x;
 	byte y;
+	byte i;
+	
+	/*
+	byte bank;	// Which bank to use for buffer
+	bank = 3;	// Easy: Read from frame banks 1 and 2, write to 3rd bank
+	//bank = 1;	// Advanced: Read from frame banks 1 and 2, write BACK to 1st bank (overwriting the frame!)
 	
 	// Render one full frame in full internal AGI resolution (160x168) at 4 bpp
 	// One 4 bit frame (either visual or priority) at internal AGI resolution (160x168) is:
 	// 160x168 x 4bit = 26880 / 2 = 13440 bytes = 8192 + 5248 bytes across 2 banks
 	printf("Rendering...");
-	render_frame();
+	//render_frame();
+	//render_frame_spirals_large();
+	render_frame_spirals_small();
 	printf("OK\n");
 	
 	// Now crop and scroll that full frame
 	//x = 0;
 	for (y = 0; y < 68; y++) {
+		
+		// Clear destination buffer
+		//buffer_switch(bank);	// Map destination working buffer to 0xc000
+		//buffer_clear();	// Caution! If re-using the same region for frame and buffer, this will clear the rendered frame!
+		
 		// Crop and scale from frame to working buffer
 		//printf("Processing...");
-		process_frame_to_buffer(3, 0, y);	// Cropy a slice, scrolling vertically
+		process_frame_to_buffer(bank, 0, y);	// Cropy a slice, scrolling vertically
 		//printf("OK\n");
 		
 		// Clear screen (which might be "dirty" because of contiguous buffer)
 		//lcd_clear();
 		
 		// Draw from working buffer (4 bpp) to screen (1 bpp)
-		//printf("Drawing...");
-		//draw_buffer(3, 0);	// Regular 1:1
+		// Draw the buffer 1:1
+		//draw_buffer(bank, 0, false);
+		
+		// Draw the buffer scaled horizontally (like the original games)
+		// Scroll the 40 pixels that are missing (120 pixels of frame are shown at 2x scale)
 		for (x = 0; x < 40; x+=1) {
-			draw_buffer(3, x, 1);	// X-stretch and scroll horizontally
+			draw_buffer(bank, x, true);	// X-stretch and scroll horizontally
 		}
-		//printf("OK\n");
+	}
+	*/
+	// Double draw test (keeping visual and prio in RAM)
+	byte bank_vis = 3;
+	byte bank_prio = 1;
+	
+	printf("Rendering...");
+	printf("1");
+	render_frame_spirals_small();
+	//render_frame_agi();
+	printf("...");
+	process_frame_to_buffer(bank_vis, 0, 0);
+	
+	printf("2");
+	render_frame_spirals_large();
+	printf("...");
+	process_frame_to_buffer(bank_prio, 0, 0);
+	printf("OK");
+	
+	y = 0;
+	for (x = 0; x < 40; x+=1) {
+		// Draw buffers sequencially
+		draw_buffer(bank_vis, x,y, true);
+		draw_buffer(bank_prio, x,y, true);
+		
+		// Draw combined picture
+		for(i = 0; i < 15; i++) {
+			draw_buffer_combined(bank_vis, bank_prio, i, x,y, true);
+		}
 	}
 }
 
@@ -382,12 +307,15 @@ void main() __naked {
 	
 	printf("VAGI\n");
 	
+	
 	//printf("rendering...");
-	agi_draw_test();
+	test_draw_agi();
+	//test_draw_combined();
 	//printf("done.\n");
 	
 	
 	while(running) {
+		
 		
 		putchar('?');
 		c = getchar();
@@ -421,8 +349,11 @@ void main() __naked {
 				// Help
 				break;
 			
-			case 'r':
-				agi_draw_test();
+			case 'a':
+				test_draw_agi();
+				break;
+			case 'c':
+				test_draw_combined();
 				break;
 			
 			case 0x1b:	// LEFT
@@ -435,6 +366,7 @@ void main() __naked {
 			//		printf_d(c); putchar('?');
 			//		break;
 		}
+		
 	}
 	
 	#if VGLDK_SERIES == 0

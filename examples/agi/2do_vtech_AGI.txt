@@ -58,6 +58,19 @@ I think it won't work, because:
 	4. Crop and scale in-place inside 1st extended bank
 	5. Do pixel-by-pixel rendering to VRAM
 
+* Using a bigger cart (I am running out of ROM space!)
+	* Mount cartridge ROM (unmount internal ROM) at 0x4000:
+		* out 0x55, 0x1e
+	* Mount cart ROM bank N (ROM offset N*0x2000) at 0x4000:
+		* out 0x51, 0x20+N
+	! Can go way beyond 64 KB cart ROM! :-D
+		out 0x55, 0x1e	= activate external cart at address 0x4000 (2nd bit)
+		out 0x51, 0x20	= ROM offset 0x00000 at 0x4000
+		out 0x51, 0x21	= ROM offset 0x04000 at 0x4000
+		out 0x51, 0x22	= ROM offset 0x08000 at 0x4000
+		out 0x51, 0x23	= ROM offset 0x0C000 at 0x4000
+		out 0x51, 0x24	= ROM offset 0x10000 at 0x4000
+	
 ------
 OLD:
 
