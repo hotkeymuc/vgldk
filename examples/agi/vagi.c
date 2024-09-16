@@ -41,6 +41,12 @@
 
 #include <stringmin.h>	// for memcpy()
 
+typedef byte bool;
+typedef byte uint8;
+typedef int int16;
+typedef word uint16;
+
+
 #ifdef VAGI_MOUSE
 	#include <mouse.h>
 #endif
@@ -87,6 +93,14 @@ byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which type of
 #include "vagi_frame.h"	// this handles the full-size AGI frame
 
 #include "vagi_buffer.h"	// this handles the working buffer(s)
+
+// ROM FS:
+#define R_MEM_OFFSET 0x4000	// Where to find the banked memory area
+#define R_BANK_SIZE 0x4000	// How big one bank is
+#define romfs_switch_bank(bank) bank_0x4000_port = bank
+
+#include "romfs.h"
+#include "romfs_data.h"
 
 // Draw something to the frame buffer
 // This is where the original AGI engine should hook into!

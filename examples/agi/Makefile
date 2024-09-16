@@ -5,7 +5,9 @@ NAME = vagi
 #SEND2MONITOR_RESET = 1
 
 # We need more than 8 KB...
-CART_SIZE_KB = 32
+#CART_SIZE_KB = 8
+#CART_SIZE_KB = 32
+CART_SIZE_KB = 1024
 
 # For Emu:
 # For targeting a specific model:

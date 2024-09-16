@@ -7,12 +7,12 @@ based on scummvm's agi implementation 2024-09-14
 
 #define CLIP(v,vmin,vmax) ((v >= vmax) ? vmax : ( (v <= vmin) ? vmin : v  ) )
 #define SWAP(a,b) {tmp=b;b=a;a=tmp;}
-
+/*
 typedef byte bool;
 typedef byte uint8;
 typedef int int16;
 typedef word uint16;
-
+*/
 
 
 // AGI picture version
