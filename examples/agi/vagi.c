@@ -36,7 +36,7 @@
 	
 	//#define HEX_USE_DUMP	// For dump(addr, count)
 	//#define HEX_DUMP_WIDTH 16	// Usually 4 for 20-character screens
-	//#include <hex.h>	// provides printf_x2
+	#include <hex.h>	// provides printf_x2
 #endif
 
 #include <stringmin.h>	// for memcpy()
@@ -97,132 +97,142 @@ byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which type of
 // ROM FS:
 #define R_MEM_OFFSET 0x4000	// Where to find the banked memory area
 #define R_BANK_SIZE 0x4000	// How big one bank is
-#define romfs_switch_bank(bank) bank_0x4000_port = bank
+#define romfs_switch_bank(bank) bank_0x4000_port = (0x20 | bank)	// and: bank_type_port = bank_type_port | 0x02
 
 #include "romfs.h"
 #include "romfs_data.h"
+#include "romfs.c"
+enum AGI_RES_KIND {
+	AGI_RES_KIND_LOG,
+	AGI_RES_KIND_PIC,
+	AGI_RES_KIND_SND,
+	AGI_RES_KIND_VIEW
+};
 
-// Draw something to the frame buffer
-// This is where the original AGI engine should hook into!
-void render_frame_spirals_small() {
-	byte x;
-	byte y;
+static const byte AGI_DIR_FILES[4] = {
+	R_LOGDIR,
+	R_PICDIR,
+	R_SNDDIR,
+	R_VIEWDIR,
+};
+
+static const byte AGI_VOL_FILES[4] = {
+	R_VOL_0,
+	#ifdef R_VOL_1
+	R_VOL_1,
+	#endif
+	#ifdef R_VOL_2
+	R_VOL_2,
+	#endif
+	#ifdef R_VOL_3
+	R_VOL_3,
+	#endif
+	#ifdef R_VOL_4
+	R_VOL_4,
+	#endif
+};
+
+
+// We only use one handle
+romfs_handle_t agi_res_h;
+word agi_res_ofs;
+word agi_res_size;
+
+word agi_res_open(byte kind, word num) {
+	romfs_handle_t h;
+	byte b1, b2, b3;
+	byte res_vol, res_ofs_hi;
+	word res_ofs;
 	
-	frame_clear(0x00);
-	
-	// Draw a nice pattern across the whole frame buffer
-	for(y = 0; y < AGI_FRAME_HEIGHT; y++) {
-		for(x = 0; x < AGI_FRAME_WIDTH; x++) {
-			
-			// Draw something in 4 bit color (0..15)
-			//c = (x * 3) & 0x0f;	// Garbage
-			//c = (x / 10) & 0x0f;	// Horizontal gradient (with weird aliasing...)
-			//c = ((x >> 2) * (y >> 2)) & 0x0f;	// Spirals
-			//c = ((x >> 1) * (y >> 1)) & 0x0f;	// Small Spirals
-			//frame_set_pixel_4bit(x, y, ((x >> 1) * (y >> 1)) & 0x0f);		// Small Spirals
-			frame_set_pixel_4bit(x, y, ((x * y) >> 1) & 0x0f);		// Small Spirals
-		}
+	// Close previous
+	if (romfs_factive(agi_res_h)) {
+		romfs_fclose(agi_res_h);
 	}
+	
+	// Mount our cartridge ROM to address 0x4000 (data must be inside the ROM binary at position 0x4000 * n)
+	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
+	//bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
+	
+	
+	// Open directory for the given kind (LOG, PIC, SND, VIEW)
+	//printf("Opening DIR...");
+	h = romfs_fopen(AGI_DIR_FILES[kind]);
+	if (h < 0) {
+		printf("DIR err=-"); printf_d(-h); putchar('\n');
+		return 0;
+	}
+	
+	// Seek to given entry number (3 bytes each)
+	romfs_fseek(h, num*3);
+	
+	// Get the 3 data bytes
+	b1 = romfs_fread(h);
+	b2 = romfs_fread(h);
+	b3 = romfs_fread(h);
+	romfs_fclose(h);
+	
+	// Extract volume and offset
+	res_vol = (b1 & 0xf0) >> 4;
+	res_ofs_hi = (b1 & 0x0f);	// << 16
+	res_ofs = (b2 << 8) | b3;
+	
+	//printf("vol="); printf_d(res_vol); printf(", ofs="); printf_x2(res_ofs_hi); printf_x2(res_ofs >> 8); printf_x2(res_ofs & 0xff); printf("\n");
+	
+	// Open volume file (assume the VOL.* files are located sequencially)
+	//printf("Opening VOL...");
+	//h = romfs_fopen(R_VOL_0 + res_vol);
+	h = romfs_fopen(AGI_VOL_FILES[res_vol]);
+	if (h < 0) {
+		printf("VOL."); printf_d(res_vol); printf(": err=-"); printf_d(-h); putchar('\n');
+		return 0;
+	}
+	
+	// Seek to address (Up to 24 bit = far!)
+	romfs_fseek_far(h, res_ofs_hi, res_ofs);
+	
+	// Check signature (0x1234)
+	b1 = romfs_fread(h);
+	b2 = romfs_fread(h);
+	if ((b1 != 0x12) || (b2 != 0x34)) {
+		// Signature mismatch!
+		printf("SIG err!\n");
+		//printf("SIG err: "); printf_x2(b1); printf_x2(b2); putchar('\n');	//printf(" != 1234\n");
+		romfs_fclose(h);
+		return 0;
+	}
+	// Check resource volume value
+	b1 = romfs_fread(h);
+	if (b1 != res_vol) {
+		// Volume mismatch (volume file number VS stored volume number of resource)
+		printf("VOL err!\n");
+		//printf("VOL err: "); printf_d(b1); putchar('\n');	//printf(" != "); printf_d(res_vol); printf("\n");
+		romfs_fclose(h);
+		return 0;
+	}
+	
+	// Read size (LO-HI)
+	b1 = romfs_fread(h);
+	b2 = romfs_fread(h);
+	agi_res_size = b1 | (b2 << 8);
+	agi_res_ofs = 0;
+	
+	// Leave open!
+	//romfs_fclose(h);
+	agi_res_h = h;
+	return agi_res_size;
 }
-void render_frame_spirals_large() {
-	byte x;
-	byte y;
-	
-	frame_clear(0x00);
-	
-	// Draw a nice pattern across the whole frame buffer
-	for(y = 0; y < AGI_FRAME_HEIGHT; y++) {
-		for(x = 0; x < AGI_FRAME_WIDTH; x++) {
-			// Draw something in 4 bit color (0..15)
-			//c = (x * 3) & 0x0f;	// Garbage
-			//c = (x / 10) & 0x0f;	// Horizontal gradient (with weird aliasing...)
-			//c = ((x >> 2) * (y >> 2)) & 0x0f;	// Spirals
-			//c = ((x >> 1) * (y >> 1)) & 0x0f;	// Small Spirals
-			//frame_set_pixel_4bit(x, y, ((x >> 2) * (y >> 2)) & 0x0f);		// Large Spirals
-			//frame_set_pixel_4bit(x, y, ((x * y) >> 4) & 0x0f);		// Large Spirals
-			frame_set_pixel_4bit(x, y, ((x * y) >> 6) & 0x0f);		// Large Spirals
-		}
-	}
+
+#define agi_res_close() romfs_fclose(agi_res_h)
+#define agi_res_peek() romfs_fpeek(agi_res_h)
+
+int agi_res_read() {
+	agi_res_ofs++;	// agi_res_size != R_FILES[].size, because a RES is just a part of a big VOL file
+	return romfs_fread(agi_res_h);
 }
 
-
-void test_draw_combined() {
-	// Test the drawing pipeline
-	byte x;
-	byte y;
-	byte i;
-	
-	/*
-	byte bank;	// Which bank to use for buffer
-	bank = 3;	// Easy: Read from frame banks 1 and 2, write to 3rd bank
-	//bank = 1;	// Advanced: Read from frame banks 1 and 2, write BACK to 1st bank (overwriting the frame!)
-	
-	// Render one full frame in full internal AGI resolution (160x168) at 4 bpp
-	// One 4 bit frame (either visual or priority) at internal AGI resolution (160x168) is:
-	// 160x168 x 4bit = 26880 / 2 = 13440 bytes = 8192 + 5248 bytes across 2 banks
-	printf("Rendering...");
-	//render_frame();
-	//render_frame_spirals_large();
-	render_frame_spirals_small();
-	printf("OK\n");
-	
-	// Now crop and scroll that full frame
-	//x = 0;
-	for (y = 0; y < 68; y++) {
-		
-		// Clear destination buffer
-		//buffer_switch(bank);	// Map destination working buffer to 0xc000
-		//buffer_clear();	// Caution! If re-using the same region for frame and buffer, this will clear the rendered frame!
-		
-		// Crop and scale from frame to working buffer
-		//printf("Processing...");
-		process_frame_to_buffer(bank, 0, y);	// Cropy a slice, scrolling vertically
-		//printf("OK\n");
-		
-		// Clear screen (which might be "dirty" because of contiguous buffer)
-		//lcd_clear();
-		
-		// Draw from working buffer (4 bpp) to screen (1 bpp)
-		// Draw the buffer 1:1
-		//draw_buffer(bank, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
-		
-		// Draw the buffer scaled horizontally (like the original games)
-		// Scroll the 40 pixels that are missing (120 pixels of frame are shown at 2x scale)
-		for (x = 0; x < 40; x+=1) {
-			draw_buffer(bank, 0,LCD_WIDTH, 0,LCD_HEIGHT, x,0, false);	// X-stretch and scroll horizontally
-		}
-	}
-	*/
-	// Double draw test (keeping visual and prio in RAM)
-	byte bank_vis = 3;
-	byte bank_pri = 1;
-	
-	printf("Rendering...");
-	printf("1");
-	render_frame_spirals_small();
-	printf("...");
-	process_frame_to_buffer(bank_vis, 0, 0);
-	
-	printf("2");
-	render_frame_spirals_large();
-	printf("...");
-	process_frame_to_buffer(bank_pri, 0, 0);
-	printf("OK");
-	
-	y = 0;
-	for (x = 0; x < 40; x+=1) {
-		// Draw buffers sequencially
-		//draw_buffer(bank_vis, x,y, true);
-		draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x,y, true);
-		//draw_buffer(bank_pri, x,y, true);
-		draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, x,y, true);
-		
-		// Draw combined picture
-		for(i = 0; i < 15; i++) {
-			//draw_buffer_combined(bank_vis, bank_pri, thresh, area_x1, area_x2, area_y1, area_y2, x_ofs,y_ofs, true);
-			draw_buffer_combined(bank_vis, bank_pri, i, 0,LCD_WIDTH, 0,LCD_HEIGHT, x,y, true);
-		}
-	}
+bool agi_res_eof() {
+	//return romfs_feof(agi_res_h);
+	return agi_res_ofs >= agi_res_size;
 }
 
 
@@ -230,35 +240,62 @@ void test_draw_combined() {
 
 #include "agi_pic.h"
 
-void render_frame_agi(byte drawing_step) {
+bool render_frame_agi(word pic_num, byte drawing_step) {
 	// Draw one AGI PIC (either its visual or priority data)
 	
 	// Mount our cartridge ROM to address 0x4000 (data must be inside the ROM binary at position 0x4000 * n)
 	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
-	bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
+	//bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
 	//dump(0x4000, 16);
 	
 	// Tell AGI renderer where the data is located
+	
+	/*
+	// Manually decode some bytes in ROM memory
+	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
+	bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
 	_data = (const byte *)0x4000;
-	
-	//_dataSize = 2978;	// Size of SQ2_PIC_1 (intro space station)
-	//_dataSize = 3400;	// Size of SQ2_PIC_2 (first screen) - YAY!
-	//_dataSize = 2592;	// Size of SQ2_PIC_3 (change room)
-	//_dataSize = 2396;	// Size of SQ2_PIC_4 (control room)
 	_dataSize = 3306;	// Size of SQ2_PIC_5 (space ship hangar)
-	//_dataSize = 3447;	// Size of SQ2_PIC_6 (vohaul without head)
-	//_dataSize = 2533;	// Size of SQ2_PIC_7 (vohaul base in orbit) - NICE!
-	//_dataSize = 3266;	// Size of SQ2_PIC_8 (landing pad) - NIICE with dithering!
-	//_dataSize = 46;	// Size of SQ2_PIC_9 (empty)
-	//_dataSize = 3104;	// Size of SQ2_PIC_10 (jungle)
-	//_dataSize = 4180;	// Size of SQ2_PIC_11 (jungle2)
-	//_dataSize = 3751;	// Size of SQ2_PIC_12 (jungle3 tree)
-	//_dataSize = 3880;	// Size of SQ2_PIC_13 (swamp bay left)
+	*/
 	
+	/*
+	// Get PIC data via ROM FS file:
+	byte f;	//R_File f;
+	//f = R_EXPORT_SQ2_PIC_1_BIN;	// intro space station
+	//f = R_EXPORT_SQ2_PIC_2_BIN;	// first screen
+	//f = R_EXPORT_SQ2_PIC_3_BIN;	// change room
+	//f = R_EXPORT_SQ2_PIC_4_BIN;	// control room
+	f = R_EXPORT_SQ2_PIC_5_BIN;	// space ship hangar
+	//f = R_EXPORT_SQ2_PIC_6_BIN;	// vohaul without head
+	//f = R_EXPORT_SQ2_PIC_7_BIN;	// vohaul base in orbit
+	//f = R_EXPORT_SQ2_PIC_8_BIN;	// landing pad
+	//f = R_EXPORT_SQ2_PIC_9_BIN;	// empty
+	//f = R_EXPORT_SQ2_PIC_10_BIN;	// jungle
+	//f = R_EXPORT_SQ2_PIC_11_BIN;	// jungle2
+	//f = R_EXPORT_SQ2_PIC_12_BIN;	// jungle3 tree
+	//f = R_EXPORT_SQ2_PIC_13_BIN;	// swamp entry
+	
+	// Bank switch the data (manually)
+	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
+	
+	_data = (const byte *)R_FILES[f].addr;	// Address in banked RAM
+	_dataSize = (R_FILES[f].banks * R_BANK_SIZE) + R_FILES[f].size;	// Size (might roll over!)
 	_dataOffset = 0;
+	//bank_0x4000_port = 0x20 | R_FILES[f].bank;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
+	romfs_switch_bank(R_FILES[f].bank);	// Switch in the starting bank
+	*/
+	
+	// Use ROM FS API and "agi_res_...()" functions
+	if (agi_res_open(AGI_RES_KIND_PIC, pic_num) == 0) {
+		printf("PIC err!\n");
+		//getchar();
+		return false;
+	}
+	
+	//_dataSize = agi_res_size;
+	//_dataOffset = 0;
 	_dataOffsetNibble = 0;
 	
-	// Prepare drawing state...
 	//vagi_drawing_step = VAGI_STEP_VIS;	// Only perform drawing operations for visual (screen) frame
 	//vagi_drawing_step = VAGI_STEP_PRI;	// Only perform drawing operations for priority frame
 	vagi_drawing_step = drawing_step;	// Only perform drawing operations for either screen OR priority
@@ -278,15 +315,17 @@ void render_frame_agi(byte drawing_step) {
 	_minCommand = 0xf0;
 	
 	// Actually call AGI drawing routine...
-	frame_clear(0x00);
-	if (drawing_step == VAGI_STEP_VIS) frame_clear(_scrColor * 0x11);	// VIS: bg=0xf (on both nibbles)
-	if (drawing_step == VAGI_STEP_PRI) frame_clear(_priColor * 0x11);	// PRI: bg=0x4 (on both nibbles)
+	//frame_clear(0x00);
 	//for(i = 0; i < 10; i++) { draw_Line(0,i*4, 159,167); }	// Test pattern
+	if (drawing_step == VAGI_STEP_VIS) frame_clear(_scrColor * 0x11);	// VIS: bg=0xf ( * 0x11 = on both nibbles)
+	if (drawing_step == VAGI_STEP_PRI) frame_clear(_priColor * 0x11);	// PRI: bg=0x4 ( * 0x11 = on both nibbles)
 	
 	//drawPictureV1();
 	//drawPictureV15();
 	drawPictureV2();
 	
+	agi_res_close();
+	return true;
 }
 
 void test_draw_agi_scroll() {
@@ -300,15 +339,17 @@ void test_draw_agi_scroll() {
 	
 	y_src = (AGI_FRAME_HEIGHT - LCD_HEIGHT) / 2;	// Start in the middle
 	
+	word pic_num = 5;
+	
 	for(;;) {
 		// Render frame(s)
 		//lcd_text_col = 0; lcd_text_row = 0; printf("VIS...");
-		render_frame_agi(VAGI_STEP_VIS);
+		render_frame_agi(pic_num, VAGI_STEP_VIS);
 		process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part)
 		//draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
 		
 		//lcd_text_col = 0; lcd_text_row = 0; printf("PRIO...");
-		//render_frame_agi(VAGI_STEP_PRI);
+		//render_frame_agi(pic_num, VAGI_STEP_PRI);
 		//process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part)
 		//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
 		
@@ -401,27 +442,37 @@ void test_draw_agi_combined() {
 	byte prio = 5;
 	byte spd = 5;
 	
+	word pic_num = 1; //5;
+	
 	bool render = true;
 	bool redraw = true;
+	bool ok;
 	
 	for(;;) {
 		if (render) {
-			// Render both frames
-			lcd_text_col = 0; lcd_text_row = 0; printf("VIS...");
-			render_frame_agi(VAGI_STEP_VIS);
-			process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part)
-			draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
-			
-			lcd_text_col = 0; lcd_text_row = 0; printf("PRIO...");
-			render_frame_agi(VAGI_STEP_PRI);
-			process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part)
-			//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
-			
-			// Draw full background
-			draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
-			
 			render = false;
 			redraw = true;
+			
+			// Render both frames
+			lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 2; printf("Loading PIC "); printf_d(pic_num);
+			
+			lcd_text_col = 0; lcd_text_row = 0; printf("VIS...");
+			ok = render_frame_agi(pic_num, VAGI_STEP_VIS);
+			if (ok) {
+				process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part)
+				draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
+				
+				lcd_text_col = 0; lcd_text_row = 0; printf("PRIO...");
+				ok = render_frame_agi(pic_num, VAGI_STEP_PRI);
+				process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part)
+				//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+				redraw = true;
+			} else {
+				redraw = false;
+			}
+			
+			// Draw full background
+			//draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
 		}
 		
 		if (redraw) {
@@ -538,6 +589,19 @@ void test_draw_agi_combined() {
 			break;
 		#endif
 		
+		case 48:	//  0
+			break;
+		case 49:	//  1
+			if (pic_num > 1) {
+				pic_num--;
+				render = true;
+			}
+			break;
+		case 50:	//  2
+			pic_num++;
+			render = true;
+			break;
+		
 		default:
 			printf("key="); printf_d(c); printf("?\n");
 		}
@@ -578,6 +642,133 @@ void test_draw_agi_combined() {
 	}
 }
 
+/*
+// Draw something to the frame buffer
+// This is where the original AGI engine should hook into!
+void render_frame_spirals_small() {
+	byte x;
+	byte y;
+	
+	frame_clear(0x00);
+	
+	// Draw a nice pattern across the whole frame buffer
+	for(y = 0; y < AGI_FRAME_HEIGHT; y++) {
+		for(x = 0; x < AGI_FRAME_WIDTH; x++) {
+			
+			// Draw something in 4 bit color (0..15)
+			//c = (x * 3) & 0x0f;	// Garbage
+			//c = (x / 10) & 0x0f;	// Horizontal gradient (with weird aliasing...)
+			//c = ((x >> 2) * (y >> 2)) & 0x0f;	// Spirals
+			//c = ((x >> 1) * (y >> 1)) & 0x0f;	// Small Spirals
+			//frame_set_pixel_4bit(x, y, ((x >> 1) * (y >> 1)) & 0x0f);		// Small Spirals
+			frame_set_pixel_4bit(x, y, ((x * y) >> 1) & 0x0f);		// Small Spirals
+		}
+	}
+}
+void render_frame_spirals_large() {
+	byte x;
+	byte y;
+	
+	frame_clear(0x00);
+	
+	// Draw a nice pattern across the whole frame buffer
+	for(y = 0; y < AGI_FRAME_HEIGHT; y++) {
+		for(x = 0; x < AGI_FRAME_WIDTH; x++) {
+			// Draw something in 4 bit color (0..15)
+			//c = (x * 3) & 0x0f;	// Garbage
+			//c = (x / 10) & 0x0f;	// Horizontal gradient (with weird aliasing...)
+			//c = ((x >> 2) * (y >> 2)) & 0x0f;	// Spirals
+			//c = ((x >> 1) * (y >> 1)) & 0x0f;	// Small Spirals
+			//frame_set_pixel_4bit(x, y, ((x >> 2) * (y >> 2)) & 0x0f);		// Large Spirals
+			//frame_set_pixel_4bit(x, y, ((x * y) >> 4) & 0x0f);		// Large Spirals
+			frame_set_pixel_4bit(x, y, ((x * y) >> 6) & 0x0f);		// Large Spirals
+		}
+	}
+}
+
+
+void test_draw_combined() {
+	// Test the drawing pipeline
+	byte x;
+	byte y;
+	byte i;
+	
+	//	
+	//	byte bank;	// Which bank to use for buffer
+	//	bank = 3;	// Easy: Read from frame banks 1 and 2, write to 3rd bank
+	//	//bank = 1;	// Advanced: Read from frame banks 1 and 2, write BACK to 1st bank (overwriting the frame!)
+	//	
+	//	// Render one full frame in full internal AGI resolution (160x168) at 4 bpp
+	//	// One 4 bit frame (either visual or priority) at internal AGI resolution (160x168) is:
+	//	// 160x168 x 4bit = 26880 / 2 = 13440 bytes = 8192 + 5248 bytes across 2 banks
+	//	printf("Rendering...");
+	//	//render_frame();
+	//	//render_frame_spirals_large();
+	//	render_frame_spirals_small();
+	//	printf("OK\n");
+	//	
+	//	// Now crop and scroll that full frame
+	//	//x = 0;
+	//	for (y = 0; y < 68; y++) {
+	//		
+	//		// Clear destination buffer
+	//		//buffer_switch(bank);	// Map destination working buffer to 0xc000
+	//		//buffer_clear();	// Caution! If re-using the same region for frame and buffer, this will clear the rendered frame!
+	//		
+	//		// Crop and scale from frame to working buffer
+	//		//printf("Processing...");
+	//		process_frame_to_buffer(bank, 0, y);	// Cropy a slice, scrolling vertically
+	//		//printf("OK\n");
+	//		
+	//		// Clear screen (which might be "dirty" because of contiguous buffer)
+	//		//lcd_clear();
+	//		
+	//		// Draw from working buffer (4 bpp) to screen (1 bpp)
+	//		// Draw the buffer 1:1
+	//		//draw_buffer(bank, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+	//		
+	//		// Draw the buffer scaled horizontally (like the original games)
+	//		// Scroll the 40 pixels that are missing (120 pixels of frame are shown at 2x scale)
+	//		for (x = 0; x < 40; x+=1) {
+	//			draw_buffer(bank, 0,LCD_WIDTH, 0,LCD_HEIGHT, x,0, false);	// X-stretch and scroll horizontally
+	//		}
+	//	}
+	//	
+	
+	// Double draw test (keeping visual and prio in RAM)
+	byte bank_vis = 3;
+	byte bank_pri = 1;
+	
+	printf("Rendering...");
+	printf("1");
+	render_frame_spirals_small();
+	printf("...");
+	process_frame_to_buffer(bank_vis, 0, 0);
+	
+	printf("2");
+	render_frame_spirals_large();
+	printf("...");
+	process_frame_to_buffer(bank_pri, 0, 0);
+	printf("OK");
+	
+	y = 0;
+	for (x = 0; x < 40; x+=1) {
+		// Draw buffers sequencially
+		//draw_buffer(bank_vis, x,y, true);
+		draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x,y, true);
+		//draw_buffer(bank_pri, x,y, true);
+		draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, x,y, true);
+		
+		// Draw combined picture
+		for(i = 0; i < 15; i++) {
+			//draw_buffer_combined(bank_vis, bank_pri, thresh, area_x1, area_x2, area_y1, area_y2, x_ofs,y_ofs, true);
+			draw_buffer_combined(bank_vis, bank_pri, i, 0,LCD_WIDTH, 0,LCD_HEIGHT, x,y, true);
+		}
+	}
+}
+
+*/
+
 
 
 #if VGLDK_SERIES == 0
@@ -596,12 +787,11 @@ void main() __naked {
 	
 	printf("VAGI\n");
 	
+	romfs_init();
 	
-	//printf("rendering...");
 	//test_draw_combined();
 	//test_draw_agi_scroll();
 	test_draw_agi_combined();
-	//printf("done.\n");
 	
 	
 	while(running) {

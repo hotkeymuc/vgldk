@@ -204,15 +204,21 @@ class ROMFS:
 		for f in self.files:
 			#r += f'	// {f.id} ({f.filename})'+'\n'
 			#r += '	{' + f'{f.mem_bank:>3},	0x{f.mem_offset:04X},	{f.size:>6}' + '},' + f'	// {f.filename}, {f.size} bytes' + '\n'
-			r += '	{' + f'{f.mem_bank:>3},	0x{f.mem_offset:04X},	{f.size // self.mem_bank_size:>2}, {f.size % self.mem_bank_size:>6}' + '},' + f'	// {f.id}: "{f.filename}", {f.size:,} bytes' + '\n'
+			#r += '	{' + f'{f.mem_bank:>3},	0x{f.mem_offset:04X},	{f.size // self.mem_bank_size:>2}, {f.size % self.mem_bank_size:>6}' + '},' + f'	// {f.id}: "{f.filename}", {f.size:,} bytes' + '\n'
+			r += '	{' + f'{f.mem_bank:>3},	0x{f.aligned_offset % self.mem_bank_size:04X},	{f.size // self.mem_bank_size:>2}, {f.size % self.mem_bank_size:>6}' + '},' + f'	// {f.id}: "{f.filename}", {f.size:,} bytes' + '\n'
 		r += '};\n'
 		
 		r += '\n'
 		r += '// Use these to address a file entry using e.g. romfs_fopen()\n'
 		r += 'enum R_File {\n'
 		for f in self.files:
-			r += f'	{f.id}'+', \n'
+			r += f'	{f.id.lower()}'+', \n'
 		r += '};\n'
+		
+		r += '\n'
+		for i,f in enumerate(self.files):
+			r += f'#define {f.id} {i}'+'\n'
+		r += '\n'
 		
 		r += '#endif\n'
 		return r

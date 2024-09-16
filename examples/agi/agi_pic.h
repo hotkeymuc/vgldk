@@ -34,12 +34,6 @@ enum AgiPictureFlags {
 };
 
 // PictureMgr
-//static const byte _data[] = { 0x00 };
-//extern const byte __at 0x4000 _data[];	// Use banked ROM data (mapped to adress 0x4000)
-const byte *_data = (const byte *)0x4000;
-word _dataOffset = 0;
-word _dataSize = 0;
-bool _dataOffsetNibble = 0;
 
 uint8 _patCode;
 uint8 _patNum;
@@ -60,25 +54,19 @@ int16 _height = 168;
 int _flags;
 int _currentStep;
 
+// Connections to the outer world
+
+//bool agi_res_eof() { return (_dataOffset >= _dataSize); }
+//bool agi_res_read() { return _data[_dataOffset++]; }
+//bool agi_res_peek() { return _data[_dataOffset]; }
+//const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
+//word _dataOffset = 0;
+//word _dataSize = 0;
+
+bool _dataOffsetNibble = 0;
+
 
 void putVirtPixel(int x, int y) {
-	/*
-	byte drawMask = 0;
-	
-	if (x < 0 || y < 0 || x >= _width || y >= _height)
-		return;
-	
-	x += _xOffset;
-	y += _yOffset;
-	
-	if (_priOn)
-		drawMask |= GFX_SCREEN_MASK_PRIORITY;
-	if (_scrOn)
-		drawMask |= GFX_SCREEN_MASK_VISUAL;
-	
-	_gfx->putPixel(x, y, drawMask, _scrColor, _priColor);
-	*/
-	
 	//@TODO: Do the _step checking on a higher level (e.g. line or flood fill)! This would save a lot of superfluous compare operations
 	if ((vagi_drawing_step == VAGI_STEP_VIS) && (_scrOn))
 		frame_set_pixel_4bit(x, y, _scrColor);
@@ -89,23 +77,30 @@ void putVirtPixel(int x, int y) {
 
 
 byte getNextByte() {
-	//printf_d(_data[_dataOffset]); printf(", "); getchar();
 	
 	if (!_dataOffsetNibble) {
-		return _data[_dataOffset++];
+		//return _data[_dataOffset++];
+		return agi_res_read();
 	} else {
-		byte curByte = _data[_dataOffset++] << 4;
-		return (_data[_dataOffset] >> 4) | curByte;
+		//byte curByte = _data[_dataOffset++] << 4;
+		//return (_data[_dataOffset] >> 4) | curByte;
+		byte curByte = agi_res_read() << 4;
+		return (agi_res_peek() >> 4) | curByte;
 	}
 }
 
 //bool getNextParamByte(byte &b) {
 bool getNextParamByte(byte *b) {
-	byte value = getNextByte();
-	if (value >= _minCommand) {
-		_dataOffset--;
-		return false;
-	}
+	//byte value = getNextByte();
+	//if (value >= _minCommand) {
+	//	_dataOffset--;
+	//	return false;
+	//}
+	
+	byte value = agi_res_peek();
+	if (value >= _minCommand) return false;
+	value = agi_res_read();	// Increase the file offset
+	
 	*b = value;
 	return true;
 }
@@ -113,14 +108,14 @@ bool getNextParamByte(byte *b) {
 byte getNextNibble() {
 	if (!_dataOffsetNibble) {
 		_dataOffsetNibble = true;
-		return _data[_dataOffset] >> 4;
+		//return _data[_dataOffset] >> 4;
+		return agi_res_peek() >> 4;
 	} else {
 		_dataOffsetNibble = false;
-		return _data[_dataOffset++] & 0x0F;
+		//return _data[_dataOffset++] & 0x0F;
+		return agi_res_read() & 0x0F;
 	}
 }
-
-
 
 
 
@@ -778,7 +773,7 @@ void drawPictureV1() {
 	
 	//debugC(8, kDebugLevelMain, "Drawing V1 picture");
 	
-	while (_dataOffset < _dataSize) {
+	while (!agi_res_eof()) {
 		curByte = getNextByte();
 		
 		switch (curByte) {
@@ -817,7 +812,8 @@ void drawPictureV15() {
 	
 	//debugC(8, kDebugLevelMain, "Drawing V1.5 picture");
 	
-	while (_dataOffset < _dataSize) {
+	//while (_dataOffset < _dataSize) {
+	while (!agi_res_eof()) {
 		curByte = getNextByte();
 		
 		switch (curByte) {
@@ -881,7 +877,8 @@ void drawPictureV2() {
 	}
 	*/
 	
-	while (_dataOffset < _dataSize) {
+	//while (_dataOffset < _dataSize) {
+	while (!agi_res_eof()) {
 		// Draw status
 		//lcd_text_col = 0; lcd_text_row = 0; printf_d(_dataOffset); printf(" / "); printf_d(_dataSize);
 		
@@ -988,7 +985,8 @@ void drawPictureV2() {
 			word a = LCD_ADDR + (LCD_HEIGHT*LCD_WIDTH/8) - bar_height*(LCD_WIDTH/8);	// At bottom
 			
 			//byte progress = ((word)_dataOffset * 30) / _dataSize;	// Leads to overflow while multiplying
-			byte progress = ((word)_dataOffset * 3) / (_dataSize / 10);	// Must work with smaller numbers
+			//byte progress = ((word)_dataOffset * 3) / (_dataSize / 10);	// Must work with smaller numbers
+			byte progress = ((word)agi_res_ofs * 3) / (agi_res_size / 10);	// Must work with smaller numbers
 			
 			// Draw bar
 			for(byte i = 0; i < bar_height; i++) {

@@ -1,27 +1,45 @@
 #!/bin/sh
 # This script compiles the VAGI cartridge, then it copies resources to the final binary and starts the emulator.
 
-# Test symlinks:
-#GAMES_PATH=/z/data/_code/_c/V-Tech/vgldk.git/examples/agi/__apps__games___SCUMM
-# Test relative paths:
-#GAMES_PATH=/z/apps/_games/_SCUMM/SQ1/..
-# Test absolute path:
 GAMES_PATH=/z/apps/_games/_SCUMM
-
-GAME_PATH=${GAMES_PATH}/SQ2
+#GAME_ID=KQ1
+#GAME_ID=KQ2
+#GAME_ID=KQ3
+#GAME_ID=LSL1
+#GAME_ID=CAULDRON
+#GAME_ID=SQ1
+GAME_ID=SQ2
+# Not working:
+##GAME_ID=Enclosure
+##GAME_ID=uriquest
+##GAME_ID=SpaceQuest0__rep_104
+##GAME_ID=SpaceQuest_NewAdventuresOfRogerWilco
+##GAME_ID=SpaceQuestX_TheLostChapter
+GAME_PATH=${GAMES_PATH}/${GAME_ID}
 
 CART_SIZE_KB=1024
 CART_ROM_FILE=out/vagi.cart.${CART_SIZE_KB}kb.bin
-CART_ROM_FINAL=out/vagi.cart.${CART_SIZE_KB}kb_extended.bin
+CART_ROM_FINAL=out/vagi.cart.${CART_SIZE_KB}kb_${GAME_ID}.bin
 
 
-echo Creating ROM FS header file..
-./romfs_gen.py\
- --file-offset=0x4000 --chip-offset=0x4000 --mem-offset=0x4000 --mem-bank-start=1 --mem-bank-size=0x4000\
+#ROMFS_SPECS="data/export_*_pic_*.bin"
+#ROMFS_SPECS="${GAME_PATH}/*DIR ${GAME_PATH}/VOL.*"
+#ROMFS_SPECS="${GAME_PATH}/LOGDIR ${GAME_PATH}/PICDIR ${GAME_PATH}/SNDDIR ${GAME_PATH}/VIEWDIR ${GAME_PATH}/VOL.0 ${GAME_PATH}/VOL.1 ${GAME_PATH}/VOL.2 ${GAME_PATH}/VOL.3"
+ROMFS_SPECS="${GAME_PATH}/LOGDIR ${GAME_PATH}/PICDIR ${GAME_PATH}/SNDDIR ${GAME_PATH}/VIEWDIR ${GAME_PATH}/VOL.*"
+
+ROMFS_ARGS=" --file-offset=0x4000 --chip-offset=0x4000\
+ --mem-offset=0x4000 --mem-bank-size=0x4000 --mem-bank-start=1\
  --align-size 0x0010\
- --file-h=romfs_data.h\
- "${GAME_PATH}/VOL.*"
+ --fix-crossing\
+ --file-src=${CART_ROM_FILE}\
+ --file-dst=${CART_ROM_FINAL}"
 
+echo Creating ROM FS header file...
+./romfs_gen.py\
+ ${ROMFS_ARGS}\
+ --file-h=romfs_data.h\
+ --verbose\
+ ${ROMFS_SPECS}
 
 
 echo Compiling cartridge ROM...
@@ -30,6 +48,7 @@ if [ $? -ne 0 ]; then
 	echo Make error: Stopping run...
 	exit 1
 fi
+
 
 # 	# Merge a data file into ROM
 # 	
@@ -56,12 +75,8 @@ fi
 
 echo Merging game data into cartridge ROM...
 ./romfs_gen.py\
- --file-offset=0x4000 --chip-offset=0x4000 --mem-offset=0x4000 --mem-bank-start=1 --mem-bank-size=0x4000\
- --align-size 0x0010\
- --file-src=${CART_ROM_FILE}\
- --file-dst=${CART_ROM_FINAL}\
- --file-h=romfs_data.h\
- "${GAME_PATH}/VOL.*"
+ ${ROMFS_ARGS}\
+ ${ROMFS_SPECS}
 
 if [ $? -ne 0 ]; then
 	echo Merge error: Stopping run...

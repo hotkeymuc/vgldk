@@ -1,4 +1,4 @@
-//#include "romfs.h"
+#include "romfs.h"
 
 static romfs_state_t romfs_states[ROMFS_MAX_HANDLES];
 
@@ -9,7 +9,7 @@ void romfs_init() {
 	}
 }
 
-int romfs_fopen(byte index) {
+romfs_handle_t romfs_fopen(byte index) {
 	// Check if file is "found"
 	if (index >= R_NUM_FILES) {
 		// Invalid file index!
@@ -35,47 +35,93 @@ int romfs_fopen(byte index) {
 		return ROMFS_ERROR_OUT_OF_HANDLES;
 	}
 	
-	
 	// Grab the file entry
-	romfs_entry_t e = R_FILES[index];
+	const romfs_entry_t *e = &R_FILES[index];
 	
 	// Initialize the state
-	romfs_states[h].active = true;
-	romfs_states[h].index = index;
-	romfs_states[h].mem_bank = e.bank;
-	romfs_states[h].mem_ofs = e.addr;
-	romfs_states[h].offset = 0;
+	romfs_state_t *state = &romfs_states[h];
+	state->active = true;
+	state->index = index;
+	state->mem_bank = e->bank;
+	state->mem_ofs = e->addr;	//@FIXME: Addr or offset?!?!?
+	
+	// For quicker EOF checks:
+	state->mem_bank_end = e->bank + e->banks;
+	state->mem_ofs_end = e->addr + e->size;
+	// Stats:
+	state->offset = 0;
 	
 	// Return the handle (which is just the index of the global state we used)
 	return h;
 }
 
+bool romfs_factive(romfs_handle_t h) {
+	return (romfs_states[h].active);
+}
+
 int romfs_fclose(romfs_handle_t h) {
-	if (!romfs_states[h].active) {
-		return ROMFS_ERROR_NOT_OPEN;
-	}
+	//if (!romfs_states[h].active) return ROMFS_ERROR_NOT_OPEN;
+	if (!romfs_factive(h)) return ROMFS_ERROR_NOT_OPEN;
+	
 	romfs_states[h].active = false;
 	return ROMFS_OK;
 }
 
 bool romfs_feof(romfs_handle_t h) {
 	// Check for EOF
-	if ((romfs_states[h].mem_bank == R_FILES[romfs_states[h].index].bank + R_FILES[romfs_states[h].index].banks) && (romfs_states[h].mem_ofs >= R_FILES[romfs_states[h].index].size)) {
+	//if ((romfs_states[h].mem_bank == R_FILES[romfs_states[h].index].bank + R_FILES[romfs_states[h].index].banks) && (romfs_states[h].mem_ofs >= R_FILES[romfs_states[h].index].size)) {
+	romfs_state_t *state = &romfs_states[h];
+	//@FIXME: It is not working! Reports EOF right away!
+	if ((state->mem_bank == state->mem_bank_end) && (state->mem_ofs >= state->mem_ofs_end)) {
 		return true;
 	}
 	return false;
 }
 
-int romfs_fread(romfs_handle_t h) {
+word romfs_fpos(romfs_handle_t h) {
+	return romfs_states[h].offset;
+}
+
+void romfs_fseek(romfs_handle_t h, word skip) {
+	romfs_state_t *state = &romfs_states[h];
+	state->offset += skip;
+	state->mem_bank += (skip / R_BANK_SIZE);
+	state->mem_ofs += (skip % R_BANK_SIZE);
+	// Handle memory bank roll-over
+	while (state->mem_ofs >= R_BANK_SIZE) {
+		state->mem_bank ++;
+		state->mem_ofs -= R_BANK_SIZE;
+	}
+}
+void romfs_fseek_far(romfs_handle_t h, word skip_hi, word skip_lo) {
+	// One giant leap...
+	romfs_states[h].mem_bank += (skip_hi / (R_BANK_SIZE >> 8));
+	
+	// ...and then the rest.
+	romfs_fseek(h, skip_lo);
+}
+
+
+int romfs_fpeek(romfs_handle_t h) {
 	// Check if handle is active
-	if (!romfs_states[h].active) return ROMFS_ERROR_NOT_OPEN;
+	//if (!romfs_states[h].active) return ROMFS_ERROR_NOT_OPEN;
+	if (!romfs_factive(h)) {
+		//printf("NOT OPEN!");
+		return ROMFS_ERROR_NOT_OPEN;
+	}
 	
 	// Check for EOF
 	//if ((romfs_states[h].mem_bank == R_FILES[romfs_states[h].index].bank + R_FILES[romfs_states[h].index].banks) && (romfs_states[h].mem_ofs >= R_FILES[romfs_states[h].index].size)) {
-	if (romfs_feof(h)) return ROMFS_ERROR_EOF;
+	/*
+	if (romfs_feof(h)) {
+		printf("EOF!");
+		return ROMFS_ERROR_EOF;
+	}
+	*/
 	
 	// Calculate memory address
 	word a = R_MEM_OFFSET + romfs_states[h].mem_ofs;
+	//word a = romfs_states[h].mem_ofs;
 	
 	// Switch to bank
 	romfs_switch_bank(romfs_states[h].mem_bank);
@@ -83,15 +129,16 @@ int romfs_fread(romfs_handle_t h) {
 	// Get the byte
 	byte r = *((byte *)a);
 	
-	// Go to next byte
-	romfs_states[h].offset ++;
-	romfs_states[h].mem_ofs ++;
+	//printf("Reading from ofs=0x"); printf_x2(a >> 8); printf_x2(a & 0xff); printf(" = 0x"); printf_x2(r); printf("\n");
 	
-	// Handle memory bank roll-over
-	while (romfs_states[h].mem_ofs >= R_BANK_SIZE) {
-		romfs_states[h].mem_bank ++;
-		romfs_states[h].mem_ofs -= R_BANK_SIZE;
-	}
+	return r;
+}
+
+int romfs_fread(romfs_handle_t h) {
+	int r = romfs_fpeek(h);
+	
+	// Go to next byte
+	romfs_fseek(h, 1);
 	
 	return r;
 }
