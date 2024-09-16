@@ -26,11 +26,11 @@ I think it won't work, because:
 		0x52 = 0x8000 - 0xbfff
 		0x53 = 0xc000 - 0xdfff
 		0x54 = 0xe000 - 0xffff
-		0x55 = (determine if ROM or cart is mounted et. al.)
+		0x55 = (determine if cart or internal ROM is mounted at a bank), defaults to 0x1C when running a ROM cart at 0x8000
 				lowest bit set: Map cartridge at 0x0000 (e.g. "out 55 1d" maps cart to 0x0000 AND 0x8000)
 				2nd    bit set: Map cartridge at 0x4000 (e.g. "out 55 1e" maps cart to 0x4000 AND 0x8000)
-				3rd    bit unset: Reboot loop (e.g. "out 55 18")
-				4th    bit unset: Reboot loop (e.g. "out 55 14")
+				3rd    bit unset: Reboot loop (e.g. "out 55 18") - probably unmounts the cart ROM it is currently running...
+				4th    bit unset: Reboot loop (e.g. "out 55 14") - probably unmounts working RAM and/or VRAM
 				5th    bit unset: nothing, doesn't even gets retained (turns back to 0x1c)
 				!! out 55 0c -> Crash sometimes
 				!! out 55 3c -> Crash with Capslock LED on
