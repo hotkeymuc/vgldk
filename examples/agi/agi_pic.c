@@ -1,5 +1,5 @@
-#ifndef __AGI_PIC_H__
-#define __AGI_PIC_H__
+#ifndef __AGI_PIC_C__
+#define __AGI_PIC_C__
 /*
 AGI PIC drawing
 based on scummvm's agi implementation 2024-09-14
@@ -10,33 +10,18 @@ based on scummvm's agi implementation 2024-09-14
 
 //#define AGI_PIC_FILL_CASES	// Optimize fill by pre-selecting a "draw_FillCheck_case" function to use throughout the fill
 
-#define CLIP(v,vmin,vmax) ((v >= vmax) ? vmax : ( (v <= vmin) ? vmin : v  ) )
-#define SWAP(a,b) {tmp=b;b=a;a=tmp;}
-/*
-typedef byte bool;
-typedef byte uint8;
-typedef int int16;
-typedef word uint16;
-*/
+#include "agi_pic.h"
 
 
-// AGI picture version
-enum AgiPictureVersion {
-	AGIPIC_C64,
-	AGIPIC_V1,
-	AGIPIC_V15,
-	AGIPIC_V2,
-	AGIPIC_256
-};
+// Connections to the outer world
+//bool agi_res_eof() { return (_dataOffset >= _dataSize); }
+//bool agi_res_read() { return _data[_dataOffset++]; }
+//bool agi_res_peek() { return _data[_dataOffset]; }
+//const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
+//word _dataOffset = 0;
+//word _dataSize = 0;
+bool _dataOffsetNibble = 0;
 
-enum AgiPictureFlags {
-	kPicFNone      = (1 << 0),
-	kPicFCircle    = (1 << 1),
-	kPicFStep      = (1 << 2),
-	kPicFf3Stop    = (1 << 3),
-	kPicFf3Cont    = (1 << 4),
-	//kPicFTrollMode = (1 << 5)
-};
 
 // PictureMgr
 
@@ -59,16 +44,6 @@ int16 _height = 168;
 int _flags;
 int _currentStep;
 
-// Connections to the outer world
-
-//bool agi_res_eof() { return (_dataOffset >= _dataSize); }
-//bool agi_res_read() { return _data[_dataOffset++]; }
-//bool agi_res_peek() { return _data[_dataOffset]; }
-//const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
-//word _dataOffset = 0;
-//word _dataSize = 0;
-
-bool _dataOffsetNibble = 0;
 
 
 void putVirtPixel(int x, int y) {
@@ -462,13 +437,14 @@ void draw_LineAbsolute() {
 	}
 }
 
+/*
 // flood fill
 typedef struct {
 	byte x;
 	byte y;
 } fill_stack_t;
 #define FILL_STACK_MAX 128
-
+*/
 
 #ifdef AGI_PIC_FILL_CASES
 	// Speed up be pre-selecting the right case (that won't change throuout the fill!)
@@ -868,6 +844,29 @@ void drawPictureV2() {
 	//bool mickeyCrystalAnimation = false;
 	//int  mickeyIteration = 0;
 	byte status = 0;	// Status countdown
+	
+	
+	// Prepare:
+	//_dataSize = agi_res_size;
+	//_dataOffset = 0;
+	_dataOffsetNibble = 0;
+	
+	_width = 160;
+	_height = 168;
+	
+	_patCode = 0;
+	_patNum = 0;
+	_priOn = false;
+	_scrOn = false;
+	_scrColor = 15;
+	_priColor = 4;
+	
+	//_pictureVersion = AGIPIC_V1;
+	//_pictureVersion = AGIPIC_V15;
+	_pictureVersion = AGIPIC_V2;
+	_minCommand = 0xf0;
+	
+	
 	
 	//debugC(8, kDebugLevelMain, "Drawing V2/V3 picture");
 	//@FIXME: Ignored:

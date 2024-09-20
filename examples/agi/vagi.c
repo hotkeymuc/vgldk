@@ -12,6 +12,10 @@
 		* Scroll & redraw to allow viewing the whole picture
 		* PIC resources must be kept at 4bpp (or more), while the resulting LCD pixel will be 1bpp. Dither!
 	
+	AGI implementations are based on:
+		* ScummVM: https://github.com/scummvm/scummvm/tree/master/engines/agi
+		* GBAGI: https://github.com/Davidebyzero/GBAGI.git
+	
 	2024-09-11 Bernhard "HotKey" Slawik
 */
 
@@ -95,151 +99,12 @@ byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which type of
 
 #include "vagi_buffer.h"	// this handles the working buffer(s)
 
-// ROM FS:
-#define R_MEM_OFFSET 0x4000	// Where to find the banked memory area
-#define R_BANK_SIZE 0x4000	// How big one bank is
-#define romfs_switch_bank(bank) bank_0x4000_port = (0x20 | bank)	// and: bank_type_port = bank_type_port | 0x02
-
-#include "romfs.h"
-#include "romfs_data.h"
-#include "romfs.c"
-enum AGI_RES_KIND {
-	AGI_RES_KIND_LOG,
-	AGI_RES_KIND_PIC,
-	AGI_RES_KIND_SND,
-	AGI_RES_KIND_VIEW
-};
-
-static const byte AGI_DIR_FILES[4] = {
-	R_LOGDIR,
-	R_PICDIR,
-	R_SNDDIR,
-	R_VIEWDIR,
-};
-
-static const byte AGI_VOL_FILES[4] = {
-	R_VOL_0,
-	#ifdef R_VOL_1
-	R_VOL_1,
-	#endif
-	#ifdef R_VOL_2
-	R_VOL_2,
-	#endif
-	#ifdef R_VOL_3
-	R_VOL_3,
-	#endif
-	#ifdef R_VOL_4
-	R_VOL_4,
-	#endif
-};
-
-
-// We only use one handle
-romfs_handle_t agi_res_h;
-word agi_res_ofs;
-word agi_res_size;
-
-word agi_res_open(byte kind, word num) {
-	romfs_handle_t h;
-	byte b1, b2, b3;
-	byte res_vol, res_ofs_hi;
-	word res_ofs;
-	
-	// Close previous
-	if (romfs_factive(agi_res_h)) {
-		romfs_fclose(agi_res_h);
-	}
-	
-	// Mount our cartridge ROM to address 0x4000 (data must be inside the ROM binary at position 0x4000 * n)
-	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
-	//bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
-	
-	
-	// Open directory for the given kind (LOG, PIC, SND, VIEW)
-	//printf("Opening DIR...");
-	h = romfs_fopen(AGI_DIR_FILES[kind]);
-	if (h < 0) {
-		printf("DIR err=-"); printf_d(-h); putchar('\n');
-		return 0;
-	}
-	
-	// Seek to given entry number (3 bytes each)
-	romfs_fseek(h, num*3);
-	
-	// Get the 3 data bytes
-	b1 = romfs_fread(h);
-	b2 = romfs_fread(h);
-	b3 = romfs_fread(h);
-	romfs_fclose(h);
-	
-	// Extract volume and offset
-	res_vol = (b1 & 0xf0) >> 4;
-	res_ofs_hi = (b1 & 0x0f);	// << 16
-	res_ofs = (b2 << 8) | b3;
-	
-	//printf("vol="); printf_d(res_vol); printf(", ofs="); printf_x2(res_ofs_hi); printf_x2(res_ofs >> 8); printf_x2(res_ofs & 0xff); printf("\n");
-	
-	// Open volume file (assume the VOL.* files are located sequencially)
-	//printf("Opening VOL...");
-	//h = romfs_fopen(R_VOL_0 + res_vol);
-	h = romfs_fopen(AGI_VOL_FILES[res_vol]);
-	if (h < 0) {
-		printf("VOL."); printf_d(res_vol); printf(": err=-"); printf_d(-h); putchar('\n');
-		return 0;
-	}
-	
-	// Seek to address (Up to 24 bit = far!)
-	romfs_fseek_far(h, res_ofs_hi, res_ofs);
-	
-	// Check signature (0x1234)
-	b1 = romfs_fread(h);
-	b2 = romfs_fread(h);
-	if ((b1 != 0x12) || (b2 != 0x34)) {
-		// Signature mismatch!
-		printf("SIG err!\n");
-		//printf("SIG err: "); printf_x2(b1); printf_x2(b2); putchar('\n');	//printf(" != 1234\n");
-		romfs_fclose(h);
-		return 0;
-	}
-	// Check resource volume value
-	b1 = romfs_fread(h);
-	if (b1 != res_vol) {
-		// Volume mismatch (volume file number VS stored volume number of resource)
-		printf("VOL err!\n");
-		//printf("VOL err: "); printf_d(b1); putchar('\n');	//printf(" != "); printf_d(res_vol); printf("\n");
-		romfs_fclose(h);
-		return 0;
-	}
-	
-	// Read size (LO-HI)
-	b1 = romfs_fread(h);
-	b2 = romfs_fread(h);
-	agi_res_size = b1 | (b2 << 8);
-	agi_res_ofs = 0;
-	
-	// Leave open!
-	//romfs_fclose(h);
-	agi_res_h = h;
-	return agi_res_size;
-}
-
-#define agi_res_close() romfs_fclose(agi_res_h)
-#define agi_res_peek() romfs_fpeek(agi_res_h)
-
-int agi_res_read() {
-	agi_res_ofs++;	// agi_res_size != R_FILES[].size, because a RES is just a part of a big VOL file
-	return romfs_fread(agi_res_h);
-}
-
-bool agi_res_eof() {
-	//return romfs_feof(agi_res_h);
-	return agi_res_ofs >= agi_res_size;
-}
-
+#include "vagi_res.h"	// This handles reading resources
 
 // The fun starts here!
 
 #include "agi_pic.h"
+#include "agi_pic.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
 
 bool render_frame_agi(word pic_num, byte drawing_step) {
 	// Draw one AGI PIC (either its visual or priority data)
@@ -293,33 +158,15 @@ bool render_frame_agi(word pic_num, byte drawing_step) {
 		return false;
 	}
 	
-	//_dataSize = agi_res_size;
-	//_dataOffset = 0;
-	_dataOffsetNibble = 0;
-	
 	//vagi_drawing_step = VAGI_STEP_VIS;	// Only perform drawing operations for visual (screen) frame
 	//vagi_drawing_step = VAGI_STEP_PRI;	// Only perform drawing operations for priority frame
 	vagi_drawing_step = drawing_step;	// Only perform drawing operations for either screen OR priority
-	_width = 160;
-	_height = 168;
-	
-	_patCode = 0;
-	_patNum = 0;
-	_priOn = false;
-	_scrOn = false;
-	_scrColor = 15;
-	_priColor = 4;
-	
-	//_pictureVersion = AGIPIC_V1;
-	//_pictureVersion = AGIPIC_V15;
-	_pictureVersion = AGIPIC_V2;
-	_minCommand = 0xf0;
 	
 	// Actually call AGI drawing routine...
 	//frame_clear(0x00);
 	//for(i = 0; i < 10; i++) { draw_Line(0,i*4, 159,167); }	// Test pattern
-	if (drawing_step == VAGI_STEP_VIS) frame_clear(_scrColor * 0x11);	// VIS: bg=0xf ( * 0x11 = on both nibbles)
-	if (drawing_step == VAGI_STEP_PRI) frame_clear(_priColor * 0x11);	// PRI: bg=0x4 ( * 0x11 = on both nibbles)
+	if (drawing_step == VAGI_STEP_VIS) frame_clear(0xf * 0x11);	// VIS: bg=_scrColor=0xf ( * 0x11 = on both nibbles)
+	if (drawing_step == VAGI_STEP_PRI) frame_clear(0x4* 0x11);	// PRI: bg=_priColor=0x4 ( * 0x11 = on both nibbles)
 	
 	//drawPictureV1();
 	//drawPictureV15();
@@ -371,23 +218,21 @@ void test_draw_agi_scroll() {
 				// Scroll VRAM to the left
 				memcpy((byte *)LCD_ADDR, (byte *)(LCD_ADDR + step/8), (LCD_HEIGHT*LCD_WIDTH - step)/8);
 				//@TODO: Use LDIR (copy BC bytes from HL to DE)!
-				/*
-				__asm
-				push bc
-				push de
-				push hl
-				
-				// Scroll one line up
-				ld bc, #((LCD_W * (LCD_H - LCD_SCROLL_AMOUNT)) / 8)	// Number of bytes to scroll (i.e. whole screen minus x lines)
-				ld hl, #(LCD_ADDR + (LCD_W / 8) * LCD_SCROLL_AMOUNT)	//#0xE01E	// Offset of 2nd line, i.e. LCD_ADDR + bytes-per-line * x
-				ld de, #LCD_ADDR	//#0xE000	// Offset of 1st line
-				ldir	// Copy BC bytes from HL to DE
-				
-				pop hl
-				pop de
-				pop bc
-				__endasm;
-				*/
+				//	__asm
+				//		push bc
+				//		push de
+				//		push hl
+				//		
+				//		// Scroll one line up
+				//		ld bc, #((LCD_W * (LCD_H - LCD_SCROLL_AMOUNT)) / 8)	// Number of bytes to scroll (i.e. whole screen minus x lines)
+				//		ld hl, #(LCD_ADDR + (LCD_W / 8) * LCD_SCROLL_AMOUNT)	//#0xE01E	// Offset of 2nd line, i.e. LCD_ADDR + bytes-per-line * x
+				//		ld de, #LCD_ADDR	//#0xE000	// Offset of 1st line
+				//		ldir	// Copy BC bytes from HL to DE
+				//		
+				//		pop hl
+				//		pop de
+				//		pop bc
+				//	__endasm;
 				
 				// Only re-draw right region
 				//draw_buffer(bank_vis, area_x1, area_x2, area_y1, area_y2, x_ofs,y_ofs, true);

@@ -30,7 +30,7 @@ BOOL IF_RESULT;
 #ifdef _WINDOWS
 #define _PRINT_LOG
 #endif
-U8 *code;
+//U8 *code;	//@TODO: We need to re-direct this to agi_res_read()
 U16 logScan[256];
 
 
