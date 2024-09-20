@@ -985,13 +985,19 @@ void drawPictureV2() {
 			word a = LCD_ADDR + (LCD_HEIGHT*LCD_WIDTH/8) - bar_height*(LCD_WIDTH/8);	// At bottom
 			
 			//byte progress = ((word)_dataOffset * 30) / _dataSize;	// Leads to overflow while multiplying
-			//byte progress = ((word)_dataOffset * 3) / (_dataSize / 10);	// Must work with smaller numbers
-			byte progress = ((word)agi_res_ofs * 3) / (agi_res_size / 10);	// Must work with smaller numbers
+			//byte progress = ((word)agi_res_ofs * 3) / (agi_res_size / 10);	// Must work with smaller numbers
+			byte progress;
+			if (vagi_drawing_step == VAGI_STEP_VIS)
+				progress = ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
+			else
+				progress = 15 + ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
 			
 			// Draw bar
-			for(byte i = 0; i < bar_height; i++) {
+			memset((byte *)(a + progress), 0x00, 30);
+			a += 30;
+			for(byte i = 1; i < bar_height; i++) {
 				if (progress > 0) memset((byte *)a, 0xff, progress);
-				if (progress < 30) memset((byte *)(a + progress), 0x00, 30-progress);
+				if (progress < 30) memset((byte *)(a + progress), (i&1) ? 0x55 : 0xAA, 30-progress);
 				a += 30;
 			}
 		}

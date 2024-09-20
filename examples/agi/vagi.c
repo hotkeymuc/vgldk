@@ -16,9 +16,10 @@
 */
 
 
-//#define VAGI_MINIMAL	// Squeeze all as much space as possible. No stdio!
 #define VAGI_MOUSE	// Support mouse
+#define VAGI_START_PIC_NUM 1	//5	// On which PIC to start
 
+//#define VAGI_MINIMAL	// Squeeze all as much space as possible. No stdio!
 #ifdef VAGI_MINIMAL
 	#include <vgldk.h>
 	#define printf(s) ((void)s)
@@ -339,7 +340,7 @@ void test_draw_agi_scroll() {
 	
 	y_src = (AGI_FRAME_HEIGHT - LCD_HEIGHT) / 2;	// Start in the middle
 	
-	word pic_num = 5;
+	word pic_num = VAGI_START_PIC_NUM;
 	
 	for(;;) {
 		// Render frame(s)
@@ -454,19 +455,26 @@ void test_draw_agi_combined() {
 			redraw = true;
 			
 			// Render both frames
-			lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 2; printf("Loading PIC "); printf_d(pic_num);
+			lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Loading PIC "); printf_d(pic_num);
 			
-			lcd_text_col = 0; lcd_text_row = 0; printf("VIS...");
+			//lcd_text_col = 0; lcd_text_row = 0;
+			//printf("VIS...");
 			ok = render_frame_agi(pic_num, VAGI_STEP_VIS);
 			if (ok) {
 				process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part)
 				draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
 				
-				lcd_text_col = 0; lcd_text_row = 0; printf("PRIO...");
+				//lcd_text_col = 0; lcd_text_row = 0;
+				//printf("PRIO...");
 				ok = render_frame_agi(pic_num, VAGI_STEP_PRI);
 				process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part)
 				//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
-				redraw = true;
+				
+				//redraw = true;
+				// Draw over the progress bar
+				draw_buffer(bank_vis, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, x_ofs,y_ofs, true);
+				redraw = false;
+				
 			} else {
 				redraw = false;
 			}
@@ -477,15 +485,17 @@ void test_draw_agi_combined() {
 		
 		if (redraw) {
 			// Redraw the full rendered frame
+			//memset((byte *)LCD_ADDR, 0xff, LCD_HEIGHT * (LCD_WIDTH/8));	// Clear screen
 			draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
 			redraw = false;
 		}
 		
-		lcd_text_col = 0; lcd_text_row = 0;	//(LCD_HEIGHT/font_char_height) - 1;
+		//lcd_text_col = 0; lcd_text_row = 0;
+		lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
 		printf("x="); printf_d(x);
 		printf(", y="); printf_d(y);
 		printf(", prio="); printf_d(prio);
-		putchar('\n');
+		//putchar('\n');
 		
 		// Draw ego
 		draw_buffer_sprite_priority(

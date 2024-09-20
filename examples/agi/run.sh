@@ -4,11 +4,12 @@
 GAMES_PATH=/z/apps/_games/_SCUMM
 #GAME_ID=KQ1
 #GAME_ID=KQ2
-#GAME_ID=KQ3
+GAME_ID=KQ3
 #GAME_ID=LSL1
 #GAME_ID=CAULDRON
 #GAME_ID=SQ1
-GAME_ID=SQ2
+#GAME_ID=SQ2
+#GAME_ID=PQ1
 # Not working:
 ##GAME_ID=Enclosure
 ##GAME_ID=uriquest
@@ -85,10 +86,18 @@ fi
 
 
 echo Emulating final image...
+#mame \
+#gl6000sl \
+#-rompath "/z/apps/_emu/_roms" \
+#-cart "${CART_ROM_FINAL}" \
+#-window -nomax -nofilter -sleep \
+#-speed 2.00 -volume -24 \
+#-skip_gameinfo -nomouse
+
 mame \
 gl6000sl \
 -rompath "/z/apps/_emu/_roms" \
 -cart "${CART_ROM_FINAL}" \
 -window -nomax -nofilter -sleep \
--speed 2.00 -volume -24 \
+-speed 8.00 -volume -24 \
 -skip_gameinfo -nomouse

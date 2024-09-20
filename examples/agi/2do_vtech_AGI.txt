@@ -9,10 +9,11 @@ I think it won't work, because:
 	-> visual and priority buffer require ~24 KB of RAM!
 
 * Shortcuts:
+	https://wiki.scummvm.org/index.php?title=Sierra_Game_Versions
 	/z/data/_code/_python/_api/Sierra_AGI/htkagi
 	/z/data/_code/_c/V-Tech/vgldk.git
-* Terminal (for 7007SL running monitor 6000SL):
-	picocom -b 9600 --imap lfcrlf --echo /dev/ttyUSB0
+	* Terminal (for 7007SL running monitor 6000SL):
+		picocom -b 9600 --imap lfcrlf --echo /dev/ttyUSB0
 
 * !! There *IS* enough RAM available! 32 KiB in total, 29 KB+ freely usable!
 	* GL7007SL (and GL6000SL?) can switch RAM bank at 0xc000-0xdfff via port 0x53!
