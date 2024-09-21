@@ -9,18 +9,18 @@ based on scummvm's agi implementation 2024-09-14
 */
 
 //#define AGI_PIC_FILL_CASES	// Optimize fill by pre-selecting a "draw_FillCheck_case" function to use throughout the fill
+//#define AGI_PIC_NIBBLE_MODE	// nibbleMode=false for SQ2, it uses separate bytes for color value of 0xf0 / 0xf2
 
 #include "agi_pic.h"
 
 
-// Connections to the outer world
-//bool agi_res_eof() { return (_dataOffset >= _dataSize); }
-//bool agi_res_read() { return _data[_dataOffset++]; }
-//bool agi_res_peek() { return _data[_dataOffset]; }
+// Connections to the outer world:
 //const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
 //word _dataOffset = 0;
 //word _dataSize = 0;
 bool _dataOffsetNibble = 0;
+
+vagi_res_handle_t pic_res_h;	// Resource handle to read from (vagi_res.h)
 
 
 // PictureMgr
@@ -57,15 +57,11 @@ void putVirtPixel(int x, int y) {
 
 
 byte getNextByte() {
-	
 	if (!_dataOffsetNibble) {
-		//return _data[_dataOffset++];
-		return agi_res_read();
+		return vagi_res_read(pic_res_h);
 	} else {
-		//byte curByte = _data[_dataOffset++] << 4;
-		//return (_data[_dataOffset] >> 4) | curByte;
-		byte curByte = agi_res_read() << 4;
-		return (agi_res_peek() >> 4) | curByte;
+		byte curByte = vagi_res_read(pic_res_h) << 4;
+		return (vagi_res_peek(pic_res_h) >> 4) | curByte;
 	}
 }
 
@@ -77,9 +73,9 @@ bool getNextParamByte(byte *b) {
 	//	return false;
 	//}
 	
-	byte value = agi_res_peek();
+	byte value = vagi_res_peek(pic_res_h);
 	if (value >= _minCommand) return false;
-	value = agi_res_read();	// Increase the file offset
+	value = vagi_res_read(pic_res_h);	// Increase the file offset
 	
 	*b = value;
 	return true;
@@ -88,12 +84,11 @@ bool getNextParamByte(byte *b) {
 byte getNextNibble() {
 	if (!_dataOffsetNibble) {
 		_dataOffsetNibble = true;
-		//return _data[_dataOffset] >> 4;
-		return agi_res_peek() >> 4;
+		return vagi_res_peek(pic_res_h) >> 4;
 	} else {
 		_dataOffsetNibble = false;
 		//return _data[_dataOffset++] & 0x0F;
-		return agi_res_read() & 0x0F;
+		return vagi_res_read(pic_res_h) & 0x0F;
 	}
 }
 
@@ -754,7 +749,7 @@ void drawPictureV1() {
 	
 	//debugC(8, kDebugLevelMain, "Drawing V1 picture");
 	
-	while (!agi_res_eof()) {
+	while (!vagi_res_eof(pic_res_h)) {
 		curByte = getNextByte();
 		
 		switch (curByte) {
@@ -794,7 +789,7 @@ void drawPictureV15() {
 	//debugC(8, kDebugLevelMain, "Drawing V1.5 picture");
 	
 	//while (_dataOffset < _dataSize) {
-	while (!agi_res_eof()) {
+	while (!vagi_res_eof(pic_res_h)) {
 		curByte = getNextByte();
 		
 		switch (curByte) {
@@ -838,13 +833,24 @@ void drawPictureV15() {
 	}
 }
 
-void drawPictureV2() {
+//void drawPictureV2() {
+void drawPictureV2(word pic_num) {
 	byte curByte;
-	bool nibbleMode = false;	// false for SQ2, it uses separate bytes for color value of 0xf0 / 0xf2
+	
+	//bool nibbleMode = false;	// false for SQ2, it uses separate bytes for color value of 0xf0 / 0xf2
 	//bool mickeyCrystalAnimation = false;
 	//int  mickeyIteration = 0;
 	byte status = 0;	// Status countdown
 	
+	
+	// Open resource
+	// Use abstract vagi_res API
+	pic_res_h = vagi_res_open(AGI_RES_KIND_PIC, pic_num);
+	if (pic_res_h < 0) {
+		//printf("PIC err!\n");
+		//getchar();
+		return;
+	}
 	
 	// Prepare:
 	//_dataSize = agi_res_size;
@@ -882,7 +888,7 @@ void drawPictureV2() {
 	*/
 	
 	//while (_dataOffset < _dataSize) {
-	while (!agi_res_eof()) {
+	while (!vagi_res_eof(pic_res_h)) {
 		// Draw status
 		//lcd_text_col = 0; lcd_text_row = 0; printf_d(_dataOffset); printf(" / "); printf_d(_dataSize);
 		
@@ -892,22 +898,36 @@ void drawPictureV2() {
 		
 		switch (curByte) {
 			case 0xf0:
+				/*
 				if (!nibbleMode) {
 					draw_SetColor();
 				} else {
 					draw_SetNibbleColor();
 				}
+				*/
+				#ifdef AGI_PIC_NIBBLE_MODE
+					draw_SetNibbleColor();
+				#else
+					draw_SetColor();
+				#endif
 				_scrOn = true;
 				break;
 			case 0xf1:
 				_scrOn = false;
 				break;
 			case 0xf2:
+				/*
 				if (!nibbleMode) {
 					draw_SetPriority();
 				} else {
 					draw_SetNibblePriority();
 				}
+				*/
+				#ifdef AGI_PIC_NIBBLE_MODE
+					draw_SetNibblePriority();
+				#else
+					draw_SetPriority();
+				#endif
 				_priOn = true;
 				break;
 			case 0xf3:
@@ -947,6 +967,7 @@ void drawPictureV2() {
 				status = 0;	// Force status
 				break;
 			case 0xff: // end of data
+				vagi_res_close(pic_res_h);
 				return;
 			default:
 				//warning("Unknown picture opcode (%x) at (%x)", curByte, _dataOffset - 1);
@@ -992,9 +1013,11 @@ void drawPictureV2() {
 			//byte progress = ((word)agi_res_ofs * 3) / (agi_res_size / 10);	// Must work with smaller numbers
 			byte progress;
 			if (vagi_drawing_step == VAGI_STEP_VIS)
-				progress = ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
+				//progress = ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
+				progress = ((word)vagi_res_states[pic_res_h].offset * 3) / (vagi_res_states[pic_res_h].res_size / 5);	// Must work with smaller numbers
 			else
-				progress = 15 + ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
+				//progress = 15 + ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
+				progress = 15 + ((word)vagi_res_states[pic_res_h].offset * 3) / (vagi_res_states[pic_res_h].res_size / 5);	// Must work with smaller numbers
 			
 			// Draw bar
 			memset((byte *)(a + progress), 0x00, 30);
@@ -1007,6 +1030,9 @@ void drawPictureV2() {
 		}
 		status++;
 	}
+	
+	// Close the resource handle
+	vagi_res_close(pic_res_h);
 }
 
 /*

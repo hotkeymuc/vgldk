@@ -27,15 +27,24 @@
 
 LOGIC *curLog,*log0;
 BOOL IF_RESULT;
+
 #ifdef _WINDOWS
 #define _PRINT_LOG
 #endif
+
 //U8 *code;	//@TODO: We need to re-direct this to agi_res_read()
-U16 logScan[256];
+word code_ofs;
+
+U16 logScan[256];	// What is this?
 
 
 char *GetMessage(LOGIC *log, int num) {                                             
-	return (char*)( log->messages + bGetW(log->messages+(num<<1)) );
+	//return (char*)( log->messages + bGetW(log->messages+(num<<1)) );
+	vagi_res_seek_to(log->res_h, log->ofs_messages + (num << 1));
+	word o = vagi_res_read_word(log->res_h);
+	vagi_res_seek_to(log->res_h, log->ofs_messages + o);
+	o = vagi_res_read_word(log->res_h);
+	return (char*)o;
 }
 
 
@@ -46,10 +55,13 @@ void InitLogicSystem() {
 }
 
 
-U8 *CallLogic(U8 num) {
+//U8 *CallLogic(U8 num) {
+word CallLogic(U8 num) {
 	LOGIC *prevLog,log;
-	U8 *pLog = (U8*)logDir[num];
-	U8 *c=code,*c2;
+	
+	//U8 *c=code,*c2;
+	word c = code_ofs;
+	word c2;
 	
 	#ifdef _FULL_BLIT_RESFRESHES
 		EraseBlitLists();
@@ -58,9 +70,18 @@ U8 *CallLogic(U8 num) {
 	
 	// load the logic
 	log.num			= num;
-	log.code		= pLog+7;
-	log.messages	= log.code+bGetW(pLog+5);
-	log.msgTotal	= *log.messages++;
+	//U8 *pLog = (U8*)logDir[num];
+	//log.code		= pLog+7;
+	//log.messages	= log.code+bGetW(pLog+5);	// Note: "pLog+5" = first byte in actual resource data (First 5 bytes: 0x12 0x34, vol, size_lo, size_hi)
+	//log.msgTotal	= *log.messages++;
+	log.res_h = vagi_res_open(AGI_RES_KIND_LOG, num);
+	if (log.res_h < 0) {
+		printf("LOG open ERR\n");
+		return 0;
+	}
+	word code_size = vagi_res_read_word(log.res_h);
+	log.ofs_code = vagi_res_tell(log.res_h);
+	log.ofs_messages = log.ofs_code + code_size;
 	
 	// set the active pointer
 	prevLog			= curLog;
@@ -76,7 +97,8 @@ U8 *CallLogic(U8 num) {
 	#endif
 	
 	curLog = prevLog;
-	code = c;
+	//code = c;
+	code_ofs = c;
 	
 	// release the pointer
 	return (c2);
@@ -87,15 +109,19 @@ U8 *CallLogic(U8 num) {
 char zs[1000];
 int cmdnum;
 #endif
-U8 *ExecuteLogic(LOGIC *log) {
+//U8 *ExecuteLogic(LOGIC *log) {
+word ExecuteLogic(LOGIC *log) {
 	register unsigned int op;
 #ifdef _PRINT_LOG
 	int i,l;
 	cmdnum = 0;
 #endif
-	code = log->code+logScan[log->num];
+	//code = log->code+logScan[log->num];
+	code_ofs = log->ofs_code + logScan[log->num];
+	vagi_res_seek_to(log->res_h, code_ofs);
 	
-	while(code && (BOOL)(op = *code++)) {
+	//while(code && (BOOL)(op = *code++)) {
+	while((!vagi_res_eof(log->res_h)) && (BOOL)(op = vagi_res_read(log->res_h))) {
 #ifdef _WINDOWS
 	if(sndFlag!=-1) {
 		SetFlag(sndFlag);
@@ -135,12 +161,16 @@ U8 *ExecuteLogic(LOGIC *log) {
 #endif
 		agiCommands[op].func();
 	}
-	return code;
+	
+	//return code;
+	return code_ofs;
 }
 
 
 void ExecuteGoto() {
-	code += (S16)(bGetW(code)+2);
+	//code += (S16)(bGetW(code)+2);
+	code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
+	vagi_res_seek_to(curLog->res_h, code_ofs);
 }
 
 
@@ -153,7 +183,8 @@ void ExecuteIF() {
 #endif
 	
 	for(;;) {
-		if((op = *code++) >= 0xFC) {
+		//if((op = *code++) >= 0xFC) {
+		if((op = vagi_res_read(curLog->res_h)) >= 0xFC) {
 			if(op == 0xFC) {
 				if(orCnt) {
 					orCnt = 0;
@@ -162,7 +193,8 @@ void ExecuteIF() {
 				}
 				orCnt++;
 			} else if(op == 0xFF) {
-				code+=2;
+				//code+=2;
+				vagi_res_skip(curLog->res_h, 2);
 				return;
 			}
 			if(op == 0xFD) {
@@ -210,19 +242,30 @@ void ExecuteIF() {
 
 void SkipORTrue() {
 	register unsigned int op;
-	while((op = *code++) != 0xFC)
-		if(op <= 0xFC)
-			code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
+	//while((op = *code++) != 0xFC)
+	while((op = vagi_res_read(curLog->res_h)) != 0xFC) {
+		if(op <= 0xFC) {
+			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
+			if (op == 0xe)	vagi_res_skip(curLog->res_h, vagi_res_read(curLog->res_h) << 1);
+			else			vagi_res_skip(curLog->res_h, testCommands[op].nParams);
+		}
+	}
 }
 
 
 void SkipANDFalse() {
 	register unsigned int op;
-	while((op = *code++) != 0xFF)
-		if(op < 0xFC)
-			code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
-	
-	code += (S16)(bGetW(code)+2);	// address
+	//while((op = *code++) != 0xFF)
+	while((op = vagi_res_read(curLog->res_h)) != 0xFF) {
+		if(op < 0xFC) {
+			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
+			if (op == 0xe)	vagi_res_skip(curLog->res_h, vagi_res_read(curLog->res_h) << 1);
+			else			vagi_res_skip(curLog->res_h, testCommands[op].nParams);
+		}
+	}
+	//code += (S16)(bGetW(code)+2);	// address
+	code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
+	vagi_res_seek_to(curLog->res_h, code_ofs);
 }
 
 

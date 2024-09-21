@@ -76,7 +76,10 @@ void draw_yCorner(bool skipOtherCoords);
 //void drawPictureC64();
 void drawPictureV1();
 void drawPictureV15();
-void drawPictureV2();
+
+//void drawPictureV2();
+void drawPictureV2(word pic_num);
+
 //void drawPictureAGI256();
 
 #endif
