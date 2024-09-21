@@ -42,8 +42,10 @@ romfs_handle_t romfs_fopen(byte index) {
 	romfs_state_t *state = &romfs_states[h];
 	state->active = true;
 	state->index = index;
-	state->mem_bank = e->bank;
-	state->mem_ofs = e->addr;	//@FIXME: Addr or offset?!?!?
+	state->mem_bank_start = e->bank;
+	state->mem_ofs_start = e->addr;	//@FIXME: Addr or offset?!?!?
+	state->mem_bank = state->mem_bank_start;
+	state->mem_ofs = state->mem_ofs_start;	//@FIXME: Addr or offset?!?!?
 	
 	// For quicker EOF checks:
 	state->mem_bank_end = e->bank + e->banks;
@@ -81,8 +83,17 @@ bool romfs_feof(romfs_handle_t h) {
 word romfs_fpos(romfs_handle_t h) {
 	return romfs_states[h].offset;
 }
-
-void romfs_fseek(romfs_handle_t h, word skip) {
+void romfs_frewind(romfs_handle_t h) {
+	// Go to beginning of file
+	
+	romfs_state_t *state = &romfs_states[h];
+	state->offset = 0;
+	state->mem_bank = state->mem_bank_start;
+	state->mem_ofs = state->mem_ofs_start;
+}
+void romfs_fskip(romfs_handle_t h, word skip) {
+	// Do a "little" skip forward (without overflowing the offset counters...)
+	
 	romfs_state_t *state = &romfs_states[h];
 	state->offset += skip;
 	state->mem_bank += (skip / R_BANK_SIZE);
@@ -93,12 +104,12 @@ void romfs_fseek(romfs_handle_t h, word skip) {
 		state->mem_ofs -= R_BANK_SIZE;
 	}
 }
-void romfs_fseek_far(romfs_handle_t h, word skip_hi, word skip_lo) {
-	// One giant leap...
+void romfs_fskip_far(romfs_handle_t h, word skip_hi, word skip_lo) {
+	// One giant leap across banks...
 	romfs_states[h].mem_bank += (skip_hi / (R_BANK_SIZE >> 8));
 	
 	// ...and then the rest.
-	romfs_fseek(h, skip_lo);
+	romfs_fskip(h, skip_lo);
 }
 
 
@@ -138,7 +149,7 @@ int romfs_fread(romfs_handle_t h) {
 	int r = romfs_fpeek(h);
 	
 	// Go to next byte
-	romfs_fseek(h, 1);
+	romfs_fskip(h, 1);
 	
 	return r;
 }

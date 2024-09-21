@@ -89,22 +89,22 @@ __sfr __at 0x54 bank_0xe000_port;
 __sfr __at 0x55 bank_type_port;	// This controls whether a bank is internal ROM or cartridge ROM
 
 
+// Since we only have enough RAM to render EITHER the visual OR the priority frame, we need to keep track of the currently active frame type
 #define VAGI_STEP_VIS 0
 #define VAGI_STEP_PRI 1
-byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which type of frame to process)
+byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which type of frame to process: visual=0 or priority=1)
 
-#include "vagi_lcd.h"
+// Platform specific helpers:
+#include "vagi_lcd.h"	// This abstracts access to the LCD screen
+#include "vagi_frame.h"	// This handles one full-size AGI frame needed at render-time
+#include "vagi_buffer.h"	// This handles the (smaller) working buffer(s) needed at run.time
+#include "vagi_res.h"	// This handles reading from AGI resources as if they were files
 
-#include "vagi_frame.h"	// this handles the full-size AGI frame
-
-#include "vagi_buffer.h"	// this handles the working buffer(s)
-
-#include "vagi_res.h"	// This handles reading resources
-
-// The fun starts here!
-
+// The AGI specific fun starts here:
 #include "agi_pic.h"
 #include "agi_pic.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
+
+
 
 bool render_frame_agi(word pic_num, byte drawing_step) {
 	// Draw one AGI PIC (either its visual or priority data)
@@ -114,9 +114,9 @@ bool render_frame_agi(word pic_num, byte drawing_step) {
 	//bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
 	//dump(0x4000, 16);
 	
+	/*
 	// Tell AGI renderer where the data is located
 	
-	/*
 	// Manually decode some bytes in ROM memory
 	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
 	bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
@@ -151,12 +151,6 @@ bool render_frame_agi(word pic_num, byte drawing_step) {
 	romfs_switch_bank(R_FILES[f].bank);	// Switch in the starting bank
 	*/
 	
-	// Use ROM FS API and "agi_res_...()" functions
-	if (agi_res_open(AGI_RES_KIND_PIC, pic_num) == 0) {
-		printf("PIC err!\n");
-		//getchar();
-		return false;
-	}
 	
 	//vagi_drawing_step = VAGI_STEP_VIS;	// Only perform drawing operations for visual (screen) frame
 	//vagi_drawing_step = VAGI_STEP_PRI;	// Only perform drawing operations for priority frame
@@ -170,13 +164,15 @@ bool render_frame_agi(word pic_num, byte drawing_step) {
 	
 	//drawPictureV1();
 	//drawPictureV15();
-	drawPictureV2();
+	drawPictureV2(pic_num);
 	
-	agi_res_close();
 	return true;
 }
 
+/*
 void test_draw_agi_scroll() {
+	// Test "smooth" scrolling with partial re-draw
+	
 	byte bank_vis = 3;
 	//byte bank_pri = 1;
 	byte x_src = 0;
@@ -254,6 +250,8 @@ void test_draw_agi_scroll() {
 		else y_src = 0;
 	}
 }
+*/
+
 
 #define sprite_width 8
 #define sprite_height 12
@@ -275,6 +273,8 @@ static const byte sprite_data[8*12] = {
 
 
 void test_draw_agi_combined() {
+	// Test drawing a sprite while respecing the priority buffer (i.e. what Sierra called "3D")
+	
 	byte bank_vis = 3;
 	byte bank_pri = 1;
 	byte x_src = 0;
@@ -288,10 +288,10 @@ void test_draw_agi_combined() {
 	byte prio = 5;
 	byte spd = 5;
 	
-	word pic_num = 1; //5;
+	word pic_num = 1; //5;	// Which PIC resource to display first
 	
-	bool render = true;
-	bool redraw = true;
+	bool render = true;	// Force re-rendering of the full-size frame
+	bool redraw = true;	// Force re-drawing of the full visual buffer
 	bool ok;
 	
 	for(;;) {
@@ -299,28 +299,27 @@ void test_draw_agi_combined() {
 			render = false;
 			redraw = true;
 			
-			// Render both frames
+			// Render both frames and create working buffers
 			lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Loading PIC "); printf_d(pic_num);
 			
-			//lcd_text_col = 0; lcd_text_row = 0;
-			//printf("VIS...");
-			ok = render_frame_agi(pic_num, VAGI_STEP_VIS);
+			//lcd_text_col = 0; lcd_text_row = 0; printf("VIS...");
+			ok = render_frame_agi(pic_num, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)
 			if (ok) {
-				process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part)
+				process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part) of frame to working buffer
 				draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
 				
-				//lcd_text_col = 0; lcd_text_row = 0;
-				//printf("PRIO...");
-				ok = render_frame_agi(pic_num, VAGI_STEP_PRI);
-				process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part)
+				//lcd_text_col = 0; lcd_text_row = 0; printf("PRIO...");
+				ok = render_frame_agi(pic_num, VAGI_STEP_PRI);	// Render the full-size priority PIC frame (takes quite long...)
+				process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part) of frame to working buffer
 				//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
 				
 				//redraw = true;
-				// Draw over the progress bar
+				// Partially redraw the lower part (where the progress bar was shown during rendering)
 				draw_buffer(bank_vis, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, x_ofs,y_ofs, true);
-				redraw = false;
+				redraw = false;	// The screen contents should be usable, so we do not need to re-draw it again
 				
 			} else {
+				// Something went wrong while loading the resource
 				redraw = false;
 			}
 			
@@ -329,12 +328,13 @@ void test_draw_agi_combined() {
 		}
 		
 		if (redraw) {
-			// Redraw the full rendered frame
+			// Redraw the full visual buffer
 			//memset((byte *)LCD_ADDR, 0xff, LCD_HEIGHT * (LCD_WIDTH/8));	// Clear screen
 			draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
-			redraw = false;
+			redraw = false;	// Prevent re-drawing again next time
 		}
 		
+		// Show some stats
 		//lcd_text_col = 0; lcd_text_row = 0;
 		lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
 		printf("x="); printf_d(x);
@@ -342,9 +342,9 @@ void test_draw_agi_combined() {
 		printf(", prio="); printf_d(prio);
 		//putchar('\n');
 		
-		// Draw ego
+		// Draw ego sprite
 		draw_buffer_sprite_priority(
-			//bank_vis,
+			//bank_vis,	// The drawing routine simply skips visual background pixels. Smart, eh?
 			bank_pri,
 			
 			&sprite_data[0], sprite_width, sprite_height,
@@ -355,12 +355,13 @@ void test_draw_agi_combined() {
 			x_ofs,y_ofs, true
 		);
 		
-		// Wait for input
+		// Wait for user input
 		char c = getchar();
 		
-		// Clear background around sprite
+		// Clear background around ego sprite
 		draw_buffer(bank_vis, x,x+sprite_width*2, y,y+sprite_height, x_ofs,y_ofs, true);
 		
+		// Handle keyboard input
 		switch(c) {
 		case 'a':
 		case 'A':
@@ -625,6 +626,16 @@ void test_draw_combined() {
 */
 
 
+#include "agi_logic.h"
+#include "agi_logic.c"	//@FIXME: Makefile only compiles the main .C file
+
+void test_logic() {
+	InitLogicSystem();
+	
+	CallLogic(0);
+}
+
+
 
 #if VGLDK_SERIES == 0
 // app
@@ -642,11 +653,12 @@ void main() __naked {
 	
 	printf("VAGI\n");
 	
-	romfs_init();
+	vagi_res_init();	// calls romfs_init()
 	
-	//test_draw_combined();
-	//test_draw_agi_scroll();
-	test_draw_agi_combined();
+	//test_draw_combined();	// Test drawing combined vis & prio
+	//test_draw_agi_scroll();	// Test partial redraw
+	//test_draw_agi_combined();	// Test rendering actual AGI PIC data
+	test_logic();	// Test the logic engine...
 	
 	
 	while(running) {
