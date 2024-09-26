@@ -102,6 +102,7 @@ import sys
 sys.path.append('../../tools')
 from rel2app import *
 import calcsize
+import sdcc	# for custom compilation
 
 # Import MONITOR tools for uploading output to real hardware
 sys.path.append('../monitor')
@@ -121,7 +122,7 @@ def cpm_make():
 	vgldk_series = VGLDK_SERIES	# Model of VTech Genius Leader to build for
 	src_path = '.'	# source directory
 	out_path = 'out'	# Output directory for the compiler
-	lib_path = None
+	lib_paths = []
 	include_paths = [
 		'../../include/arch/gl%d'%vgldk_series,	# Architecture specific drivers
 		'../../include',	# General hardware drivers
@@ -235,7 +236,7 @@ def cpm_make():
 	cpm_cart_filename = '%s/cpm_%d_cart.bin' % (out_path, vgldk_series)
 	
 	put('Compiling CP/M (CRT0, BINT, BIOS, BDOS) for entry at 0x%04X...' % cpm_loc_code)
-	cpm_data = compile(
+	cpm_data = sdcc.compile(
 		# The .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
 		crt_s_files = [
 			#'%s/cpm_crt0.s' % src_path
@@ -251,8 +252,8 @@ def cpm_make():
 		output_hex_file = cpm_hex_filename,
 		output_bin_file = cpm_bin_filename,
 		
-		lib_path = lib_path,	#'../../lib'
-		include_paths = include_paths,	#'../../include'
+		lib_paths = lib_paths,	# [ '../../lib' ]
+		include_paths = include_paths,	# [ '../../include' ]
 		loc_code = cpm_loc_code,	#0x8000 - code_size_estimate	# Put CPM as far up as possible
 		loc_data = cpm_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
 		
@@ -299,7 +300,7 @@ def cpm_make():
 		ccp_com_filename = '%s/ccp.com' % out_path
 		
 		put('Compiling CCP for entry at 0x%04X...' % ccp_loc_code)
-		ccp_data = compile(
+		ccp_data = sdcc.compile(
 			# The .s file(s) get(s) compiled to a .rel file, which gets pre-pended to .c source
 			crt_s_files = [
 				'%s/program_crt0.s' % src_path
@@ -313,8 +314,8 @@ def cpm_make():
 			output_hex_file = '%s/ccp.hex' % out_path,
 			output_bin_file = ccp_bin_filename,
 			
-			lib_path = lib_path,	#'../../lib'
-			include_paths = include_paths,	#'../../include'
+			lib_paths = lib_paths,	# [ '../../lib' ]
+			include_paths = include_paths,	# [ '../../include' ]
 			loc_code = ccp_loc_code,	#0x8000 - code_size_estimate	# Put CPM as far up as possible
 			loc_data = ccp_loc_data,	# static variable data and gsinit-code will be put to this address in binary file
 			
@@ -567,125 +568,6 @@ def cpm_make():
 #
 
 
-# Wrapper around SDCC compiler
-def compile(
-		crt_s_files = ['./crt0.s'],
-		crt_rel_file = 'out/crt0.rel',
-		source_files = ['./main.c'],	# CRT0 rel file is prepended automatically
-		output_hex_file = 'out/main.hex',
-		output_bin_file = 'out/main.bin',
-		lib_path = None,	#'../../lib'
-		include_paths = ['../../include'],
-		loc_code = 0x8000,	# 0x8000 for cartridge
-		loc_data = 0xc000,	# 0xc000 for internal RAM
-		defines = { 'VGLDK_SERIES': VGLDK_SERIES }
-	):
-	"""Wrapper around the SDCC compiler"""
-	
-	"""
-	### Alternative: Compile source file(s) using Z88DK, generate .bin file
-	my_env = os.environ.copy()
-	my_env['PATH'] = os.environ['PATH'] + ';' + os.path.join(z88dk_path, 'bin')
-	my_env['OZFILES'] = z88dk_lib_path	# Normally these files reside inside the z88dk, but we can hijack them and use our minimal local version
-	my_env['ZCCCFG'] = os.path.abspath(z88dk_lib_path + '/config')
-	
-	#cmd = os.path.join(z88dk_path, 'bin', 'zcc')
-	#cmd = 'zcc +vgl -vn -clib=sdcc_iy -SO3 --max-allocs-per-node200000 %PROGNAME%.c -o %PROGNAME% -create-app'
-	#cmd = 'zcc +vgl -v -clib=sdcc_iy -SO3 --max-allocs-per-node200000 %PROGNAME%.c -o %PROGNAME% -create-app'
-	cmd = 'zcc'
-	cmd += ' +' + z88dk_target
-	cmd += ' -vn'
-	cmd += ' -clib=new'	# "new" or "sdcc_iy" or ...
-	cmd += ' -subtype=' + z88dk_subtype
-	#cmd += ' -I' + os.path.abspath(libs_path)
-	#cmd += ' -I' + os.path.abspath(os.path.join(z88dk_path, 'include'))
-	#cmd += ' -lm'
-	#cmd += ' -l' + 'gen_math'
-	#cmd += ' -l' + 'zx80_clib'
-	#cmd += ' -lndos'
-	#cmd += ' -l' + 'z88_clib'
-	#cmd += ' -l' + 'z88_math'
-	cmd += ' %s' % ' '.join(source_files)	# may only be a single .c file
-	cmd += ' -o ' + output_bin_file
-	cmd += ' -create-app'
-	"""
-	
-	# Compile .s file(s) to .rel file
-	cmd = 'sdasz80'
-	cmd += ' -o %s' % crt_rel_file
-	cmd += ' %s' % ' '.join(crt_s_files)
-	
-	put('>> %s' % cmd)
-	r = os.system(cmd)
-	#put(subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env=env).stdout.read())
-	
-	#process_rel_file(crt_rel_file)	#, output_bin_file)
-	
-	
-	### Compile source file(s) using SDCC, generate .hex file
-	cmd = 'sdcc -mz80'
-	
-	#cmd += ' --model-small'	# model-small = default, but not supported on Z80
-	cmd += ' --no-std-crt0'	# Provide our own crt0 .rel
-	#cmd += ' --nostdlib'
-	
-	#@TODO: Allow multiple paths
-	if lib_path is not None: cmd += ' --lib-path %s' % lib_path
-	if include_paths is not None:
-		for include_path in include_paths:
-			cmd += ' -I %s' % include_path
-	
-	cmd += ' --code-loc 0x%04X' % loc_code
-	#if loc_stack is not None: cmd += ' --stack-loc 0x%04X' % loc_stack
-	if loc_data is not None: cmd += ' --data-loc 0x%04X' % loc_data
-	#if loc_idata is not None: cmd += ' --idata-loc 0x%04X' % loc_idata
-	#if loc_xram is not None: cmd += ' --xram-loc 0x%04X' % loc_xram
-	
-	# Add "#define"s
-	for k,v in defines.items():
-		cmd += ' -D %s=%s' % (k, v)
-	
-	#cmd += ' --verbose'	# Show stages of compilation
-	#cmd += ' --vc'	# vc = messages are compatible with Micro$oft visual studio
-	#cmd += ' -V'	# V = Show actual commands that are run by the compiler
-	
-	cmd += ' -o %s' % output_hex_file
-	cmd += ' %s %s' % (crt_rel_file, ' '.join(source_files))	# .rel, .c, .c ...
-	
-	put('>> %s' % cmd)
-	r = os.system(cmd)
-	if r != 0:
-		put('Result: %s' % r)
-		sys.exit(1)
-	#put(subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env=env).stdout.read())
-	
-	# Analyze the intermediate .rel file (without binary references)
-	#process_rel_file(crt_rel_file)	#, output_bin_file)
-	
-	
-	### Convert .hex file to .bin file
-	if output_bin_file is not None:
-		cmd = 'objcopy -Iihex -Obinary %s %s' % (output_hex_file, output_bin_file)
-		put('>> %s' % cmd)
-		r = os.system(cmd)
-		if r != 0:
-			put('Result: %s' % r)
-			sys.exit(1)
-		#put(subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True, env=env).stdout.read())
-		
-		#@FIXME: The .bin file also contains some data at the RAM area... (e.g. file offset 0xc000)
-		
-		## Analyze final .rel file (with binary references)
-		#process_rel_file(crt_rel_file, output_bin_file)
-		
-		## Show cartridge size statistics
-		#calcsize.analyze(output_bin_file)
-		
-		### Return pure binary data
-		with open(output_bin_file, 'rb') as h:
-			data = h.read()
-		return data
-	
 
 
 def cpm_upload(data):
@@ -704,7 +586,7 @@ def cpm_upload(data):
 	# GL4000
 	
 	# Set banks
-	put('Setting bank switching ports...')
+	put('Setting bank switching ports (GL4000)...')
 	comp.port_out(0, 0x00)	# Set 0x0000-0x3FFF to ROM 0x0000
 	comp.port_out(1, 0x01)	# Set 0x4000-0x7FFF to ROM 0x4000
 	#comp.port_out(2, 0x00)	# ?
@@ -719,11 +601,11 @@ def cpm_upload(data):
 	#comp.dump(0xC000, l)
 	#comp.dump(0xE000, l)
 	
-	put('Testing for RAM at 0x0000...')
 	
 	ram_found = False
+	addr = 0x0000
+	put(f'Testing for writable RAM at 0x{addr:04X}...')
 	while not ram_found:
-		addr = 0x0000
 		# Get old value
 		old = comp.peek(addr)[0]
 		# Write new value
@@ -763,5 +645,6 @@ def cpm_upload(data):
 
 
 if __name__ == '__main__':
+	#@TODO: Add argparse command line arguments!
 	cpm_make()
 	
