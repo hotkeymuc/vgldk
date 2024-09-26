@@ -27,21 +27,16 @@ CART_ROM_FINAL=out/vagi.cart.${CART_SIZE_KB}kb_${GAME_ID}.bin
 #ROMFS_SPECS="${GAME_PATH}/*DIR ${GAME_PATH}/VOL.*"
 #ROMFS_SPECS="${GAME_PATH}/LOGDIR ${GAME_PATH}/PICDIR ${GAME_PATH}/SNDDIR ${GAME_PATH}/VIEWDIR ${GAME_PATH}/VOL.0 ${GAME_PATH}/VOL.1 ${GAME_PATH}/VOL.2 ${GAME_PATH}/VOL.3"
 ROMFS_SPECS="${GAME_PATH}/LOGDIR ${GAME_PATH}/PICDIR ${GAME_PATH}/SNDDIR ${GAME_PATH}/VIEWDIR ${GAME_PATH}/VOL.*"
-
 ROMFS_ARGS=" --file-offset=0x4000 --chip-offset=0x4000\
  --mem-offset=0x4000 --mem-bank-size=0x4000 --mem-bank-start=1\
  --align-size 0x0010\
- --fix-crossing\
- --file-src=${CART_ROM_FILE}\
- --file-dst=${CART_ROM_FINAL}"
-
+ --fix-crossing"
 echo Creating ROM FS header file...
 ./romfs_gen.py\
  ${ROMFS_ARGS}\
  --file-h=romfs_data.h\
- --verbose\
  ${ROMFS_SPECS}
-
+# --verbose
 
 echo Compiling cartridge ROM...
 make cart
@@ -77,6 +72,8 @@ fi
 echo Merging game data into cartridge ROM...
 ./romfs_gen.py\
  ${ROMFS_ARGS}\
+ --file-src=${CART_ROM_FILE}\
+ --file-dst=${CART_ROM_FINAL}\
  ${ROMFS_SPECS}
 
 if [ $? -ne 0 ]; then
