@@ -23,10 +23,10 @@ Some bare minimum stdio functions
 	byte stdio_echo;
 	
 	// Proxy functions
-	void putchar(char c) {
+	void inline putchar(char c) {
 		(*p_stdout_putchar)(c);
 	}
-	char getchar() {
+	char inline getchar() {
 		return (*p_stdin_getchar)();
 	}
 	/*

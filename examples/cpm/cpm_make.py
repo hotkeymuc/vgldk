@@ -464,7 +464,8 @@ def cpm_make():
 		# Make sure ROMs directory exists
 		if not os.path.isdir(rom_out_path):
 			put('Creating ROMs directory "%s", because it does not exits, yet...' % rom_out_path)
-			os.mkdir(MAME_ROMS_DIR)
+			#os.mkdir(MAME_ROMS_DIR)
+			os.mkdir(rom_out_path)
 			put('Don\'t forget to copy the required additional driver ROMs (e.g. hd44780_a00.zip) there, too!') 
 		
 		# Create the ZIP file
@@ -472,7 +473,7 @@ def cpm_make():
 		elif vgldk_series == 6000: mame_sys = 'gl6000sl'	# MAME system name
 		elif vgldk_series == 7007: mame_sys = 'gl7007sl'	# MAME system name
 		else:
-			put('At the moment, only generation of gl4000/gl6000sl/gl7007sl ROMs is implemented.')
+			put('At the moment, only generation of gl4000/gl6000sl/gl7007sl ROMs is implemented, not %s' % vgldk_series)
 			sys.exit(1)
 		
 		output_file_sysromzip = '%s/%s.zip' % (rom_out_path, mame_sys)

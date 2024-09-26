@@ -1,11 +1,12 @@
-;; crt0 for a Z80 based V-Tech Genius Leader / PreComputer
+;; crt0 for a Z80 based V-Tech Genius Leader 6000SL / Prestige?
 ;; Based on SDCC's z80 crt0 and stuff I have implemented for z88dk's "vgl" target
 
 ;; SDCC asm syntax: https://github.com/darconeous/sdcc/blob/master/sdas/doc/asmlnk.txt
 ;; vgl info: /z/data/_code/_c/z88dk.git/libsrc/_DEVELOPMENT/target/vgl
 
 	.module crt0
-	.globl	_main	; main() function (in C)
+	;.globl	_main	; main() function (in C)
+	.globl	_vgldk_init	; Will invoke main()
 	.area	_HEADER (ABS)
 	
 
@@ -108,40 +109,72 @@
 ;; Init - actual CRT init/life cycle procedure
 ;	.org	0x0040
 init:
-	;di ; disable interrupts
-	;im 1	; GL original uses "im 1": only ONE single interrupt handler at 0x0038
-	
-	ld sp, #0xdff0	; GL4000 0eda: Load StackPointer to 0xdff0 (top of internal RAM)
+	di ; disable interrupts
+	im 1	; GL original uses "im 1": only ONE single interrupt handler at 0x0038
 	
 	;call	gsinit	; Initialise global variables
 	
-	ld	a, #0xff	; GL4000 0edd: output 0xff to port 0x11
-	out	(0x11),a
+	;; GL6000SL
+	ld sp, #0xff87	; GL6000: ld sp, #0xff87 - leave just a little bit more
+	;ld a, #0
+	;ld i, a
 	
-	ld	a, #0xde	; GL4000 0ee1: output 0xde to port 0x12 (default mode)
-	;ld	a, #0xfe	; All on, except bit 0 which powers off the system
-	;ld	a, #0xf6	; All on, except PowerOff and Beep
-	out	(0x12),a	
+	; LCD
+	;ld a, #3
+	;out (0x31), a
 	
-	xor	a			; GL4000 0ee5: output 0x00 to all mappers (1, 2, 3, 4, 5)
-	;out	(0x00),a	;	rombank0 (0x0000 - 0x3fff)
-	out	(0x01),a	;	rombank1 (0x4000 - 0x7fff)
-	out	(0x02),a	; ?
-	;out	(0x03),a	; rombank2 (0x8000 - 0xffff): Sending "0x00" disables the cartridge port!
-	out	(0x04),a	; ?
-	out	(0x05),a	; ?
+	; Bank switching (0x50...0x56, e.g. 0x50=0x0000-0x4000, 0x51=0x4000-0x8000, ...)
+	;	0x50 = 0x0000 - 0x3fff
+	;	0x51 = 0x4000 - 0x7fff
+	;	0x52 = 0x8000 - 0xbfff
+	;	0x53 = 0xc000 - 0xdfff
+	;	0x54 = 0xe000 - 0xffff
+	;; e.g. OUT 0x51, 0x1B	-> maps ROM:0x6C000 to CPU:0x4000
+	;; e.g. OUT 0x52, 0x20	-> maps CART:0x0000 to CPU:0x8000
+	ld a, #0
+	out (0x55), a
+	out (0x50), a
 	
-	ld	(0xdff1),a	; GL4000 0ef0: Put zeros above stack
+	ld a, #1
+	out (0x51), a
 	
-	ld	a, #0x40	; GL4000 0f15: Output 0x40 to port 0x06 - dunno what this does
-	out	(0x06),a
+	ld a, #2
+	out (0x52), a
+	
+	
+	; Map cart to 0x8000 (found by trial and error)
+	ld a, #0x0e
+	out (0x55), a
+	ld a, #0x20
+	out (0x52), a
+	
+	
+	; Next one is needed for VRAM to function properly (first scan lines)
+	ld a, #1
+	out (0x53), a
+	
+	; 0x54 = 0xe000 = vram
+	ld a, #0
+	out (0x54), a
+	
+;	; ?
+;	;ld a, #0
+;	;out (0x22), a
+;	;ld a, #0xe0
+;	;out (0x21), a
+;	;ld a, #0x60
+;	;out (0x23), a
+	
+	
 	
 	;ei
 	
 	;; System is ready
 	
 	;; Call main() function (C entry point)
-	jp	_main
+	;jp	_main
+	jp	_vgldk_init	; Will invoke main()
+	
 	;; End of main()
 	
 	;; Jump to shutdown code

@@ -84,7 +84,7 @@ class ROMFS:
 				# Allow pushing the file across boundaries
 				if fix_crossing:
 					if (f.size > self.mem_bank_size):
-						put(f'	* File "{f.filename}" is larger than a segment and MUST cross boundaries!')
+						put(f'	* File "{f.filename}" is larger than a segment ({f.size:,} > {self.mem_bank_size:,}) and MUST cross boundaries!')
 					else:
 						o_align = ((o_mem // self.mem_bank_size) + 1) * self.mem_bank_size
 						align = o_align - o_mem
@@ -98,7 +98,7 @@ class ROMFS:
 			o_file += align
 			o_chip += align
 			o_mem += align
-			o_mem_bank = (o_mem // self.mem_bank_size)	# Re-calculate
+			o_mem_bank = ((o_mem-self.mem_offset) // self.mem_bank_size) + self.mem_bank_start	# Re-calculate
 			
 			# Update file stats
 			f.data_offset = o
@@ -114,7 +114,7 @@ class ROMFS:
 			o_file += f.size
 			o_chip += f.size
 			o_mem += f.size
-			o_mem_bank = (o_mem // self.mem_bank_size)	# Re-calculate
+			o_mem_bank = ((o_mem-self.mem_offset) // self.mem_bank_size) + self.mem_bank_start	# Re-calculate
 		
 		self.final_data_offset = o
 		self.final_aligned_offset = o_aligned
@@ -188,6 +188,9 @@ class ROMFS:
 		args = ' '.join(sys.argv)
 		r += f'*	Command line arguments: "{str(args)}"\n'
 		r += '*	\n'
+		r += '*	Files:\n'
+		r += ''.join([ '*		%s\n'%f.org_filename for f in self.files ])
+		r += '*	\n'
 		r += '\n'.join([ f'*	{l}' for l in self.dump_stats().split('\n') ]) + '\n'
 		r += '*/\n'
 		
@@ -223,72 +226,28 @@ class ROMFS:
 		r += '#endif\n'
 		return r
 
-
-if __name__ == '__main__':
+def generate_rom(
+		filename_src,
+		filename_dst,
+		filename_h,
+		filespecs,
+		file_offset = 0x8000,
+		chip_offset = 0x8000,
+		mem_offset = 0x8000,
+		mem_bank_size = 0x2000,
+		mem_bank_start = 0,
+		align_size = 0x2000,
+		pad = 0xff,
+		verbose = False,
+		fix_crossing = False,
+	):
 	
-	parser = OptionParser(
-		description='Bundle binary files into your ROM',
-		usage='Usage: %prog [options] file_spec...'
-	)
-	
-	align_size = 1	#0x100	#0x1000	# 0x2000	# 0x4000
-	file_offset = 0x4000
-	chip_offset = file_offset
-	mem_offset = 0x4000	# 0x0000 or 0x4000
-	mem_bank_size = 0x4000
-	mem_bank_start = 0
-	pad = 0xff
-	fix_crossing = False
-	verbose = False
-	
-	parser.add_option('-f', '--file-offset', dest='file_offset', default=file_offset, action='store', type='int', help=f'Offset in final file (default: 0x{file_offset:04X})')
-	parser.add_option('-c', '--chip-offset', dest='chip_offset', default=chip_offset, action='store', type='int', help=f'Offset in ROM chip (default: 0x{chip_offset:04X})')
-	parser.add_option('-m', '--mem-offset', dest='mem_offset', default=mem_offset, action='store', type='int', help=f'Offset in memory (default: 0x{mem_offset:04X})')
-	parser.add_option('-b', '--mem-bank-start', dest='mem_bank_start', default=mem_bank_start, action='store', type='int', help=f'Number of first memory bank to use (default: {mem_bank_start})')
-	parser.add_option('-s', '--mem-bank-size', dest='mem_bank_size', default=mem_bank_size, action='store', type='int', help=f'Size of each memory bank (default: 0x{mem_bank_size:04X})')
-	parser.add_option('-a', '--align-size', dest='align_size', default=align_size, action='store', type='int', help=f'Alignment/padding (default: 0x{align_size:04X})')
-	
-	#parser.add_option('-s', '--src-ofs', dest='src_ofs', default=0, action='store', type='int', help='Source file offset (default: 0)')
-	#parser.add_option('-n', '--src-num', dest='src_num', default=-1, action='store', type='int', help='Source data count (default: all)')
-	
-	parser.add_option('-p', '--pad', dest='pad', default=pad, action='store', type='int', help='Padding (default: %d / 0x%02X)' % (pad,pad))
-	parser.add_option('-x', '--fix-crossing', dest='fix_crossing', default=fix_crossing, action='store_true', help='Try keeping files from crossing bank bounds')
-	
-	#parser.add_option('-t', '--keep-trailing', dest='keep_trailing', default=not skip_trailing, action='store_true', help='Keep trailing 0xFF and 0x00')
-	#parser.add_option('-z', '--skip-zeros', dest='skip_zeros', default=skip_zeros, action='store_true', help='Skip zero bytes')
-	
-	parser.add_option('-r', '--file-src', action='store', type='string', dest='filename_src', help='Source ROM file to read')
-	parser.add_option('-w', '--file-dst', action='store', type='string', dest='filename_dst', help='Destination ROM file to write')
-	parser.add_option('-g', '--file-h', action='store', type='string', dest='filename_h', help='C-style .h file to generate')
-	
-	parser.add_option('-v', '--verbose', dest='verbose', default=verbose, action='store_true', help='Show verbose traffic')
-	
-	opt, args = parser.parse_args()
-	
-	file_offset = opt.file_offset	# 0x8000
-	chip_offset = opt.chip_offset	# 0x8000
-	mem_offset = opt.mem_offset	# 0x8000
-	mem_bank_size = opt.mem_bank_size	# 0x2000
-	mem_bank_start = opt.mem_bank_start	# 0
-	align_size = max(1, opt.align_size)	#0x2000
-	verbose = opt.verbose
-	fix_crossing = opt.fix_crossing
-	
-	filename_src = opt.filename_src
-	filename_dst = opt.filename_dst
-	filename_h = opt.filename_h
-	
-	# Positional
-	if len(args) == 0:
-		parser.print_help()
-		sys.exit(1)
-	
+	# Create an ROMFS instance to hold the infos
 	romfs = ROMFS(file_offset=file_offset, chip_offset=chip_offset, mem_offset=mem_offset, mem_bank_size=mem_bank_size, mem_bank_start=mem_bank_start)
 	
 	# Process file specs
 	if verbose: put('Gathering...')
-	for arg in args:
-		filespec = arg
+	for filespec in filespecs:
 		if verbose: put(f'	* Processing spec "{filespec}"...')
 		for filename in glob.glob(filespec):
 			filename_abs = os.path.abspath(filename)	# Resolve relative path elements
@@ -331,7 +290,7 @@ if __name__ == '__main__':
 	if filename_src is None:
 		#put(f'No source ROM file specified!')
 		#sys.exit(3)
-		put(f'No source ROM file specified. Using null.')
+		put(f'No source ROM file specified. Using empty buffer.')
 	else:
 		if verbose: put(f'Reading source file "{filename_src}"...')
 		with open(filename_src, 'rb') as h:
@@ -364,7 +323,69 @@ if __name__ == '__main__':
 	put(f'Writing output file "{filename_dst}": {len(data):,} bytes / {len(data)/1024:6.1f} KB...')
 	with open(filename_dst, 'wb') as h:
 		h.write(data)
+
+if __name__ == '__main__':
 	
-	if verbose: put('Done.')
+	parser = OptionParser(
+		description='Bundle binary files into your ROM',
+		usage='Usage: %prog [options] file_spec...'
+	)
+	
+	align_size = 1	#0x100	#0x1000	# 0x2000	# 0x4000
+	file_offset = 0x4000
+	chip_offset = file_offset
+	mem_offset = 0x4000	# 0x0000 or 0x4000
+	mem_bank_size = 0x4000
+	mem_bank_start = 0
+	pad = 0xff
+	fix_crossing = False
+	verbose = False
+	
+	parser.add_option('-f', '--file-offset', dest='file_offset', default=file_offset, action='store', type='int', help=f'Offset in final file (default: 0x{file_offset:04X})')
+	parser.add_option('-c', '--chip-offset', dest='chip_offset', default=chip_offset, action='store', type='int', help=f'Offset in ROM chip (default: 0x{chip_offset:04X})')
+	parser.add_option('-m', '--mem-offset', dest='mem_offset', default=mem_offset, action='store', type='int', help=f'Offset in memory (default: 0x{mem_offset:04X})')
+	parser.add_option('-b', '--mem-bank-start', dest='mem_bank_start', default=mem_bank_start, action='store', type='int', help=f'Number of first memory bank to use (default: {mem_bank_start})')
+	parser.add_option('-s', '--mem-bank-size', dest='mem_bank_size', default=mem_bank_size, action='store', type='int', help=f'Size of each memory bank (default: 0x{mem_bank_size:04X})')
+	parser.add_option('-a', '--align-size', dest='align_size', default=align_size, action='store', type='int', help=f'Alignment/padding (default: 0x{align_size:04X})')
+	
+	#parser.add_option('-s', '--src-ofs', dest='src_ofs', default=0, action='store', type='int', help='Source file offset (default: 0)')
+	#parser.add_option('-n', '--src-num', dest='src_num', default=-1, action='store', type='int', help='Source data count (default: all)')
+	
+	parser.add_option('-p', '--pad', dest='pad', default=pad, action='store', type='int', help='Padding (default: %d / 0x%02X)' % (pad,pad))
+	parser.add_option('-x', '--fix-crossing', dest='fix_crossing', default=fix_crossing, action='store_true', help='Try keeping files from crossing bank bounds')
+	
+	#parser.add_option('-t', '--keep-trailing', dest='keep_trailing', default=not skip_trailing, action='store_true', help='Keep trailing 0xFF and 0x00')
+	#parser.add_option('-z', '--skip-zeros', dest='skip_zeros', default=skip_zeros, action='store_true', help='Skip zero bytes')
+	
+	parser.add_option('-r', '--file-src', action='store', type='string', dest='filename_src', help='Source ROM file to read')
+	parser.add_option('-w', '--file-dst', action='store', type='string', dest='filename_dst', help='Destination ROM file to write')
+	parser.add_option('-g', '--file-h', action='store', type='string', dest='filename_h', help='C-style .h file to generate')
+	
+	parser.add_option('-v', '--verbose', dest='verbose', default=verbose, action='store_true', help='Show verbose traffic')
+	
+	opt, args = parser.parse_args()
+	
+	
+	# Positional
+	if len(args) == 0:
+		parser.print_help()
+		sys.exit(1)
+	
+	generate_rom(
+		filename_src = opt.filename_src,
+		filename_dst = opt.filename_dst,
+		filename_h = opt.filename_h,
+		filespecs = args,	# Positional arguments
+		file_offset = opt.file_offset,	# 0x8000
+		chip_offset = opt.chip_offset,	# 0x8000
+		mem_offset = opt.mem_offset,	# 0x8000
+		mem_bank_size = opt.mem_bank_size,	# 0x2000
+		mem_bank_start = opt.mem_bank_start,	# 0
+		align_size = max(1, opt.align_size),	#0x2000
+		pad = opt.pad,
+		verbose = opt.verbose,
+		fix_crossing = opt.fix_crossing
+	)
+	
 	
 

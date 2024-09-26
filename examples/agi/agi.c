@@ -1,6 +1,8 @@
 
 #include "agi.h"
 
+VERTYPE AGIVER;
+
 // from agimain.c:
 BOOL PLAYER_CONTROL, TEXT_MODE, WINDOW_OPEN, REFRESH_SCREEN, MENU_SET, INPUT_ENABLED, QUIT_FLAG;
 BOOL SOUND_ON, PIC_VISIBLE, PRI_VISIBLE, STATUS_VISIBLE, VOBJ_BLOCKING, WALK_HOLD;
@@ -21,8 +23,22 @@ int pushedScriptCount, scriptCount;
 U8 invObjRooms[MAX_IOBJ];
 
 
+// parse.c:
+U16 input[MAX_INPUT],inpos;
+int wordCount;
+BOOL MORE_MODE;
+char *wordStrings[MAX_INPUT];
+
+
 // more:
 
+bool MessageBox(char *t) {
+	printf(t);
+	return (getchar() == 10);
+}
+bool MessageBoxXY(char *t, byte x, byte y, byte w) {
+	return MessageBox(t);
+}
 void ErrorMessage(int msg, int param) {
 	printf_d(msg); printf(": "); printf_d(param);
 }

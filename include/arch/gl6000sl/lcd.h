@@ -144,8 +144,8 @@ void lcd_clear() {
 	for (y = 0; y < lcd_h; y++) {
 		//b = (y % 2 == 0) ? 0xaa : 0x55;	// 50% grey pattern
 		for(x = 0; x < (lcd_w / 8); x++) {
-			//*p++ = b;
-			//*p++ = 0x55;	// dithered grey?
+			//*p++ = b;	// dithered grey
+			//*p++ = 0x55;	// fine stripes
 			*p++ = 0x00;	// white
 			//*p++ = 0x80;	// stripes
 			//*p++ = 0xff;	// black

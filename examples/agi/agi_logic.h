@@ -8,13 +8,7 @@
  * For details: https://github.com/Davidebyzero/GBAGI.git
 */
 
-// Glue code
-#define U8 byte
-#define U16 word
-#define S16 signed int
-#define BOOL bool
-#define TRUE true
-#define FALSE false
+#include "agi.h"
 #define agi_logic_get_byte() vagi_res_read(curLogic->res_h)
 #define agi_logic_get_word() vagi_res_read_word(curLogic->res_h)
 #define agi_logic_skip(n) vagi_res_skip(curLogic->res_hn)
@@ -36,6 +30,12 @@ typedef struct {
 extern LOGIC *curLog,*log0;
 extern BOOL IF_RESULT;
 extern U16 logScan[256];
+
+// Helpers:
+U8 code_get();
+U16 code_get_word();
+void code_skip(U8 n);
+void code_term();
 
 char *GetMessage(LOGIC *log, int num);
 void InitLogicSystem(void);

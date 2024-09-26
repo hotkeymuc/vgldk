@@ -33,6 +33,8 @@ typedef struct {
 
 #define ISNUM(x) ((x>='0')&&(x<='9'))
 
+#define BUILD_DATE "2024/09/13"
+#define BUILD_VERSION	"2.11"
 
 
 #define CLIP(v,vmin,vmax) ((v >= vmax) ? vmax : ( (v <= vmin) ? vmin : v  ) )
@@ -51,6 +53,25 @@ typedef word uint16;
 #define PIC_MAXY			167
 #define PIC_SIZE			26880
 
+// from errmsg.h:
+enum {
+	ERR_BAD_CMD,
+	ERR_TEST_CMD,
+	ERR_PIC_CODE,
+	ERR_VOBJ_NUM,
+	ERR_VOBJ_VIEW,
+	ERR_VOBJ_LOOP,
+	ERR_VOBJ_CEL,
+	ERR_NO_VIEW,
+	ERR_VOBJ_NO_CEL,
+	ERR_PRINT,
+	ERR_NOMENUSET,
+	ERR_ADDMENUITEM,
+	ERR_FINDMENUITEM,
+	
+	TOTAL_ERRORS
+};
+
 
 // from gamedata.h:
 typedef struct {
@@ -58,6 +79,7 @@ typedef struct {
     U16 minor;
 } VERTYPE;
 extern VERTYPE AGIVER;
+
 
 // from agimain.h:
 extern BOOL PLAYER_CONTROL, TEXT_MODE, WINDOW_OPEN, REFRESH_SCREEN, MENU_SET, INPUT_ENABLED;
@@ -84,10 +106,20 @@ void ExecuteInvDialog(void);
 U8 FindObj(char *name);
 
 
+// parse.h:
+#define MAX_INPUT	10
+extern U16 input[MAX_INPUT],inpos;
+extern char *wordStrings[MAX_INPUT];
+extern int wordCount;
+
+
 // more:
+bool MessageBox(char *t);
+bool MessageBoxXY(char *t, byte x, byte y, byte w);
 void ErrorMessage(int msg, int param);
 void ErrorMessage2(int msg, int param1, int param2);
 void ErrorMessage3(int msg, int param1, int param2, int param3);
+
 U8 rand();
 
 #endif

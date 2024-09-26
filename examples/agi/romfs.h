@@ -13,6 +13,8 @@ These things must be defined outside:
 2024-09-16 Bernhard "HotKey" Slawik
 */
 
+//#define ROMFS_DEBUG	// Verbose output to stdout
+
 #define ROMFS_OK 0
 #define ROMFS_ERROR_EOF -1
 #define ROMFS_ERROR_NOT_FOUND -2
@@ -34,13 +36,16 @@ typedef struct {
 typedef struct {
 	bool active;	// Is something opened?
 	byte index;	// Which file is opened
+	
 	byte mem_bank;	// Current bank
 	word mem_ofs;	// Current offset inside bank
 	
 	byte mem_bank_start;	// For allowing rewind
-	byte mem_ofs_start;	// For allowing rewind
+	word mem_ofs_start;	// For allowing rewind
+	
 	byte mem_bank_end;	// For quicker EOF checking
-	byte mem_ofs_end;	// For quicker EOF checking
+	word mem_ofs_end;	// For quicker EOF checking
+	
 	word offset;	// Current linear offset @FIXME: 16 bit! Roll-over!
 } romfs_state_t;
 
@@ -56,6 +61,7 @@ int romfs_fclose(romfs_handle_t h);
 
 bool romfs_feof(romfs_handle_t h);
 word romfs_fpos(romfs_handle_t h);
+word romfs_fsize(romfs_handle_t h);
 void romfs_frewind(romfs_handle_t h);
 void romfs_fskip(romfs_handle_t h, word skip);
 void romfs_fskip_far(romfs_handle_t h, word skip_hi, word skip_lo);

@@ -4,7 +4,7 @@
 ;; vgl info: /z/data/_code/_c/z88dk.git/libsrc/_DEVELOPMENT/target/vgl
 
 	.module crt0
-	.globl	_main
+	;.globl	_main
 	.globl	_vgldk_init
 	
 	.area	_HEADER (ABS)

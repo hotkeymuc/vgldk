@@ -9,9 +9,11 @@ This is a test program for CP/M
 
 void main() {
 	
-	puts("Hello world");
+	//puts("Hello world");
+	//getchar();
 	
-	getchar();
+	puts("HELLORLD!");
+	//getchar();
 	
 	exit();
 }

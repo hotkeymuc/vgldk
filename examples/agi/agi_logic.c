@@ -20,9 +20,12 @@
 //#include "input.h"
 //#include "screen.h"
 //#include "picture.h"
-
+#include "agi.h"
 #include "agi_logic.h"
 #include "agi_commands.h"
+
+#include "agi_view.h"
+#include "agi_pic.h"
 
 
 LOGIC *curLog,*log0;
@@ -34,8 +37,24 @@ BOOL IF_RESULT;
 
 //U8 *code;	//@TODO: We need to re-direct this to agi_res_read()
 word code_ofs;
+U16 logScan[256];	// Stores offset inside given logic
 
-U16 logScan[256];	// What is this?
+
+// Helpers:
+U8 code_get() {
+	return vagi_res_read(curLog->res_h);
+}
+U16 code_get_word() {
+	return vagi_res_read_word(curLog->res_h);
+}
+void code_skip(U8 n) {
+	vagi_res_skip(curLog->res_h, n);
+}
+void code_term() {
+	// We need to signal that this logic is done (original: "code == NULL")
+	vagi_res_close(curLog->res_h);
+}
+
 
 
 char *GetMessage(LOGIC *log, int num) {                                             
@@ -51,7 +70,7 @@ char *GetMessage(LOGIC *log, int num) {
 void InitLogicSystem() {
 	curLog 			= NULL;
 	log0			= NULL;
-	memset(logScan,0,sizeof(logScan));
+	memset(logScan, 0, sizeof(logScan));
 }
 
 
@@ -184,7 +203,7 @@ void ExecuteIF() {
 	
 	for(;;) {
 		//if((op = *code++) >= 0xFC) {
-		if((op = vagi_res_read(curLog->res_h)) >= 0xFC) {
+		if((op = code_get()) >= 0xFC) {
 			if(op == 0xFC) {
 				if(orCnt) {
 					orCnt = 0;
@@ -243,10 +262,10 @@ void ExecuteIF() {
 void SkipORTrue() {
 	register unsigned int op;
 	//while((op = *code++) != 0xFC)
-	while((op = vagi_res_read(curLog->res_h)) != 0xFC) {
+	while((op = code_get()) != 0xFC) {
 		if(op <= 0xFC) {
 			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
-			if (op == 0xe)	vagi_res_skip(curLog->res_h, vagi_res_read(curLog->res_h) << 1);
+			if (op == 0xe)	vagi_res_skip(curLog->res_h, code_get() << 1);
 			else			vagi_res_skip(curLog->res_h, testCommands[op].nParams);
 		}
 	}
@@ -256,10 +275,10 @@ void SkipORTrue() {
 void SkipANDFalse() {
 	register unsigned int op;
 	//while((op = *code++) != 0xFF)
-	while((op = vagi_res_read(curLog->res_h)) != 0xFF) {
+	while((op = code_get()) != 0xFF) {
 		if(op < 0xFC) {
 			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
-			if (op == 0xe)	vagi_res_skip(curLog->res_h, vagi_res_read(curLog->res_h) << 1);
+			if (op == 0xe)	vagi_res_skip(curLog->res_h, code_get() << 1);
 			else			vagi_res_skip(curLog->res_h, testCommands[op].nParams);
 		}
 	}
@@ -271,25 +290,32 @@ void SkipANDFalse() {
 
 U8 *NewRoom(U8 num) {
 	VOBJ *vObj;
+	int i;
 	
-	for (vObj=ViewObjs; vObj<&ViewObjs[MAX_VOBJ]; vObj++) {
+	//for (vObj=ViewObjs; vObj<&ViewObjs[MAX_VOBJ]; vObj++) {
+	for (i = 0; i < MAX_VOBJ; i++) {
+		vObj = &ViewObjs[i];
 		vObj->flags			&= ~(oANIMATE|oDRAWN);
 		vObj->flags			|= oUPDATE;
 		vObj->pCel			= NULL;
 		vObj->pView			= NULL;
 		vObj->blit			= NULL;
-		vObj->stepTime		=
-		vObj->stepCount		=
-		vObj->cycleCount	=
-		vObj->cycleTime		=
+		vObj->stepTime		= 1;
+		vObj->stepCount		= 1;
+		vObj->cycleCount	= 1;
+		vObj->cycleTime		= 1;
 		vObj->stepSize		= 1;
 	}
+	
+	//@TODO: Implement
+	/*
 	
 	StopSound();
 	ClearControllers();
 	
 	pPView		= pViews;
 	pOverlay	= overlays;
+	*/
 	
 	PLAYER_CONTROL	= TRUE;
 	VOBJ_BLOCKING	= FALSE;
@@ -320,7 +346,10 @@ U8 *NewRoom(U8 num) {
 	SetFlag(fNEWROOM);
 	
 	ClearControllers();
+	//@TODO: Implement
+	/*
 	WriteStatusLine();
+	*/
 	
 	return NULL;
 }

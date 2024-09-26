@@ -24,19 +24,23 @@ char cmd_arg[MAX_INPUT];
 #define MONITOR_SERIAL	// Include serial functions
 	#define MONITOR_SERIAL_AUTOSTART	// Make softserial take over STDIO at startup
 	
-	//#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use ASM-based softserial (custom for each architecture)
+	#define MONITOR_SERIAL_USE_SOFTSERIAL	// Use ASM-based softserial (custom for each architecture)
 	
-	#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart (currently only GL4000/6000)
+	//#define MONITOR_SERIAL_USE_SOFTUART	// Use new C-based softuart (currently only GL4000/6000)
 	//#define SOFTUART_BAUD 9600	// Solid and stable
-	#define SOFTUART_BAUD 19200	// Experimental
+	//#define SOFTUART_BAUD 19200	// Experimental
 
 #define MONITOR_FILES	// Include file system stuff
 	//#define MONITOR_FILES_FS_NULL	// Include FS driver for NULL filesystem
 	//#define MONITOR_FILES_FS_INTERNAL	// Include FS driver for "internal" ROM data
 	//#define MONITOR_FILES_FS_PARABUDDY	// Include FS driver for externally mounted FS
+	#define MONITOR_FILES_FS_HOST	// Include FS driver for externally mounted FS via host.py
+	
+	#define MONITOR_FILES_ROOT_FS fs_root	// Use "fs_root" as the root filesystem (allows different fs's to be mounted)
+	//#define MONITOR_FILES_ROOT_FS fs_internal	// Use "fs_internal" as the root filesystem
 
 // Commands to include (affects how big the binary gets)
-//#define MONITOR_CMD_BEEP
+#define MONITOR_CMD_BEEP
 //#define MONITOR_CMD_CLS
 #define MONITOR_CMD_DUMP
 #define MONITOR_CMD_ECHO
@@ -49,8 +53,8 @@ char cmd_arg[MAX_INPUT];
 #define MONITOR_CMD_CALL
 #define MONITOR_CMD_PORT
 //#define MONITOR_CMD_VER	// ~54 bytes
-//#define MONITOR_CMD_LOAD	// Requires MONITOR_FILES
-//#define MONITOR_CMD_RUN	// Requires MONITOR_CMD_LOAD and MONITOR_CMD_CALL
+#define MONITOR_CMD_LOAD	// Requires MONITOR_FILES
+#define MONITOR_CMD_RUN	// Requires MONITOR_CMD_LOAD and MONITOR_CMD_CALL
 
 
 // Definitions
@@ -175,7 +179,7 @@ int cmd_beep(int argc, char *argv[]) {
 	if (argc <= 1) {
 		beep();
 	} else {
-		vgl_sound_note(atoi(argv[1]), (argc > 2) ? atoi(argv[2]) : 500);
+		sound_note(atoi(argv[1]), (argc > 2) ? atoi(argv[2]) : 500);
 	}
 	return ERR_OK;
 }
@@ -526,14 +530,14 @@ int cmd_ver(int argc, char *argv[]) {
 	
 	// File systems
 	#ifdef MONITOR_FILES_FS_NULL
-		#include <fs_null.h>
+		#include <fileio/fs_null.h>
 	#endif
 	
 	#ifdef MONITOR_FILES_FS_INTERNAL
 		#include "../app/out/app_hello.app.0xc800.bin.h"
 		#define FS_INTERNAL_NAME "hello"
 		#define FS_INTERNAL_DATA APP_HELLO_DATA
-		#include <fs_internal.h>
+		#include <fileio/fs_internal.h>
 	#endif
 	
 	#ifdef MONITOR_FILES_FS_PARABUDDY
@@ -542,39 +546,61 @@ int cmd_ver(int argc, char *argv[]) {
 		#define PB_USE_SOFTUART	// For running on real hardware
 		//#define PB_DEBUG_FRAMES
 		//#define PB_DEBUG_PROTOCOL_ERRORS
-		#include <parabuddy.h>
-		#include <fs_parabuddy.h>
+		#include <driver/parabuddy.h>
+		#include <fileio/fs_parabuddy.h>
+	#endif
+	
+	#ifdef MONITOR_FILES_FS_HOST
+		//#define HOST_DRIVER_MAME	// For testing in MAME
+		#define HOST_DRIVER_SOFTSERIAL	// For running on real hardware
+		//#define HOST_DRIVER_SOFTUART	// For running on real hardware
+		#define HOST_PROTOCOL_BINARY
+		//#define HOST_PROTOCOL_BINARY_SAFE
+		//#define HOST_PROTOCOL_HEX
+		//#include <driver/host.h>
+		#include <fileio/fs_host.h>
 	#endif
 	
 	// Define mounts for the root filesystem (automatically, as macros)
 	#ifdef __FS_NULL_H
-	  #define FS_ROOT_MOUNT__NUL {"nul", &fs_null},
+		#define FS_ROOT_MOUNT__NUL {"nul", &fs_null},
 	#else
-	  #define FS_ROOT_MOUNT__NUL
+		#define FS_ROOT_MOUNT__NUL
 	#endif
+	
 	#ifdef __FS_INTERNAL_H
-	  #define FS_ROOT_MOUNT__INT  {"int", &fs_internal},
+		#define FS_ROOT_MOUNT__INT  {"int", &fs_internal},
 	#else
-	  #define FS_ROOT_MOUNT__INT
+		#define FS_ROOT_MOUNT__INT
 	#endif
+	
 	#ifdef __FS_PARABUDDY_H
-	  #define FS_ROOT_MOUNT__PB  {"pb", &fs_parabuddy},
+		#define FS_ROOT_MOUNT__PB  {"pb", &fs_parabuddy},
 	#else
-	  #define FS_ROOT_MOUNT__PB
+		#define FS_ROOT_MOUNT__PB
+	#endif
+	
+	#ifdef __FS_HOST_H
+		#define FS_ROOT_MOUNT__HOST  {"host", &fs_host},
+	#else
+		#define FS_ROOT_MOUNT__HOST
 	#endif
 	
 	// Create the full list of available file system mounts
 	#define FS_ROOT_MOUNTS {\
-		FS_ROOT_MOUNT__NUL \
-		FS_ROOT_MOUNT__INT \
-		FS_ROOT_MOUNT__PB  \
+		FS_ROOT_MOUNT__NUL  \
+		FS_ROOT_MOUNT__INT  \
+		FS_ROOT_MOUNT__PB   \
+		FS_ROOT_MOUNT__HOST \
 	}
-	#include <fs_root.h>
+	#include <fileio/fs_root.h>
 	
 	// Specify which FS to use as the root (usually fs_root, but can be fs_int to save space)
 	//#define FILEIO_ROOT_FS fs_internal
-	#define FILEIO_ROOT_FS fs_root
-	#include <fileio.h>
+	//#define FILEIO_ROOT_FS fs_root
+	#define FILEIO_ROOT_FS MONITOR_FILES_ROOT_FS
+	
+	#include <fileio/fileio.h>
 	
 	int cmd_files_cd(int argc, char *argv[]) {
 		

@@ -44,12 +44,19 @@
 	#include <hex.h>	// provides printf_x2
 #endif
 
+// Glue
+
 #include <stringmin.h>	// for memcpy()
+void strncpy(char *dst, char *src, byte maxl) {
+	byte l = strlen(src);
+	memcpy(dst, src, (l < maxl) ? l : maxl);
+}
 
 typedef byte bool;
 typedef byte uint8;
 typedef int int16;
 typedef word uint16;
+
 
 
 #ifdef VAGI_MOUSE
@@ -101,8 +108,14 @@ byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which type of
 #include "vagi_res.h"	// This handles reading from AGI resources as if they were files
 
 // The AGI specific fun starts here:
+#include "agi.h"
+#include "agi.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
+
 #include "agi_pic.h"
 #include "agi_pic.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
+
+#include "agi_view.h"
+#include "agi_view.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
 
 
 
@@ -110,7 +123,8 @@ bool render_frame_agi(word pic_num, byte drawing_step) {
 	// Draw one AGI PIC (either its visual or priority data)
 	
 	// Mount our cartridge ROM to address 0x4000 (data must be inside the ROM binary at position 0x4000 * n)
-	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
+	//bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
+	//bank_type_port = bank_type_port | 0x04;	// Switch address region 0x8000-0xBFFF to use cartridge ROM
 	//bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
 	//dump(0x4000, 16);
 	
@@ -626,6 +640,14 @@ void test_draw_combined() {
 */
 
 
+#include "agi_vars.h"
+#include "agi_vars.c"	//@FIXME: Makefile only compiles the main .C file
+
+#include "agi_commands.h"
+#include "agi_cmd_test.c"	//@FIXME: Makefile only compiles the main .C file
+#include "agi_cmd_agi.c"	//@FIXME: Makefile only compiles the main .C file
+#include "agi_commands.c"	//@FIXME: Makefile only compiles the main .C file
+
 #include "agi_logic.h"
 #include "agi_logic.c"	//@FIXME: Makefile only compiles the main .C file
 
@@ -636,15 +658,17 @@ void test_logic() {
 }
 
 
-
+// Main entry point
 #if VGLDK_SERIES == 0
 // app
 int main(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
+	
 #else
-// regular cart ROM does not provide command line args
+// regular ROM does not provide command line args
 void main() __naked {
+	
 #endif
 	
 	byte running = 1;
@@ -652,6 +676,9 @@ void main() __naked {
 	//word i;
 	
 	printf("VAGI\n");
+	
+	AGIVER.major = 2;
+	AGIVER.minor = 0;
 	
 	vagi_res_init();	// calls romfs_init()
 	

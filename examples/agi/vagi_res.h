@@ -9,16 +9,36 @@ It re-directs accesses to ROM FS, which stores the raw files.
 */
 
 // ROM FS:
-#define R_MEM_OFFSET 0x4000	// Where to find the banked memory area
-#define R_BANK_SIZE 0x4000	// How big one bank is
-#define romfs_switch_bank(bank) bank_0x4000_port = (0x20 | bank)	// and: bank_type_port = bank_type_port | 0x02
+//#define ROMFS_DEBUG	// Verbose ROM access output to stdout
+//#define R_MEM_OFFSET 0x4000	// Where to find the banked memory area
+//#define R_BANK_SIZE 0x4000	// How big one bank is
 
-#define VAGI_RES_ERROR_SIGNATURE_ERROR -5
-#define VAGI_RES_ERROR_VOLUME_ERROR -6
+// At 0x4000:
+//#define romfs_switch_bank(bank) bank_0x4000_port = (0x20 | bank)	// and: bank_type_port = bank_type_port | 0x02
+// At 0x8000:
+//#define romfs_switch_bank(bank) bank_0x8000_port = (0x20 | bank)	// and: bank_type_port = bank_type_port | 0x04
+void inline romfs_switch_bank(byte bank) {
+	#ifdef ROMFS_DEBUG
+		printf("romfs_switch_bank("); printf_d(bank); printf(")\n");
+	#endif
+	
+	// if R_MEM_OFFSET = 0x4000:
+	//bank_type_port = bank_type_port | 0x02;	// Enable external cart on segment 0x4000
+	//bank_0x4000_port = (0x20 | bank);	// Map desired chip segment to memory segment 0x4000
+	
+	// if R_MEM_OFFSET = 0x8000:
+	bank_type_port = bank_type_port | 0x04;	// Enable external cart on segment 0x8000
+	bank_0x8000_port = (0x20 | bank);	// Map desired chip segment to memory segment 0x8000
+}
 
 #include "romfs.h"
 #include "romfs_data.h"
 #include "romfs.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
+
+
+#define VAGI_RES_ERROR_SIGNATURE_ERROR -5
+#define VAGI_RES_ERROR_VOLUME_ERROR -6
+
 
 enum AGI_RES_KIND {
 	AGI_RES_KIND_LOG,
@@ -113,9 +133,12 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	state->offset = 0;
 	
 	// Mount our cartridge ROM to address 0x4000 (data must be inside the ROM binary at position 0x4000 * n)
-	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
-	//bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
+	//bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
+	// bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
 	
+	// Mount cartridge at cartridge port 0x8000
+	//bank_type_port = bank_type_port | 0x04;	// Switch address region 0x8000-0xBFFF to use cartridge ROM
+	//bank_0x8000_port = 0x20 | 0;	// Mount ROM segment n=0 (offset 0x4000 * n) to address 0x8000
 	
 	// Open directory for the given kind (LOG, PIC, SND, VIEW)
 	//printf("Opening DIR...");
@@ -125,6 +148,10 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 		printf("DIR err=-"); printf_d(-rh); putchar('\n');
 		//return 0;
 		return rh;
+	}
+	
+	if (num*3 > romfs_fsize(rh)) {
+		return ROMFS_ERROR_EOF;
 	}
 	
 	// Seek to given entry number (3 bytes each)
@@ -233,6 +260,7 @@ word vagi_res_read_word(vagi_res_handle_t h) {
 bool vagi_res_eof(vagi_res_handle_t h) {
 	// End-of-resource (agi_res_size) != R_FILES[].size, because a RES is just a part of a big VOL file
 	//return romfs_feof(agi_res_h);
+	if (!vagi_res_states[h].active) return true;
 	return vagi_res_states[h].offset >= vagi_res_states[h].res_size;
 }
 

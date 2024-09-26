@@ -33,6 +33,7 @@ typedef struct {
 
 // Statically define the known FS's
 const fs_root_mount_t fs_root_mounts[] = FS_ROOT_MOUNTS;
+
 #define FS_ROOT_MOUNTS_COUNT (sizeof(fs_root_mounts) / sizeof(fs_root_mount_t))
 
 

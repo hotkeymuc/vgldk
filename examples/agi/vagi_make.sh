@@ -1,5 +1,12 @@
 #!/bin/sh
+#
+# Note: Since the VAGI runtime will not fit into the cart segment (16KB at 0x8000-0xBFFF) we will have to create a system ROM
+#
+# ! This file has been superceeded by "vagi_make.py" !
+#
 # This script compiles the VAGI cartridge, then it copies resources to the final binary and starts the emulator.
+#
+
 
 GAMES_PATH=/z/apps/_games/_SCUMM
 #GAME_ID=KQ1

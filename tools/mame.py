@@ -68,7 +68,7 @@ def create_sysrom_zip(rom_data, mame_sys=MAME_EMUSYS, zip_filename=None):
 	elif mame_sys == 'gl6000sl': output_file_sysrom = '27-5894-01'
 	elif mame_sys == 'gl7007sl': output_file_sysrom = '27-6060-00'
 	else:
-		put('At the moment, only generation of gl4000/gl6000sl/gl7007sl ROMs is implemented.')
+		put('At the moment, only generation of gl4000/gl6000sl/gl7007sl ROMs is implemented, not "%s".' % mame_sys)
 		sys.exit(1)
 	
 	# Chose a default filename if none given
