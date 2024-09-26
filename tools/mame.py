@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-MAME runner
+MAME runner and tools
 
 Starts MAME and allows interaction via STDIO
 (see mame_pc2000.cpp_patched.txt)
@@ -28,6 +28,9 @@ import time
 import subprocess
 from _thread import start_new_thread
 
+import zipfile	# For creating MAME system ROM zip file
+import datetime	# For nice date
+
 def put(txt):
 	print('mame: %s' % txt)
 
@@ -53,6 +56,49 @@ def str_hex(s):
 
 def str_binhex(b):
 	return ', '.join(['%02X'%v for v in b])
+
+
+def create_sysrom_zip(rom_data, mame_sys=MAME_EMUSYS, zip_filename=None):
+	"""Create a MAME compatible system ROM file (zip file)"""
+	
+	# This filename is specific to each MAME system!
+	#if   mame_sys == 'pc1000'  : output_file_sysrom = '27-'
+	#if   mame_sys == 'gl2000'  : output_file_sysrom = '27-'
+	if   mame_sys == 'gl4000'  : output_file_sysrom = '27-5480-00'
+	elif mame_sys == 'gl6000sl': output_file_sysrom = '27-5894-01'
+	elif mame_sys == 'gl7007sl': output_file_sysrom = '27-6060-00'
+	else:
+		put('At the moment, only generation of gl4000/gl6000sl/gl7007sl ROMs is implemented.')
+		sys.exit(1)
+	
+	# Chose a default filename if none given
+	if zip_filename is None:
+		#zip_filename = '%s/%s.zip' % (MAME_ROMPATH, mame_sys)
+		zip_filename = './%s.zip' % mame_sys
+	
+	# Generate the system ROM .zip file
+	put('Generating systom zip file "%s"...' % zip_filename)
+	with zipfile.ZipFile(zip_filename, 'w') as z:
+		
+		# Write dynamic info file
+		with z.open('_this_is_a_fake_system.txt', 'w') as h:
+			h.write(b'This is a fake system image created by VGLDK mame.py.\n')
+			
+			now = datetime.datetime.now()
+			h.write(b'File created by %b on %b.' % (bytes(__file__, 'ascii'), bytes(str(now), 'ascii')))
+		
+		# Write properly named system ROM (must match machine specific name)
+		with z.open(output_file_sysrom, 'w') as h_sysrom:
+			#h_sysrom.write(cpm_data)	# Write the whole address space to sysrom
+			
+			# Copy data to system ROM file
+			h_sysrom.write(rom_data)
+			#
+		#
+	#
+
+
+
 
 class MAME:
 	"Host implementation when using MAME"
