@@ -31,8 +31,10 @@ Modified memory layout for CP/M:
 	C000 - DFFF	Internal RAM 0000 - 1FFF
 	E000 - FFFF	Internal RAM 0000 - 1FFF copy / unused
 
+! GL6000SL/GL7007SL may be able to switch off system ROM at runtime!
+! The following instructions are for GL4000 which has a fixed system ROM
 
-How to start up CP/M:
+How to start up CP/M (on GL4000):
 	New Method: Boot stock system and swap ROM/RAM at run-time:
 		* Enable internal ROM (stock configuration)
 		* Insert the (E)EPROM cartridge containing the CP/M code
@@ -95,7 +97,7 @@ BDOS_MOUNTS = [
 import time
 import os	# For running files at the command line
 import datetime	# For nice date
-import zipfile	# For creating MAME system ROM zip file
+
 
 # Import VGLDK tools
 import sys
@@ -103,6 +105,7 @@ sys.path.append('../../tools')
 from rel2app import *
 import calcsize
 import sdcc	# for custom compilation
+import mame	# for creating MAME system ROMs
 
 # Import MONITOR tools for uploading output to real hardware
 sys.path.append('../monitor')
@@ -242,7 +245,6 @@ def cpm_make():
 			#'%s/cpm_crt0.s' % src_path
 			'%s/cpm_crt0_%d.s' % (src_path, vgldk_series)
 		],
-		#crt_rel_file = '%s/cpm_crt0.rel' % out_path,
 		crt_rel_file = '%s/cpm_crt0.rel' % out_path,
 		
 		source_files = [
@@ -454,19 +456,10 @@ def cpm_make():
 	if GENERATE_MAME_ROM:
 		### Create MAME sys ROM for emulation
 		put('Creating MAME sys ROM for emulation...')
-		if vgldk_series == 4000:
-			mame_sys = 'gl4000'	# MAME system name
-			output_file_sysrom = '27-5480-00'	# This filename is specific to each MAME system!
-			output_file_sysromzip = '%s/%s.zip' % (rom_out_path, mame_sys)
-		elif vgldk_series == 6000:
-			mame_sys = 'gl6000sl'	# MAME system name
-			output_file_sysrom = '27-5894-01'	# This filename is specific to each MAME system!
-			#mame_sys = 'gl7007sl'	# MAME system name
-			#output_file_sysrom = '27-6060-00'	# This filename is specific to each MAME system!
-			output_file_sysromzip = '%s/%s.zip' % (rom_out_path, mame_sys)
-		else:
-			put('At the moment, only generation of gl4000/gl6000sl ROMs is implemented.')
-			sys.exit(1)
+		
+		# Get CP/M RAM (will be the system ROM data)
+		with open(cpm_ram_filename, 'rb') as h_rom:
+			data_sysrom = h_rom.read()
 		
 		# Make sure ROMs directory exists
 		if not os.path.isdir(rom_out_path):
@@ -474,28 +467,21 @@ def cpm_make():
 			os.mkdir(MAME_ROMS_DIR)
 			put('Don\'t forget to copy the required additional driver ROMs (e.g. hd44780_a00.zip) there, too!') 
 		
+		# Create the ZIP file
+		if   vgldk_series == 4000: mame_sys = 'gl4000'	# MAME system name
+		elif vgldk_series == 6000: mame_sys = 'gl6000sl'	# MAME system name
+		elif vgldk_series == 7007: mame_sys = 'gl7007sl'	# MAME system name
+		else:
+			put('At the moment, only generation of gl4000/gl6000sl/gl7007sl ROMs is implemented.')
+			sys.exit(1)
 		
-		# Generate the system ROM .zip file
-		put('Generating zip file "%s"...' % output_file_sysromzip)
-		with zipfile.ZipFile(output_file_sysromzip, 'w') as z:
-			
-			# Write dynamic info file
-			with z.open('_this_is_cpm.txt', 'w') as h:
-				h.write(b'This is a fake system image to emulate a bootstrapped CP/M SRAM mounted in system ROM area.\n')
-				
-				now = datetime.datetime.now()
-				h.write(b'File created by %b on %b.' % (bytes(__file__, 'ascii'), bytes(str(now), 'ascii')))
-			
-			# Write properly named system ROM (must match machine specific name)
-			with z.open(output_file_sysrom, 'w') as h_sysrom:
-				#h_sysrom.write(cpm_data)	# Write the whole address space to sysrom
-				
-				# Copy CP/M RAM to system ROM file
-				with open(cpm_ram_filename, 'rb') as h_rom:
-					h_sysrom.write(h_rom.read())
-				#
-			#
-		#
+		output_file_sysromzip = '%s/%s.zip' % (rom_out_path, mame_sys)
+		put('Creating MAME system ROM zip at "%s"...' % output_file_sysromzip)
+		mame.create_sysrom_zip(
+			rom_data=data_sysrom,
+			mame_sys=mame_sys,
+			zip_filename=output_file_sysromzip
+		)
 	#
 	
 	if EMULATE_IN_MAME:
@@ -566,6 +552,7 @@ def cpm_make():
 		host.run()
 	#
 #
+
 
 
 
