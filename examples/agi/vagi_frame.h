@@ -59,6 +59,7 @@
 		memset((byte *)AGI_FRAME_ADDR, b, (AGI_FRAME_HEIGHT * (AGI_FRAME_WIDTH >> 1)) - 0x2000);	// Clear remainder inside second buffer
 	}
 	
+	//void inline frame_banked_set_pixel_4bit(byte x, byte y, byte c) {
 	void frame_banked_set_pixel_4bit(byte x, byte y, byte c) {
 		// Set 4 bit color value of banked buffer at 0xc000
 		
@@ -85,6 +86,7 @@
 		else				*(byte *)a = (*(byte *)a & 0x0f) | (c << 4);
 	}
 	
+	//byte inline frame_banked_get_pixel_4bit(byte x, byte y) {
 	byte frame_banked_get_pixel_4bit(byte x, byte y) {
 		// Get 4 bit color value from banked buffer at 0xc000
 		

@@ -27,7 +27,7 @@ void inline romfs_switch_bank(byte bank) {
 	//bank_0x4000_port = (0x20 | bank);	// Map desired chip segment to memory segment 0x4000
 	
 	// if R_MEM_OFFSET = 0x8000:
-	bank_type_port = bank_type_port | 0x04;	// Enable external cart on segment 0x8000
+	//bank_type_port = bank_type_port | 0x04;	// Enable external cart on segment 0x8000
 	bank_0x8000_port = (0x20 | bank);	// Map desired chip segment to memory segment 0x8000
 }
 
@@ -35,9 +35,11 @@ void inline romfs_switch_bank(byte bank) {
 #include "romfs_data.h"
 #include "romfs.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
 
+#define VAGI_RES_MAX_HANDLES 6
 
-#define VAGI_RES_ERROR_SIGNATURE_ERROR -5
-#define VAGI_RES_ERROR_VOLUME_ERROR -6
+#define VAGI_RES_ERROR_SIGNATURE_ERROR -11
+#define VAGI_RES_ERROR_VOLUME_ERROR -12
+#define VAGI_RES_ERROR_OUT_OF_HANDLES -13
 
 
 enum AGI_RES_KIND {
@@ -72,7 +74,6 @@ static const byte AGI_VOL_FILES[4] = {
 
 
 // State
-#define VAGI_RES_MAX_HANDLES ROMFS_MAX_HANDLES	//4
 
 typedef struct {
 	bool active;	// Is something opened?
@@ -105,25 +106,17 @@ void vagi_res_init() {
 
 vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	byte b1, b2, b3;
-	//byte res_vol, res_ofs_hi;
-	//word res_ofs;
-	/*
-	romfs_handle_t h;
-	// Close previous
-	if (romfs_factive(agi_res_h)) {
-		romfs_fclose(agi_res_h);
-	}
-	*/
 	
 	// Find a free handle/state
 	vagi_res_handle_t h;
 	for (h = 0; h < VAGI_RES_MAX_HANDLES; h++) {
-		if (!vagi_res_states[h].active) break;
+		if (vagi_res_states[h].active == false) break;
 	}
 	if (h >= VAGI_RES_MAX_HANDLES) {
 		// No free handle available!
-		return ROMFS_ERROR_OUT_OF_HANDLES;
+		return VAGI_RES_ERROR_OUT_OF_HANDLES;
 	}
+	
 	vagi_res_state_t *state = &vagi_res_states[h];
 	state->active = false;	// Set to true later on, if everthing works out
 	//state->kind = kind;	// We actually don't need to access that after open
@@ -164,18 +157,19 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	romfs_fclose(rh);	// We don't need to access the DIR after that and can re-use that romfs state
 	
 	// Extract volume and offset
+	if (b1 & 0x80) {
+		// MSB set = compressed PIC resource (see GBAGI:gbarom/decompress.c:PIC_expand)
+	}
 	state->res_vol = (b1 & 0xf0) >> 4;
 	state->res_ofs_hi = (b1 & 0x0f);	// << 16
 	state->res_ofs = (b2 << 8) | b3;
-	
 	//printf("vol="); printf_d(res_vol); printf(", ofs="); printf_x2(res_ofs_hi); printf_x2(res_ofs >> 8); printf_x2(res_ofs & 0xff); printf("\n");
 	
 	// Open volume file (assume the VOL.* files are located sequencially)
 	//printf("Opening VOL...");
-	//h = romfs_fopen(R_VOL_0 + res_vol);
 	rh = romfs_fopen(AGI_VOL_FILES[state->res_vol]);
 	if (rh < 0) {
-		printf("VOL."); printf_d(state->res_vol); printf(": err=-"); printf_d(-rh); putchar('\n');
+		printf("VOL."); printf_d(state->res_vol); printf(" err=-"); printf_d(-rh); putchar('\n');
 		//return 0;
 		return rh;
 	}
@@ -225,24 +219,37 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 //#define vagi_res_skip(n) romfs_fskip(agi_res_h, n)
 
 void vagi_res_close(vagi_res_handle_t h) {
+	// Close underlying romfs handle
 	romfs_fclose(vagi_res_states[h].romfs_handle);
+	// Mark handle as free
 	vagi_res_states[h].active = false;
 }
-byte vagi_res_peek(vagi_res_handle_t h) {
+byte *vagi_res_point(vagi_res_handle_t h) {
+	// Return a pointer (not banking-safe!)
+	return romfs_fpoint(vagi_res_states[h].romfs_handle);
+}
+byte inline vagi_res_peek(vagi_res_handle_t h) {
 	return romfs_fpeek(vagi_res_states[h].romfs_handle);
 }
-void vagi_res_skip(vagi_res_handle_t h, word n) {
-	romfs_fskip(vagi_res_states[h].romfs_handle, n);
+void inline vagi_res_skip(vagi_res_handle_t h, word n) {
+	vagi_res_state_t *state = &vagi_res_states[h];
+	romfs_fskip(state->romfs_handle, n);
+	state->offset += n;
 }
 void vagi_res_seek_to(vagi_res_handle_t h, word n) {
-	romfs_frewind(vagi_res_states[h].romfs_handle);
-	romfs_fskip_far(vagi_res_states[h].romfs_handle, vagi_res_states[h].res_ofs_hi, vagi_res_states[h].res_ofs);
-	vagi_res_states[h].offset = n;
-	romfs_fskip(vagi_res_states[h].romfs_handle, 5);	// Skip resource header
-	romfs_fskip(vagi_res_states[h].romfs_handle, n);	// Skip into data
+	vagi_res_state_t *state = &vagi_res_states[h];
+	
+	romfs_frewind(state->romfs_handle);
+	romfs_fskip_far(state->romfs_handle, state->res_ofs_hi, state->res_ofs);
+	romfs_fskip(state->romfs_handle, 5);	// Skip resource header (0x1234, vol, sizeLO, sizeHI)
+	romfs_fskip(state->romfs_handle, n);	// Skip into data
+	state->offset = n;
 }
-word vagi_res_tell(vagi_res_handle_t h) {
+word inline vagi_res_tell(vagi_res_handle_t h) {
 	return vagi_res_states[h].offset;
+}
+word inline vagi_res_size(vagi_res_handle_t h) {
+	return vagi_res_states[h].res_size;
 }
 
 int vagi_res_read(vagi_res_handle_t h) {

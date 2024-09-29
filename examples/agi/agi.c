@@ -1,6 +1,8 @@
 
 #include "agi.h"
 
+#include "agi_vars.h"	// To show status of variables
+
 VERTYPE AGIVER;
 
 // from agimain.c:
@@ -32,21 +34,43 @@ char *wordStrings[MAX_INPUT];
 
 // more:
 
+void dump_vars() {
+	//for(int i = 0; i < MAX_VARS; i++) {
+	printf("vars:");
+	for(int i = 0; i < 20; i++) {
+		printf_x2(vars[i]);
+	}
+	printf("\n");
+}
+void WriteStatusLine() {
+	if (!STATUS_VISIBLE) return;
+	printf("STATS:");
+	dump_vars();
+}
+
 bool MessageBox(char *t) {
+	printf("MessageBox: [");
 	printf(t);
+	printf("]\n");
 	return (getchar() == 10);
 }
 bool MessageBoxXY(char *t, byte x, byte y, byte w) {
 	return MessageBox(t);
 }
 void ErrorMessage(int msg, int param) {
+	printf("ErrorMessage:");
 	printf_d(msg); printf(": "); printf_d(param);
+	getchar();
 }
 void ErrorMessage2(int msg, int param1, int param2) {
+	printf("ErrorMessage:");
 	printf_d(msg); printf(": "); printf_d(param1); printf(", "); printf_d(param2);
+	getchar();
 }
 void ErrorMessage3(int msg, int param1, int param2, int param3) {
+	printf("ErrorMessage:");
 	printf_d(msg); printf(": "); printf_d(param1); printf(", "); printf_d(param2); printf(", "); printf_d(param3);
+	getchar();
 }
 
 #define STATE_BYTES 7

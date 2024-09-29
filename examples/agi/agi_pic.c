@@ -847,8 +847,8 @@ void drawPictureV2(word pic_num) {
 	// Use abstract vagi_res API
 	pic_res_h = vagi_res_open(AGI_RES_KIND_PIC, pic_num);
 	if (pic_res_h < 0) {
-		//printf("PIC err!\n");
-		//getchar();
+		printf("PIC err=-"); printf_d(-pic_res_h); printf("!\n");
+		getchar();
 		return;
 	}
 	
@@ -890,7 +890,7 @@ void drawPictureV2(word pic_num) {
 	//while (_dataOffset < _dataSize) {
 	while (!vagi_res_eof(pic_res_h)) {
 		// Draw status
-		//lcd_text_col = 0; lcd_text_row = 0; printf_d(_dataOffset); printf(" / "); printf_d(_dataSize);
+		//lcd_text_col = 0; lcd_text_row = 0; printf("draw: "); printf_d(vagi_res_tell(pic_res_h)); printf(" / "); printf_d(vagi_res_size(pic_res_h));
 		
 		curByte = getNextByte();	// Get next byte
 		
@@ -1002,7 +1002,7 @@ void drawPictureV2(word pic_num) {
 		draw_buffer(AGI_FRAME_BANK_LO, 0,0, false);
 		*/
 		
-		if (status == 0) {
+		if (status == 0) {	// Only when status variable overflows
 			// Status bar
 			// 240 pixels with 8 pixel chunks = 30 chunks
 			const byte bar_height = 4;
@@ -1014,10 +1014,12 @@ void drawPictureV2(word pic_num) {
 			byte progress;
 			if (vagi_drawing_step == VAGI_STEP_VIS)
 				//progress = ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
-				progress = ((word)vagi_res_states[pic_res_h].offset * 3) / (vagi_res_states[pic_res_h].res_size / 5);	// Must work with smaller numbers
+				//progress = ((word)vagi_res_states[pic_res_h].offset * 3) / (vagi_res_states[pic_res_h].res_size / 5);	// Must work with smaller numbers
+				progress = ((word)vagi_res_tell(pic_res_h) * 3) / (vagi_res_size(pic_res_h) / 5);	// Must work with smaller numbers
 			else
 				//progress = 15 + ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
-				progress = 15 + ((word)vagi_res_states[pic_res_h].offset * 3) / (vagi_res_states[pic_res_h].res_size / 5);	// Must work with smaller numbers
+				//progress = 15 + ((word)vagi_res_states[pic_res_h].offset * 3) / (vagi_res_states[pic_res_h].res_size / 5);	// Must work with smaller numbers
+				progress = 15 + ((word)vagi_res_tell(pic_res_h) * 3) / (vagi_res_size(pic_res_h) / 5);	// Must work with smaller numbers
 			
 			// Draw bar
 			memset((byte *)(a + progress), 0x00, 30);

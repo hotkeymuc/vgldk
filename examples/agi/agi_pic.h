@@ -56,6 +56,7 @@ typedef struct {
 	byte y;
 } fill_stack_t;
 #define FILL_STACK_MAX 128
+//#define FILL_STACK_MAX 250
 
 
 bool inline draw_FillCheck(int16 x, int16 y);

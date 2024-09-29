@@ -21,14 +21,14 @@
 #define __AGI_VARS_H__
 
 
-#define MAX_VARS			256
+#define MAX_VARS			256	// GBAGI default: 256
 extern U8 vars[MAX_VARS];
 
 #define MAX_FLAGS			256
 extern U8 flags[MAX_FLAGS/8];
 extern U8 toggleFlags[MAX_FLAGS];
 
-#define MAX_CONTROLLERS		50
+#define MAX_CONTROLLERS		40	// GBAGI default: 50
 extern U8 controllers[MAX_CONTROLLERS];
 
 typedef struct {
@@ -38,8 +38,8 @@ typedef struct {
 
 extern CTLMAP ctlMap[MAX_CONTROLLERS];
 
-#define MAX_STRINGS			24
-#define MAX_STRINGS_LEN		40
+#define MAX_STRINGS			24	// GBAGI default: 24
+#define MAX_STRINGS_LEN		40	// GBAGI default: 40
 extern char strings[MAX_STRINGS][MAX_STRINGS_LEN+1];
 
 

@@ -27,7 +27,7 @@ GAMES_PATH = '/z/apps/_games/_SCUMM'
 #GAME_ID = 'LSL1'
 #GAME_ID = 'CAULDRON'
 #GAME_ID = 'SQ1'
-GAME_ID = 'SQ2'
+GAME_ID = 'SQ2'	# my fav!
 #GAME_ID = 'PQ1'
 # Not working:
 ##GAME_ID = 'Enclosure'
@@ -35,6 +35,7 @@ GAME_ID = 'SQ2'
 ##GAME_ID = 'SpaceQuest0__rep_104'
 ##GAME_ID = 'SpaceQuest_NewAdventuresOfRogerWilco'
 ##GAME_ID = 'SpaceQuestX_TheLostChapter'
+
 GAME_PATH = f'{GAMES_PATH}/{GAME_ID}'	# Where to find the game
 GAME_CART_FILENAME = f'out/DATA_{GAME_ID}.bin'	# Where to put the bundled game ROM
 
@@ -121,7 +122,9 @@ def vagi_make():
 	loc_internal_ram = 0xc000
 	
 	loc_code = 0x0100	# Put compiled code after the CRT0 zero page
-	loc_data = loc_internal_ram
+	#loc_data = loc_internal_ram	# Put heap in regular banked RAM
+	#loc_data = 0xebb8	# Put static heap in non-banked upper segment, right after VRAM
+	loc_data = 0xec00	# Put static heap in non-banked upper segment
 	
 	# Set-up layout
 	#cart_eeprom_size = 8192	# Size of EEPROM you are planning to use

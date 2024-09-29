@@ -141,14 +141,16 @@ typedef struct {
 extern PVIEW pViews[MAX_PVIEWS], *pPView;
 extern U8 priTable[172];
 
+//#define MAX_VOBJ			32 // erm..can be set to higher in the object file, but none use it more than 17 AFAIK (save me RAM!)
+#define MAX_VOBJ			18	// GBAGI default: 32
 
-#define MAX_VOBJ			32 // erm..can be set to higher in the object file, but none use it more than 17 AFAIK (save me RAM!)
 
 //#define TEST_Y(x1,x2,y)	((x1 >= code[1]) && (y >= code[2]) && (x2 <= code[3]) && (y <= code[4]))
 
 
 extern VOBJ picView,objView, ViewObjs[MAX_VOBJ];
-extern BLIT blUpdate, blStatic, blits[MAX_VOBJ];
+extern BLIT blUpdate, blStatic;
+//extern BLIT blits[MAX_VOBJ];
 extern BOOL PRI_FIXED;
 
 void InitViewSystem(void);

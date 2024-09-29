@@ -50,6 +50,9 @@ void cEqualn() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
 	IF_RESULT = ( vars[ code_0 ] == code_1 );
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("v["); printf_d(code_0); printf("] ("); printf_d(vars[code_0]); printf(") = "); printf_d(code_1); printf("\n");
+	#endif
 }
 
 //if (equalv(vA,vB)) { .....
@@ -61,6 +64,9 @@ void cEqualv() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
 	IF_RESULT = ( vars[ code_0 ] == vars[ code_1 ] );
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("v["); printf_d(code_0); printf("] ("); printf_d(vars[code_0]); printf(") = v["); printf_d(code_1); printf("] ("); printf_d(vars[code_1]); printf(")\n");
+	#endif
 }
 
 //if (lessn(vA,B)) { .....
@@ -72,6 +78,9 @@ void cLessn() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
 	IF_RESULT = ( vars[ code_0 ] < code_1 );
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("v["); printf_d(code_0); printf("] ("); printf_d(vars[code_0]); printf(") < "); printf_d(code_1); printf("\n");
+	#endif
 }
 
 //if (lessn(vA,vB)) { .....
@@ -83,6 +92,9 @@ void cLessv() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
 	IF_RESULT = ( vars[ code_0 ] < vars[ code_1 ] );
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("v["); printf_d(code_0); printf("] ("); printf_d(vars[code_0]); printf(") < v["); printf_d(code_1); printf("] ("); printf_d(vars[code_1]); printf(")\n");
+	#endif
 }
 
 //if (greatern(vA,B)) { .....
@@ -94,6 +106,9 @@ void cGreatern() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
 	IF_RESULT = ( vars[ code_0 ] > code_1 );
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("v["); printf_d(code_0); printf("] ("); printf_d(vars[code_0]); printf(") > "); printf_d(code_1); printf("\n");
+	#endif
 }
 
 //if (greaterv(vA,vB)) { .....
@@ -105,6 +120,9 @@ void cGreaterv() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
 	IF_RESULT = ( vars[ code_0 ] > vars[ code_1 ] );
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("v["); printf_d(code_0); printf("] ("); printf_d(vars[code_0]); printf(") > v["); printf_d(code_1); printf("] ("); printf_d(vars[code_1]); printf(")\n");
+	#endif
 }
 
 //if (isset(fA)) { .....
@@ -113,6 +131,9 @@ void cGreaterv() {
 void cIsset() {
 	U8 code_0 = code_get();
 	IF_RESULT = TestFlag( code_0 );
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("f["); printf_d(code_0); printf("] ("); printf_d(IF_RESULT); printf(")\n");	//if (IF_RESULT) printf("TRUE"); else printf("FALSE");
+	#endif
 }
 
 //if (isset(vA)) { .....
@@ -120,6 +141,9 @@ void cIsset() {
 void cIssetv() {
 	U8 code_0 = code_get();
 	IF_RESULT = TestFlag( vars[ code_0 ] );
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("f[v["); printf_d(code_0); printf("] ("); printf_d(vars[code_0]); printf("] ("); printf_d(TestFlag(vars[code_0])); printf(")\n");
+	#endif
 }
 
 //if (has(iA)) { .....
@@ -161,7 +185,7 @@ void cController() {
 void cHaveKey() {
 	int k;
 	
-	if(!(k=vars[vKEYPRESSED])) {
+	if(!(k = vars[vKEYPRESSED])) {
 		//while((k = PollKey()) == -1);
 		while((k = keyboard_inkey()) == KEY_CHARCODE_NONE);
 	}
@@ -219,6 +243,9 @@ void cHaveKey() {
 void cSaid() {
 	int i,curWord,wordCnt;
 	int m = inpos;
+	#ifdef AGI_LOGIC_DEBUG_IFS
+		printf("cSaid()...");
+	#endif
 	wordCnt = code_get();
 	if(inpos&&(!TestFlag(fSAIDOK))&&TestFlag(fPLAYERCOMMAND)) {
 		i=0;
@@ -226,7 +253,9 @@ void cSaid() {
 			//curWord = bGetW(code);
 			//code+=2;
 			curWord = code_get_word();
-			
+			#ifdef AGI_LOGIC_DEBUG_IFS
+				printf_d(curWord);printf("...");
+			#endif
 			wordCnt--;
 			if(curWord==9999) {
 				//code += wordCnt<<1;

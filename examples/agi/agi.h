@@ -114,6 +114,8 @@ extern int wordCount;
 
 
 // more:
+void dump_vars();
+void WriteStatusLine();
 bool MessageBox(char *t);
 bool MessageBoxXY(char *t, byte x, byte y, byte w);
 void ErrorMessage(int msg, int param);

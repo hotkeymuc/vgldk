@@ -59,7 +59,7 @@ void inline buffer_switch(byte bank) {
 void buffer_clear() {
 	memset((byte *)BUFFER_ADDR, 0x00, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
 }
-void inline buffer_add_pixel_4bit(byte x, byte y, byte c) {
+void buffer_add_pixel_4bit(byte x, byte y, byte c) {
 	// Add 4 bit color value of the working buffer at 0xc000
 	// Like set_pixel, but only does a single OR operation, hence: faster.
 	/*
@@ -75,13 +75,17 @@ void inline buffer_add_pixel_4bit(byte x, byte y, byte c) {
 	if (x & 1)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
 	else		*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
 }
-void inline buffer_set_pixel_4bit(byte x, byte y, byte c) {
+
+//void inline buffer_set_pixel_4bit(byte x, byte y, byte c) {
+void buffer_set_pixel_4bit(byte x, byte y, byte c) {
 	// Set 4 bit color value of the working buffer at 0xc000
 	byte *a = (byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1));
 	if (x & 1)	*a = (*a & 0x0f) | (c << 4);
 	else		*a = (*a & 0xf0) | c;
 }
-byte inline buffer_get_pixel_4bit(byte x, byte y) {
+
+//byte inline buffer_get_pixel_4bit(byte x, byte y) {
+byte buffer_get_pixel_4bit(byte x, byte y) {
 	// Get the 4 bit color value of the working buffer at 0xc000
 	/*
 	word a;

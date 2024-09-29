@@ -32,7 +32,7 @@ romfs_handle_t romfs_fopen(byte index) {
 	// Find a free handle/state
 	romfs_handle_t h;
 	for (h = 0; h < ROMFS_MAX_HANDLES; h++) {
-		if (!romfs_states[h].active) break;
+		if (romfs_states[h].active == false) break;
 	}
 	if (h >= ROMFS_MAX_HANDLES) {
 		// No free handle available!
@@ -87,7 +87,7 @@ bool romfs_feof(romfs_handle_t h) {
 	return false;
 }
 
-word romfs_fpos(romfs_handle_t h) {
+word inline romfs_fpos(romfs_handle_t h) {
 	return romfs_states[h].offset;
 }
 
@@ -165,14 +165,21 @@ void romfs_fskip_far(romfs_handle_t h, word skip_hi, word skip_lo) {
 	*/
 }
 
+byte *romfs_fpoint(romfs_handle_t h) {
+	// Return current pointer
+	return (byte *)(R_MEM_OFFSET + romfs_states[h].mem_ofs);
+}
 
-int romfs_fpeek(romfs_handle_t h) {
+//int romfs_fpeek(romfs_handle_t h) {
+byte inline romfs_fpeek(romfs_handle_t h) {
 	// Check if handle is active
 	//if (!romfs_states[h].active) return ROMFS_ERROR_NOT_OPEN;
+	/*
 	if (!romfs_factive(h)) {
 		//printf("NOT OPEN!");
 		return ROMFS_ERROR_NOT_OPEN;
 	}
+	*/
 	
 	// Check for EOF
 	//if ((romfs_states[h].mem_bank == R_FILES[romfs_states[h].index].bank + R_FILES[romfs_states[h].index].banks) && (romfs_states[h].mem_ofs >= R_FILES[romfs_states[h].index].size)) {
@@ -192,7 +199,6 @@ int romfs_fpeek(romfs_handle_t h) {
 	
 	// Get the byte
 	byte r = *((byte *)a);
-	
 	//printf("Reading from ofs=0x"); printf_x2(a >> 8); printf_x2(a & 0xff); printf(" = 0x"); printf_x2(r); printf("\n");
 	
 	return r;

@@ -271,7 +271,7 @@ void cLoadLogics() {
 //	interpreters, this command loaded the specified logic resource (logic.vNum)
 //	from the vol file into RAM so it could be executed.
 void cLoadLogicsV() {
-	code_skip( 1);
+	code_skip(1);
 	// do nothing thanks to the preload!
 #ifdef _FULL_BLIT_RESFRESHES
 	EraseBlitLists();
@@ -325,23 +325,10 @@ void cLoadPic() {
 void cDrawPic() {
 	U8 code_0 = code_get();
 	
-	//DrawPic( vars[ code_0 ] );
+	U8 pic_num = vars[ code_0 ];
+	printf("cDrawPic(v["); printf_d(code_0); printf("] ("); printf_d(pic_num); printf("))...\n");
 	
-	// vagi:
-	const byte bank_vis = 3;
-	const byte bank_pri = 1;
-	bool ok = render_frame_agi(code_0, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)
-	if (ok) {
-		process_frame_to_buffer(bank_vis, 0, 0);	// Crop (upper or lower part) of frame to working buffer
-		draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
-		
-		ok = render_frame_agi(code_0, VAGI_STEP_PRI);	// Render the full-size priority PIC frame (takes quite long...)
-		process_frame_to_buffer(bank_pri, 0, 0);	// Crop (upper or lower part) of frame to working buffer
-		//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
-		
-		// Partially redraw the lower part (where the progress bar was shown during rendering)
-		draw_buffer(bank_vis, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, 0,0, true);
-	}
+	vagi_draw_pic(pic_num);
 }
 
 //show.pic();
@@ -1255,7 +1242,7 @@ void cLoadSound() {
 	DrawBlitLists();
 #endif
 	//code++;
-	code_skip( 1);
+	code_skip(1);
 }
 
 //sound(SOUNDNO,fDONEFLAG);
@@ -1315,7 +1302,7 @@ void cPrint() {
 //	Otherwise, it will simply stay on until the player presses a button.
 void cPrintV() {
 	U8 code_0 = code_get();
-	MessageBox(GetMessage(curLog,vars[ code_0 ]));
+	MessageBox(GetMessage(curLog, vars[ code_0 ]));
 }
 
 //display(ROW,COLUMN,mMESSAGE);
@@ -1443,20 +1430,14 @@ void cConfigureScreen() {
 //	Turns the status bar on making it visible at it's configured coordinate.
 void cStatusLineOn() {
 	STATUS_VISIBLE = TRUE;
-	//@TODO: Implement
-	/*
 	WriteStatusLine();
-	*/
 }
 
 //status.line.off();
 //	Turns the status bar off making it invisible.
 void cStatusLineOff() {
 	STATUS_VISIBLE = FALSE;
-	//@TODO: Implement
-	/*
 	WriteStatusLine();
-	*/
 }
 
 //set.string(sA,mB);
@@ -1488,6 +1469,7 @@ void cGetString() {
 	U8 code_3 = code_get();
 	U8 code_4 = code_get();
 	//@TODO: Implement
+	printf("cGetString");
 	/*
 	ExecuteGetStringDialog(FALSE,code_0,GetMessage(curLog,code_1),code_4+1);
 	*/
@@ -1511,6 +1493,7 @@ void cParse() {
 	ResetFlag(fPLAYERCOMMAND);
 	ResetFlag(fSAIDOK);
 	//@TODO: Implement
+	printf("cParse!");
 	/*
 	if(code_0<MAX_STRINGS)
 		ParseInput(strings[code_0]);
@@ -1527,6 +1510,7 @@ void cGetNum() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
 	//@TODO: Implement
+	printf("cGetNum!");
 	/*
 	ExecuteGetStringDialog(TRUE,code_1,GetMessage(curLog,code_0),3);
 	*/
@@ -1618,6 +1602,7 @@ void cAddToPicV() {
 //	and it's description. Otherwise it's simply a list of the items.
 void cStatus() {
 	//@TODO: Implement
+	printf("cStatus");
 	//ExecuteInvDialog();
 }
 
@@ -1662,10 +1647,7 @@ void cInitDisk() {
 //	title screen, whether to set up the menu, assign the controller keys, etc.
 void cRestartGame() {
 	if(	TestFlag(fRESTARTMODE) ||
-		MessageBox(
-			"Press „… to restart\nthe game.\n\n"
-			"Press †‡ to continue\nthis game."
-		)
+		MessageBox("Restart?")
 	) {
 		//@TODO: Implement
 		/*
@@ -1747,7 +1729,10 @@ void cObjStatusV() {
 //	presses Enter (A) it will quit, otherwise if they press ESC (B) it will not.
 void cQuit() {
 	U8 code_0 = code_get();
-	if(code_0 || MessageBox("Press „… to quit.\nPress †‡ to keep playing.")) {
+	
+	printf("cQuit!"); getchar();
+	
+	if(code_0 || MessageBox("Really quit?")) {
 		//AGIExit();
 		QUIT_FLAG = TRUE;
 		//code = NULL;
@@ -1765,7 +1750,7 @@ void cShowMem() {
 //	Simply pauses the game by displaying a message box and waits for the player
 //	to press a button or key to close it.
 void cPause() {
-	MessageBox("      Game paused.\nPress „… to continue.");
+	MessageBox("Game paused.");
 }
 
 //echo.line();
@@ -1805,13 +1790,12 @@ void cToggleMonitor() {
 
 //version();
 //	Displays a message box with the interpreter's name and version information.
-void cVersion()
-{
+void cVersion() {
 	MessageBox(
-		"         VAGI based on\n\n"
-		"         GBAGI v"BUILD_VERSION"\n\n"
-		"    By  Brian Provinciano\n"
-		"    http://www.bripro.com"
+		"VAGI based on\n"
+		"GBAGI v"BUILD_VERSION"\n\n"
+		"By  Brian Provinciano\n"
+		"http://www.bripro.com"
 	);
 }
 
@@ -1822,13 +1806,13 @@ void cVersion()
 //	GBAGI as only picture and picview information is needed.
 void cScriptSize() {
 	// Not to be implemented
-
+	
 #ifdef _FULL_BLIT_RESFRESHES
 	EraseBlitLists();
 	DrawBlitLists();
 #endif
-	//code++;
-	code_skip( 1);
+	U8 code_0 = code_get();
+	printf("cScriptSize="); printf_d(code_0);
 }
 
 //set.game.id(mID);
@@ -1851,7 +1835,7 @@ void cSetGameId() {
 void cLog() {
 	// Not to be implemented
 	//code++;
-	code_skip( 1);
+	code_skip(1);
 }
 
 //set.scan.start();
@@ -1860,6 +1844,7 @@ void cLog() {
 //	this command was called rather than the beginning of the logic.
 void cSetScanStart() {
 	//logScan[curLog->num] = (U16)(code-curLog->code);
+	printf("cSetScanStart");
 	U16 code_now = vagi_res_tell(curLog->res_h);
 	logScan[curLog->num] = (U16)(code_now - curLog->ofs_code);
 }
@@ -1868,6 +1853,7 @@ void cSetScanStart() {
 //	Clears the bookmark in the current logic. When the logic is called again,
 //	it will begin execution from the beginning of the logic as it would normally.
 void cResetScanStart() {
+	printf("cResetScanStart");
 	logScan[curLog->num] = 0;
 }
 
@@ -1962,7 +1948,7 @@ void cDiscardViewV() {
 	DrawBlitLists();
 #endif
 	//code++;
-	code_skip( 1);
+	code_skip(1);
 }
 
 //clear.text.rect(Y1,X1,Y2,X2,COLOUR);
@@ -2118,8 +2104,7 @@ void cMulV() {
 void cDivN() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
-	if(code_1) // the real interpreter would crash upon dividing by zero,
-				// but I don't need to be _that_ accurate!
+	if(code_1) // the real interpreter would crash upon dividing by zero, but I don't need to be _that_ accurate!
 		vars[ code_0 ] /= code_1;
 }
 
@@ -2130,8 +2115,7 @@ void cDivN() {
 void cDivV() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
-	if(vars[ code_1 ]) // the real interpreter would crash upon dividing by zero,
-						// but I don't need to be _that_ accurate!
+	if(vars[ code_1 ]) // the real interpreter would crash upon dividing by zero, but I don't need to be _that_ accurate!
 		vars[ code_0 ] /= vars[ code_1 ];
 }
 
@@ -2162,6 +2146,7 @@ void cSetSimple() {
 //	value onto the stack though, so if you use it twice, the previous saved
 //	value will be lost.
 void cPushScript() {
+	printf("cPushScript");
 	//pushedScriptCount = scriptCount;
 	//code=code;
 }
@@ -2170,6 +2155,7 @@ void cPushScript() {
 //	push.script() and set it to the current position, discarding any elements
 //	added to the script after the push.script() command has been called.
 void cPopScript() {
+	printf("cPopScript");
 	//scriptCount = pushedScriptCount;
 	//code=code;
 }

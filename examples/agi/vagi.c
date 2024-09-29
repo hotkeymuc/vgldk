@@ -20,7 +20,7 @@
 */
 
 
-#define VAGI_MOUSE	// Support mouse
+//#define VAGI_MOUSE	// Support mouse
 #define VAGI_START_PIC_NUM 1	//5	// On which PIC to start
 
 //#define VAGI_MINIMAL	// Squeeze all as much space as possible. No stdio!
@@ -39,8 +39,8 @@
 	#include <vgldk.h>
 	#include <stdiomin.h>	// for gets/puts/printf/printf_d. Will be auto-included on VGLDK_SERIES=0
 	
-	//#define HEX_USE_DUMP	// For dump(addr, count)
-	//#define HEX_DUMP_WIDTH 16	// Usually 4 for 20-character screens
+	#define HEX_USE_DUMP	// For dump(addr, count)
+	#define HEX_DUMP_WIDTH 16	// Usually 4 for 20-character screens
 	#include <hex.h>	// provides printf_x2
 #endif
 
@@ -286,7 +286,7 @@ static const byte sprite_data[8*12] = {
 };
 
 
-void test_draw_agi_combined() {
+void test_draw_agi_combined(byte pic_num, bool interactive) {
 	// Test drawing a sprite while respecing the priority buffer (i.e. what Sierra called "3D")
 	
 	byte bank_vis = 3;
@@ -302,7 +302,7 @@ void test_draw_agi_combined() {
 	byte prio = 5;
 	byte spd = 5;
 	
-	word pic_num = 1; //5;	// Which PIC resource to display first
+	//word pic_num = 1; //5;	// Which PIC resource to display first
 	
 	bool render = true;	// Force re-rendering of the full-size frame
 	bool redraw = true;	// Force re-drawing of the full visual buffer
@@ -347,6 +347,9 @@ void test_draw_agi_combined() {
 			draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
 			redraw = false;	// Prevent re-drawing again next time
 		}
+		
+		// Quit if not interactive
+		if (!interactive) return;
 		
 		// Show some stats
 		//lcd_text_col = 0; lcd_text_row = 0;
@@ -400,7 +403,6 @@ void test_draw_agi_combined() {
 		case 25:	// MAME down
 			y += spd;	// DOWN
 			break;
-		
 		
 		case 'q':
 		case 'Q':
@@ -509,6 +511,39 @@ void test_draw_agi_combined() {
 		else y_src = 0;
 		*/
 		
+	}
+}
+
+
+void vagi_draw_pic(byte pic_num) {
+	// vagi:
+	const byte bank_vis = 3;
+	const byte bank_pri = 1;
+	
+	// Render both frames and create working buffers
+	lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Loading PIC "); printf_d(pic_num);
+	
+	bool ok = render_frame_agi(pic_num, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)
+	if (ok) {
+		process_frame_to_buffer(bank_vis, 0, 0);	// Crop (upper or lower part) of frame to working buffer
+		
+		//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Drawing PIC "); printf_d(pic_num);
+		draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
+		
+		//@FIXME: SQ2 hangs at intro 140 while drawing prio!
+		/*
+		lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Loading PRIO "); printf_d(pic_num);
+		ok = render_frame_agi(pic_num, VAGI_STEP_PRI);	// Render the full-size priority PIC frame (takes quite long...)
+		if (ok) {
+			process_frame_to_buffer(bank_pri, 0, 0);	// Crop (upper or lower part) of frame to working buffer
+			//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+		}
+		
+		lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("done.");
+		*/
+		
+		// Partially redraw the lower part (where the progress bar was shown during rendering)
+		draw_buffer(bank_vis, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, 0,0, true);
 	}
 }
 
@@ -640,6 +675,12 @@ void test_draw_combined() {
 */
 
 
+
+// Logic!
+//#define AGI_LOGIC_DEBUG	// Verbose logic output (each OP, each CallLogic)
+//#define AGI_LOGIC_DEBUG_IFS	// Even verboser logic debug: Show "IF v[x] > y" etc.
+#define AGI_COMMANDS_NO_NAMES	// Do not include command names, safes about 0x800+ bytes of space
+
 #include "agi_vars.h"
 #include "agi_vars.c"	//@FIXME: Makefile only compiles the main .C file
 
@@ -651,12 +692,135 @@ void test_draw_combined() {
 #include "agi_logic.h"
 #include "agi_logic.c"	//@FIXME: Makefile only compiles the main .C file
 
-void test_logic() {
-	InitLogicSystem();
+void vagi_init() {
+	vagi_res_init();	// calls romfs_init()
 	
-	CallLogic(0);
+	QUIT_FLAG = FALSE;
+	
+	// agimain.c:AGIInit():
+	PLAYER_CONTROL	= TRUE;
+	INPUT_ENABLED	= FALSE;
+	TEXT_MODE		= FALSE;
+	STATUS_VISIBLE	= FALSE;
+	VOBJ_BLOCKING	= FALSE;
+	WINDOW_OPEN		= FALSE;
+	REFRESH_SCREEN	= FALSE;
+	PIC_VISIBLE		= FALSE;
+	PRI_VISIBLE		= FALSE;
+	WALK_HOLD		= FALSE;
+	//MENU_SELECTABLE	= TRUE;
+	
+	scriptCount 	= 0;
+	
+	//ydiff 			= 0;
+	minRow 			= 1;
+	minRowY			= 0;	//(minRow*(SCREEN_WIDTH*CHAR_HEIGHT));
+	inputPos		= 22;
+	statusRow		= 0;
+	
+	textColour		= 0x0F;
+	textAttr		= 0;
+	
+	//msgX			= -1;
+	//msgY			= -1;
+	//maxWidth		= -1;
+	
+	ClearVars();
+	ClearFlags();
+	ClearControllers();
+	//if(!RESTART) ClearControlKeys();
+	
+	vars[vCOMPUTER]		= 0; // PC
+	vars[vMONTIOR]	= 3; // EGA
+	vars[vSOUNDTYPE]		= 1; // PC
+	vars[vMAXINPUT]		= MAX_STRINGS_LEN;
+	vars[vMEMORY]		= 10;
+	
+	SetFlag(fNEWROOM);
+	
+	//InitSound();
+	InitLogicSystem();
+	//InitViewSystem();
+	//InitPicSystem(TRUE);
+	//InitObjSystem();
+	//InitParseSystem();
+	//InitSaveRestore();
+	//if(!RESTART) InitMenuSystem();
+	
+	SOUND_ON	= TRUE;
+	SetFlag(fSOUND);
+	
 }
 
+bool vagi_main() {
+#ifdef SKIPTOSCREEN
+	int m=1;
+#endif
+	
+	ClearControllers();
+	
+	ResetFlag(fPLAYERCOMMAND);
+	ResetFlag(fSAIDOK);
+	vars[vKEYPRESSED]	= 0;
+	vars[vUNKWORD]		= 0;
+	
+	//DoDelayNPoll();
+	if(QUIT_FLAG) {
+		//printf("QUIT_FLAG");
+		return false;	//break;
+	}
+	//SystemDoit();
+	
+	if(PLAYER_CONTROL)
+		ViewObjs[0].direction = vars[vEGODIR];
+	else
+		vars[vEGODIR] = ViewObjs[0].direction;
+	
+	CalcVObjsDir();
+	
+	oldScore = vars[vSCORE];
+	SOUND_ON = TestFlag(fSOUND);
+	
+#ifdef SKIPTOSCREEN
+	if(vars[0]==25) {
+	if(m==1) {
+		ViewObjs[0].x = 10;
+		ViewObjs[0].y = 150;
+		NewRoom(SKIPTOSCREEN);
+	}
+	if(m<2) m++;}
+#endif
+	
+	dump_vars();
+	printf("logic0...");
+	
+	while(!CallLogic(0)) {
+		if(QUIT_FLAG) break;
+		
+		vars[vUNKWORD]		= 0;
+		vars[vOBJBORDER]		= 0;
+		vars[vOBJECT]		= 0;
+		ResetFlag(fPLAYERCOMMAND);
+		oldScore = vars[vSCORE];
+	}
+	//printf("logic0 finished.\n");
+	
+	ViewObjs[0].direction = vars[vEGODIR];
+	
+	//if( (oldScore!=vars[vSCORE]) || (TestFlag(fSOUND)!=SOUND_ON) ) WriteStatusLine();
+	
+	vars[vOBJBORDER]		= 0;
+	vars[vOBJECT]		= 0;
+	
+	ResetFlag(fNEWROOM);
+	ResetFlag(fRESTART);
+	ResetFlag(fRESTORE);
+	
+	//if(!TEXT_MODE) UpdateGfx();
+	
+	if(QUIT_FLAG) return false;
+	return true;
+}
 
 // Main entry point
 #if VGLDK_SERIES == 0
@@ -676,27 +840,37 @@ void main() __naked {
 	//word i;
 	
 	printf("VAGI\n");
-	
 	AGIVER.major = 2;
 	AGIVER.minor = 0;
 	
-	vagi_res_init();	// calls romfs_init()
+	vagi_init();
+	
 	
 	//test_draw_combined();	// Test drawing combined vis & prio
 	//test_draw_agi_scroll();	// Test partial redraw
-	//test_draw_agi_combined();	// Test rendering actual AGI PIC data
-	test_logic();	// Test the logic engine...
+	//test_draw_agi_combined(VAGI_START_PIC_NUM, true);	// Test rendering actual AGI PIC data
+	//test_draw_agi_combined(VAGI_START_PIC_NUM, false);	// Test rendering actual AGI PIC data
+	//printf("end of render."); getchar();
 	
 	
 	while(running) {
 		
+		//running = vagi_main();
+		QUIT_FLAG = FALSE;
+		vagi_main();
 		
-		putchar('?');
+		//putchar('?');
+		printf('vagi>');
 		c = getchar();
 		
 		switch(c) {
 			case 13:
 			case 10:
+				break;
+			
+			case 'd':
+			case 'D':
+				test_draw_agi_combined(VAGI_START_PIC_NUM, true);
 				break;
 			
 			case 'q':

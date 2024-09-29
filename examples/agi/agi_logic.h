@@ -22,7 +22,8 @@ typedef struct {
 	U8 msgTotal;
 	
 	// We stay inside a vagi_res_handle
-	vagi_res_handle_t res_h;
+	vagi_res_handle_t res_h;	// Used for logic itself
+	vagi_res_handle_t msg_res_h;	// Used for GetMessage (seeks around)
 	word ofs_code;
 	word ofs_messages;
 } LOGIC;

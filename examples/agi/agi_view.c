@@ -35,7 +35,8 @@
 
 VOBJ picView, ViewObjs[MAX_VOBJ], *viewPtrs[MAX_VOBJ];
 PVIEW pViews[MAX_PVIEWS], *pPView;
-BLIT blUpdate, blStatic, blits[MAX_VOBJ];
+BLIT blUpdate, blStatic;
+//BLIT blits[MAX_VOBJ];
 BOOL PRI_FIXED;         
 int priYList[MAX_VOBJ];   
 U8 priTable[172];
@@ -78,12 +79,13 @@ void InitViewSystem() {
 		v = &ViewObjs[i];
 		v->num = i++;
 	}
+	/*
+	memset(&blUpdate, 0,sizeof(BLIT));
+	memset(&blStatic, 0,sizeof(BLIT)); 
+	memset(blits,0,sizeof(blits));
 	
-	//memset(&blUpdate, 0,sizeof(BLIT));
-	//memset(&blStatic, 0,sizeof(BLIT)); 
-	//memset(blits,0,sizeof(blits));
-	
-	//EraseBlitLists();
+	EraseBlitLists();
+	*/
 }
 
 void UpdateVObj() {

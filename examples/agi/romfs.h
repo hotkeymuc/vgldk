@@ -21,7 +21,7 @@ These things must be defined outside:
 #define ROMFS_ERROR_OUT_OF_HANDLES -3
 #define ROMFS_ERROR_NOT_OPEN -4
 
-#define ROMFS_MAX_HANDLES 4
+#define ROMFS_MAX_HANDLES 6	//4
 
 
 // romfs_gen.py creates these entries
@@ -66,7 +66,11 @@ void romfs_frewind(romfs_handle_t h);
 void romfs_fskip(romfs_handle_t h, word skip);
 void romfs_fskip_far(romfs_handle_t h, word skip_hi, word skip_lo);
 
-int romfs_fpeek(romfs_handle_t h);
+byte *romfs_fpoint(romfs_handle_t h);
+
+//int romfs_fpeek(romfs_handle_t h);
+byte romfs_fpeek(romfs_handle_t h);
+
 int romfs_fread(romfs_handle_t h);
 
 #endif
