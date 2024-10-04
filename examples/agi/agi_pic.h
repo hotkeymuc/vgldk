@@ -30,6 +30,16 @@ enum AgiPictureFlags {
 	//kPicFTrollMode = (1 << 5)
 };
 
+
+// picture.h:
+#define PRI_CONTROL		(0x01)	//(0x10)
+#define PRI_SIGNAL		(0x02)	//(0x20)
+#define PRI_WATER		(0x03)	//(0x30)
+#define FLAG_CONTROL	(0x01)
+#define FLAG_SIGNAL		(0x02)
+#define FLAG_WATER		(0x04)
+
+
 // Connections to the outer world
 //bool agi_res_eof() { return (_dataOffset >= _dataSize); }
 //bool agi_res_read() { return _data[_dataOffset++]; }
@@ -55,13 +65,16 @@ typedef struct {
 	byte x;
 	byte y;
 } fill_stack_t;
-#define FILL_STACK_MAX 128
+//#define FILL_STACK_MAX 16
+#define FILL_STACK_MAX 32
+//#define FILL_STACK_MAX 128
+//#define FILL_STACK_MAX 172
 //#define FILL_STACK_MAX 250
 
 
 bool inline draw_FillCheck(int16 x, int16 y);
 
-void _draw_Fill(int16 x, int16 y);
+bool _draw_Fill(int16 x, int16 y);
 void draw_Fill();
 void draw_xCorner(bool skipOtherCoords);
 void draw_yCorner(bool skipOtherCoords);

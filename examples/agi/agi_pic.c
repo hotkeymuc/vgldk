@@ -72,6 +72,7 @@ bool getNextParamByte(byte *b) {
 	//	_dataOffset--;
 	//	return false;
 	//}
+	if (vagi_res_eof(pic_res_h)) return false;
 	
 	byte value = vagi_res_peek(pic_res_h);
 	if (value >= _minCommand) return false;
@@ -523,17 +524,17 @@ typedef struct {
 	}
 #endif
 
-void _draw_Fill(int16 x, int16 y) {
+bool _draw_Fill(int16 x, int16 y) {
 	fill_stack_t stack[FILL_STACK_MAX];
 	byte stack_pos = 0;
 	//fill_stack_t p;
 	int16 px, py;
 	
-	if (!_scrOn && !_priOn) return;
+	if (!_scrOn && !_priOn) return false;
 	
 	// Quick reject
-	if ((vagi_drawing_step == VAGI_STEP_VIS) && (!_scrOn)) return;
-	if ((vagi_drawing_step == VAGI_STEP_PRI) && (!_priOn)) return;
+	if ((vagi_drawing_step == VAGI_STEP_VIS) && (!_scrOn)) return false;
+	if ((vagi_drawing_step == VAGI_STEP_PRI) && (!_priOn)) return false;
 	
 	#ifdef AGI_PIC_FILL_CASES
 	// Pre-select the appropriate checking function (we can decide these things IN ADVANCE before entering the flood fill)
@@ -543,8 +544,8 @@ void _draw_Fill(int16 x, int16 y) {
 	else if (_priOn && !_scrOn && _priColor != 4)
 		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case2;
 	else {
-		if (!_scrOn) return;
-		if (_scrColor == 15) return;
+		if (!_scrOn) return false;
+		if (_scrColor == 15) return false;
 		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case3;
 	}
 	#endif
@@ -564,6 +565,12 @@ void _draw_Fill(int16 x, int16 y) {
 	// Exit if stack is empty
 	//while (!stack.empty()) {
 	while (stack_pos > 0) {
+		if (stack_pos >= FILL_STACK_MAX) {
+			printf("FILL_STACK_MAX!");
+			//break;
+			return false;
+		}
+		
 		//Common::Point p = stack.pop();
 		//p = &stack[stack_pos--];
 		stack_pos--;
@@ -609,13 +616,19 @@ void _draw_Fill(int16 x, int16 y) {
 			}
 		}
 	}
-	
+	return true;
 }
 void draw_Fill() {
 	byte x1, y1;
+	bool cont = true;
 	
-	while (getNextParamByte(&x1) && getNextParamByte(&y1))
-		_draw_Fill(x1, y1);
+	while (getNextParamByte(&x1) && getNextParamByte(&y1)) {
+		//printf("x="); printf_x2(x1); printf(", y="); printf_x2(y1); printf("\n");
+		
+		if (cont) {	// If an error occurs: Do not call drawFill again, something went wrong.
+			cont = _draw_Fill(x1, y1);
+		}
+	}
 }
 
 
@@ -895,6 +908,7 @@ void drawPictureV2(word pic_num) {
 		curByte = getNextByte();	// Get next byte
 		
 		//printf(" = "); printf_d(curByte); putchar('\n'); getchar();
+		//printf_x2(curByte); //putchar('\n'); getchar();
 		
 		switch (curByte) {
 			case 0xf0:

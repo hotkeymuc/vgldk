@@ -123,6 +123,7 @@ typedef struct {
 	};
 } VOBJ;
 
+/*
 typedef struct _BLIT {
 	struct _BLIT *prev, *next;
 	VOBJ	*v;
@@ -133,23 +134,26 @@ typedef struct _BLIT {
 
 extern BLIT blUpdate, blStatic;
 
+
 typedef struct {
 	U8		view,loop,cel,x,y,pri;
 } PVIEW;
 
 #define MAX_PVIEWS 32
 extern PVIEW pViews[MAX_PVIEWS], *pPView;
+*/
+
 extern U8 priTable[172];
 
 //#define MAX_VOBJ			32 // erm..can be set to higher in the object file, but none use it more than 17 AFAIK (save me RAM!)
-#define MAX_VOBJ			18	// GBAGI default: 32
+#define MAX_VOBJ			18	// GBAGI default: 32, SQ2 references #36
 
 
 //#define TEST_Y(x1,x2,y)	((x1 >= code[1]) && (y >= code[2]) && (x2 <= code[3]) && (y <= code[4]))
 
 
 extern VOBJ picView,objView, ViewObjs[MAX_VOBJ];
-extern BLIT blUpdate, blStatic;
+//extern BLIT blUpdate, blStatic;
 //extern BLIT blits[MAX_VOBJ];
 extern BOOL PRI_FIXED;
 
@@ -175,13 +179,17 @@ void DrawObj(int num);
 void EraseObj(int num);
 void UpdateObjCel(VOBJ *v);
 void UpdateObjLoop(VOBJ *v);
+/*
 void SaveBlit(BLIT *b);
 void RestoreBlit(BLIT *b);
+*/
 void BlitVObj(VOBJ *v);
 BOOL CheckUpdateVObj(VOBJ *v);
 BOOL CheckStaticVObj(VOBJ *v);
+
 void EraseBlitLists(void);
 void DrawBlitLists(void);
+/*
 void UpdateBlitLists(void);
 void EraseBlitList(BLIT *b);
 BLIT *BuildBlitList( BOOL(*f)(VOBJ *) , BLIT *blParent);
@@ -189,6 +197,7 @@ void AddBlit(VOBJ *v, BLIT *blParent);
 BLIT *NewBlit(VOBJ *v);
 void DrawBlitList(BLIT *blParent);
 void UpdateBlitList(BLIT *blParent);
+*/
 void AddToPic(U8 num, U8 loop, U8 cel, U8 x, U8 y, U8 pri);
 void AddObjPicPri(VOBJ *v);
 int  CalcPriY(int pri);

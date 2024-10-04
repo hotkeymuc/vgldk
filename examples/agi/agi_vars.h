@@ -26,7 +26,7 @@ extern U8 vars[MAX_VARS];
 
 #define MAX_FLAGS			256
 extern U8 flags[MAX_FLAGS/8];
-extern U8 toggleFlags[MAX_FLAGS];
+//extern U8 toggleFlags[MAX_FLAGS];
 
 #define MAX_CONTROLLERS		40	// GBAGI default: 50
 extern U8 controllers[MAX_CONTROLLERS];

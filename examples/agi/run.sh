@@ -1,6 +1,11 @@
 #!/bin/sh
 # This script compiles the VAGI cartridge, then it copies resources to the final binary and starts the emulator.
-
+#
+#
+# Note: Use vagi_make.py instead
+#
+#
+#
 GAMES_PATH=/z/apps/_games/_SCUMM
 #GAME_ID=KQ1
 #GAME_ID=KQ2

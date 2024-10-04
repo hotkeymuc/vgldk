@@ -58,7 +58,6 @@ typedef int int16;
 typedef word uint16;
 
 
-
 #ifdef VAGI_MOUSE
 	#include <mouse.h>
 #endif
@@ -82,7 +81,6 @@ __sfr __at 0x54 bank_0xe000_port;
 //	bank 2	0x4000 - 0x5fff	8KB extended RAM at 0xc000 - 0xdfff
 //	bank 3	0x6000 - 0x7fff	8KB extended RAM at 0xc000 - 0xdfff
 
-
 //	0x55: (usually 0x1C = 0b00011100)
 //		lowest bit set: Map cartridge at 0x0000 (e.g. "out 55 1d" maps cart to 0x0000 AND 0x8000)
 //		2nd    bit set: Map cartridge at 0x4000 (e.g. "out 55 1e" maps cart to 0x4000 AND 0x8000)
@@ -93,31 +91,32 @@ __sfr __at 0x54 bank_0xe000_port;
 //		!! out 55 3c -> Crash with Capslock LED on
 //		!! out 55 9c -> nothing, doesn't even gets retained (turns back to 0x1c)
 //		!! out 55 fc -> System powers off!
-__sfr __at 0x55 bank_type_port;	// This controls whether a bank is internal ROM or cartridge ROM
+__sfr __at 0x55 bank_type_port;	// This controls whether a bank is mapped to internal ROM (0) or external cartridge ROM (1)
 
-
-// Since we only have enough RAM to render EITHER the visual OR the priority frame, we need to keep track of the currently active frame type
-#define VAGI_STEP_VIS 0
-#define VAGI_STEP_PRI 1
-byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which type of frame to process: visual=0 or priority=1)
 
 // Platform specific helpers:
 #include "vagi_lcd.h"	// This abstracts access to the LCD screen
-#include "vagi_frame.h"	// This handles one full-size AGI frame needed at render-time
-#include "vagi_buffer.h"	// This handles the (smaller) working buffer(s) needed at run.time
-#include "vagi_res.h"	// This handles reading from AGI resources as if they were files
+#include "vagi_frame.h"	// This handles one big full-size AGI frame needed only once at render-time
+#include "vagi_buffer.h"	// This handles the (smaller) working buffer(s) needed at run-time (derived from frame)
+#include "vagi_res.h"	// This allows reading from AGI resources as if they were files
 
 // The AGI specific fun starts here:
 #include "agi.h"
 #include "agi.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
 
-#include "agi_pic.h"
-#include "agi_pic.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
-
 #include "agi_view.h"
 #include "agi_view.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
 
+// PIC code
+//@TODO: The PIC code would lend itself well to be put onto a separate code segment for bank switching
 
+// Since we only have enough RAM to render EITHER the visual OR the priority frame, we need to keep track of the currently active frame type
+#define VAGI_STEP_VIS 0
+#define VAGI_STEP_PRI 1
+byte vagi_drawing_step = VAGI_STEP_VIS;	// Current rendering step (which kind of PIC data to process: 0=visual, 1=priority)
+
+#include "agi_pic.h"
+#include "agi_pic.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
 
 bool render_frame_agi(word pic_num, byte drawing_step) {
 	// Draw one AGI PIC (either its visual or priority data)
@@ -128,44 +127,6 @@ bool render_frame_agi(word pic_num, byte drawing_step) {
 	//bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
 	//dump(0x4000, 16);
 	
-	/*
-	// Tell AGI renderer where the data is located
-	
-	// Manually decode some bytes in ROM memory
-	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
-	bank_0x4000_port = 0x20 | 1;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
-	_data = (const byte *)0x4000;
-	_dataSize = 3306;	// Size of SQ2_PIC_5 (space ship hangar)
-	*/
-	
-	/*
-	// Get PIC data via ROM FS file:
-	byte f;	//R_File f;
-	//f = R_EXPORT_SQ2_PIC_1_BIN;	// intro space station
-	//f = R_EXPORT_SQ2_PIC_2_BIN;	// first screen
-	//f = R_EXPORT_SQ2_PIC_3_BIN;	// change room
-	//f = R_EXPORT_SQ2_PIC_4_BIN;	// control room
-	f = R_EXPORT_SQ2_PIC_5_BIN;	// space ship hangar
-	//f = R_EXPORT_SQ2_PIC_6_BIN;	// vohaul without head
-	//f = R_EXPORT_SQ2_PIC_7_BIN;	// vohaul base in orbit
-	//f = R_EXPORT_SQ2_PIC_8_BIN;	// landing pad
-	//f = R_EXPORT_SQ2_PIC_9_BIN;	// empty
-	//f = R_EXPORT_SQ2_PIC_10_BIN;	// jungle
-	//f = R_EXPORT_SQ2_PIC_11_BIN;	// jungle2
-	//f = R_EXPORT_SQ2_PIC_12_BIN;	// jungle3 tree
-	//f = R_EXPORT_SQ2_PIC_13_BIN;	// swamp entry
-	
-	// Bank switch the data (manually)
-	bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
-	
-	_data = (const byte *)R_FILES[f].addr;	// Address in banked RAM
-	_dataSize = (R_FILES[f].banks * R_BANK_SIZE) + R_FILES[f].size;	// Size (might roll over!)
-	_dataOffset = 0;
-	//bank_0x4000_port = 0x20 | R_FILES[f].bank;	// Mount ROM segment n=1 (offset 0x4000 * n) to address 0x4000
-	romfs_switch_bank(R_FILES[f].bank);	// Switch in the starting bank
-	*/
-	
-	
 	//vagi_drawing_step = VAGI_STEP_VIS;	// Only perform drawing operations for visual (screen) frame
 	//vagi_drawing_step = VAGI_STEP_PRI;	// Only perform drawing operations for priority frame
 	vagi_drawing_step = drawing_step;	// Only perform drawing operations for either screen OR priority
@@ -173,124 +134,63 @@ bool render_frame_agi(word pic_num, byte drawing_step) {
 	// Actually call AGI drawing routine...
 	//frame_clear(0x00);
 	//for(i = 0; i < 10; i++) { draw_Line(0,i*4, 159,167); }	// Test pattern
-	if (drawing_step == VAGI_STEP_VIS) frame_clear(0xf * 0x11);	// VIS: bg=_scrColor=0xf ( * 0x11 = on both nibbles)
-	if (drawing_step == VAGI_STEP_PRI) frame_clear(0x4* 0x11);	// PRI: bg=_priColor=0x4 ( * 0x11 = on both nibbles)
+	if (drawing_step == VAGI_STEP_VIS) frame_clear(0xf * 0x11);	// VIS: bg=_scrColor=0xf ( * 0x11 = "on both nibbles")
+	if (drawing_step == VAGI_STEP_PRI) frame_clear(0x4 * 0x11);	// PRI: bg=_priColor=0x4 ( * 0x11 = "on both nibbles")
 	
-	//drawPictureV1();
-	//drawPictureV15();
+	//drawPictureV1(pic_num);
+	//drawPictureV15(pic_num);
 	drawPictureV2(pic_num);
 	
 	return true;
 }
 
-/*
-void test_draw_agi_scroll() {
-	// Test "smooth" scrolling with partial re-draw
+
+
+void vagi_draw_pic(byte pic_num) {
+	// vagi:
+	const byte bank_vis = BUFFER_BANK_VIS;	// 3
+	const byte bank_pri = BUFFER_BANK_PRI;	// 1 (caution! Shared with VAGI_FRAME_BANK_LO), must be done last, overwriting the frame in the process
 	
-	byte bank_vis = 3;
-	//byte bank_pri = 1;
-	byte x_src = 0;
-	byte y_src = 0;
-	byte x_ofs = 0;
-	byte y_ofs = 0;
-	byte i;
+	// Render both frames and create working buffers
+	//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
+	lcd_text_col = 0; lcd_text_row = 0;
+	printf("Loading PIC "); printf_d(pic_num);
 	
-	y_src = (AGI_FRAME_HEIGHT - LCD_HEIGHT) / 2;	// Start in the middle
-	
-	word pic_num = VAGI_START_PIC_NUM;
-	
-	for(;;) {
-		// Render frame(s)
-		//lcd_text_col = 0; lcd_text_row = 0; printf("VIS...");
-		render_frame_agi(pic_num, VAGI_STEP_VIS);
-		process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part)
-		//draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
+	// Render and process the VIS frame.
+	bool ok = render_frame_agi(pic_num, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)
+	if (ok) {
+		// Crop/scale frame to visual working buffer
+		process_frame_to_buffer(bank_vis, 0, 0);
 		
-		//lcd_text_col = 0; lcd_text_row = 0; printf("PRIO...");
-		//render_frame_agi(pic_num, VAGI_STEP_PRI);
-		//process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part)
-		//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+		// Show visual buffer while priority is being rendered
+		//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Drawing PIC "); printf_d(pic_num);
+		draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
 		
-		// Scroll horizontally (no re-rendering needed)
-		const byte step = 8;	//(AGI_FRAME_WIDTH - (LCD_WIDTH/2)) / steps;	// Must be multiple of 8 for hardware-scroll to work
-		const byte steps = (AGI_FRAME_WIDTH - (LCD_WIDTH/2)) / step;
-		
-		for(i = 0; i < steps; i++) {
-			//lcd_clear();
-			x_ofs = (i * (AGI_FRAME_WIDTH - (LCD_WIDTH/2))) / steps;
-			
-			//printf("VIS");
-			//draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
-			if (x_ofs == 0) {
-				// Draw full frame
-				draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
-			} else {
-				// Scroll VRAM to the left
-				memcpy((byte *)LCD_ADDR, (byte *)(LCD_ADDR + step/8), (LCD_HEIGHT*LCD_WIDTH - step)/8);
-				//@TODO: Use LDIR (copy BC bytes from HL to DE)!
-				//	__asm
-				//		push bc
-				//		push de
-				//		push hl
-				//		
-				//		// Scroll one line up
-				//		ld bc, #((LCD_W * (LCD_H - LCD_SCROLL_AMOUNT)) / 8)	// Number of bytes to scroll (i.e. whole screen minus x lines)
-				//		ld hl, #(LCD_ADDR + (LCD_W / 8) * LCD_SCROLL_AMOUNT)	//#0xE01E	// Offset of 2nd line, i.e. LCD_ADDR + bytes-per-line * x
-				//		ld de, #LCD_ADDR	//#0xE000	// Offset of 1st line
-				//		ldir	// Copy BC bytes from HL to DE
-				//		
-				//		pop hl
-				//		pop de
-				//		pop bc
-				//	__endasm;
-				
-				// Only re-draw right region
-				//draw_buffer(bank_vis, area_x1, area_x2, area_y1, area_y2, x_ofs,y_ofs, true);
-				draw_buffer(bank_vis, LCD_WIDTH-step,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
-				
-			}
-			
-			
-			//printf("PRIO");
-			//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
-			
-			// Next time: Scroll to the other side (left / right)
-			//if (x_ofs == 0) x_ofs = (AGI_FRAME_WIDTH - (LCD_WIDTH/2));
-			//else x_ofs = 0;
+		// Render and process the PRI frame. The buffer is co-located with the frame buffer, overwriting it in the process. Must be done last.
+		//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Loading PRIO "); printf_d(pic_num);
+		ok = render_frame_agi(pic_num, VAGI_STEP_PRI);	// Render the full-size priority PIC frame (takes quite long...)
+		if (ok) {
+			// Crop/scale frame to priority working buffer
+			process_frame_to_buffer(bank_pri, 0, 0);
+			//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
 		}
+		//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("done.");
 		
-		// Next time: Crop to the other slice of the frame (upper / lower)
-		if (y_src == 0) y_src = (AGI_FRAME_HEIGHT - LCD_HEIGHT);
-		else y_src = 0;
+		// Partially redraw the lower part (where the progress bar was shown during rendering)
+		draw_buffer(bank_vis, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, 0,0, true);
 	}
+	
+	// Reset cursor to start at the top
+	lcd_text_col = 0; lcd_text_row = 0;
 }
-*/
 
 
-#define sprite_width 8
-#define sprite_height 12
-#define sprite_transparency 3
-static const byte sprite_data[8*12] = {
-	  3,   3, 0xf, 0xf, 0xf, 0xf,   3,   3, 
-	  3,   3, 0xf, 0xf, 0xf, 0xf,   3,   3, 
-	  3, 0xf, 0x0, 0x0, 0x0, 0x0, 0xf,   3, 
-	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
-	0xf, 0x0, 0xf, 0x0, 0x0, 0xf, 0x0, 0xf, 
-	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
-	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
-	0xf, 0x0, 0xf, 0x0, 0x0, 0xf, 0x0, 0xf, 
-	0xf, 0x0, 0x0, 0xf, 0xf, 0x0, 0x0, 0xf, 
-	  3, 0xf, 0x0, 0x0, 0x0, 0x0, 0xf,   3, 
-	  3,   3, 0xf, 0x0, 0x0, 0xf,   3,   3, 
-	  3,   3,   3, 0xf, 0xf,   3,   3,   3, 
-};
-
-
+/*
 void test_draw_agi_combined(byte pic_num, bool interactive) {
 	// Test drawing a sprite while respecing the priority buffer (i.e. what Sierra called "3D")
 	
-	byte bank_vis = 3;
-	byte bank_pri = 1;
+	byte bank_vis = BUFFER_BANK_VIS;	//3;
+	byte bank_pri = BUFFER_BANK_PRI;	//1;	Caution! collides with VAGI_FRAME_BANK_LO/HI
 	byte x_src = 0;
 	byte y_src = 0;
 	byte x_ofs = 0;
@@ -478,7 +378,7 @@ void test_draw_agi_combined(byte pic_num, bool interactive) {
 			printf("key="); printf_d(c); printf("?\n");
 		}
 		
-		/*
+		/ *
 		for(byte j = 0; j < 2; j++) {
 			// go through the thresholds (z-depth)
 			for(byte i = 0; i < 15; i++) {
@@ -509,43 +409,12 @@ void test_draw_agi_combined(byte pic_num, bool interactive) {
 		// Next time: Crop to the other slice of the frame (upper / lower)
 		if (y_src == 0) y_src = (AGI_FRAME_HEIGHT - LCD_HEIGHT);
 		else y_src = 0;
-		*/
+		* /
 		
 	}
 }
+*/
 
-
-void vagi_draw_pic(byte pic_num) {
-	// vagi:
-	const byte bank_vis = 3;
-	const byte bank_pri = 1;
-	
-	// Render both frames and create working buffers
-	lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Loading PIC "); printf_d(pic_num);
-	
-	bool ok = render_frame_agi(pic_num, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)
-	if (ok) {
-		process_frame_to_buffer(bank_vis, 0, 0);	// Crop (upper or lower part) of frame to working buffer
-		
-		//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Drawing PIC "); printf_d(pic_num);
-		draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
-		
-		//@FIXME: SQ2 hangs at intro 140 while drawing prio!
-		/*
-		lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Loading PRIO "); printf_d(pic_num);
-		ok = render_frame_agi(pic_num, VAGI_STEP_PRI);	// Render the full-size priority PIC frame (takes quite long...)
-		if (ok) {
-			process_frame_to_buffer(bank_pri, 0, 0);	// Crop (upper or lower part) of frame to working buffer
-			//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
-		}
-		
-		lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("done.");
-		*/
-		
-		// Partially redraw the lower part (where the progress bar was shown during rendering)
-		draw_buffer(bank_vis, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, 0,0, true);
-	}
-}
 
 /*
 // Draw something to the frame buffer
@@ -590,7 +459,6 @@ void render_frame_spirals_large() {
 		}
 	}
 }
-
 
 void test_draw_combined() {
 	// Test the drawing pipeline
@@ -740,7 +608,7 @@ void vagi_init() {
 	
 	//InitSound();
 	InitLogicSystem();
-	//InitViewSystem();
+	InitViewSystem();
 	//InitPicSystem(TRUE);
 	//InitObjSystem();
 	//InitParseSystem();
@@ -748,11 +616,69 @@ void vagi_init() {
 	//if(!RESTART) InitMenuSystem();
 	
 	SOUND_ON	= TRUE;
-	SetFlag(fSOUND);
+	//SetFlag(fSOUND);
+	ResetFlag(fSOUND);
 	
 }
 
-bool vagi_main() {
+void vagi_handle_input() {
+	// GBAGI: DoDelayNPoll() / PollInput()
+	byte key;
+	
+	//while((BOOL)(event = ReadEvent()) && (!TestFlag(fPLAYERCOMMAND))) {
+	while (!TestFlag(fPLAYERCOMMAND)) {
+		key = keyboard_inkey();
+		
+		if (key == KEY_CHARCODE_NONE) break;
+		
+		// Handle directions
+		int d = -1;
+		if (key == KEY_LEFT) d = dirLEFT;
+		if (key == KEY_RIGHT) d = dirRIGHT;
+		if (key == KEY_UP) d = dirUP;
+		if (key == KEY_DOWN) d = dirDOWN;
+		if (d >= 0) {
+			if (d == ViewObjs[0].direction) {	// Press the button twice?
+				vars[vEGODIR] = dirNONE;	// Stop
+			} else {
+				vars[vEGODIR] = d;	// New direction
+			}
+			if (PLAYER_CONTROL) {
+				ViewObjs[0].motion = mtNONE;
+			}
+		} else {
+			
+			//@TODO: Handle GUI
+			if (key == 'r') {
+				// Re-set ego
+				ViewObjs[0].x = 30;
+				ViewObjs[0].y = 80;
+				ViewObjs[0].priority = 14;
+			}
+			
+			/*
+			// Set controllers (if they have a key associated)
+			CTLMAP *c;
+			for(c = ctlMap; c < ctlMap+MAX_CONTROLLERS; c++) {
+				if(key == c->key) {
+					controllers[c->num] = 1;
+					break;
+				}
+			}
+			*/
+			vars[vKEYPRESSED] = (U8)key;
+		}
+	}
+}
+
+
+#define FRAMES_PER_SECOND 10	// Used for in-game time
+byte timer_frame = 0;
+
+
+bool vagi_loop() {
+	// aka. GBAGI: agimain.c:AGIMain() (without the outer loop)
+	
 #ifdef SKIPTOSCREEN
 	int m=1;
 #endif
@@ -764,19 +690,37 @@ bool vagi_main() {
 	vars[vKEYPRESSED]	= 0;
 	vars[vUNKWORD]		= 0;
 	
-	//DoDelayNPoll();
+	// Timer
+	timer_frame++;
+	if (timer_frame > FRAMES_PER_SECOND) {
+		timer_frame = 0;
+		if(++vars[vSECONDS]>=60) {
+			vars[vSECONDS]=0;
+			if(++vars[vMINUTES]>=60) {
+				vars[vMINUTES]=0;
+				if(++vars[vHOURS]>=60) {
+					vars[vHOURS]=0;
+					vars[vDAYS]++;
+				}
+			}
+		}
+	}
+	
+	// Handle user inputs NOW!
+	vagi_handle_input();
+	
+	
+	//
 	if(QUIT_FLAG) {
 		//printf("QUIT_FLAG");
 		return false;	//break;
 	}
 	//SystemDoit();
 	
-	if(PLAYER_CONTROL)
-		ViewObjs[0].direction = vars[vEGODIR];
-	else
-		vars[vEGODIR] = ViewObjs[0].direction;
+	if (PLAYER_CONTROL) ViewObjs[0].direction = vars[vEGODIR];
+	else vars[vEGODIR] = ViewObjs[0].direction;
 	
-	CalcVObjsDir();
+	CalcVObjsDir();	// agi_view.c: This makes ViewObjs move/wander/follow
 	
 	oldScore = vars[vSCORE];
 	SOUND_ON = TestFlag(fSOUND);
@@ -791,15 +735,15 @@ bool vagi_main() {
 	if(m<2) m++;}
 #endif
 	
-	dump_vars();
-	printf("logic0...");
-	
+	// Invoke the game logic (i.e. call LOG0)
+	//dump_vars();
+	//printf("logic0...");
 	while(!CallLogic(0)) {
 		if(QUIT_FLAG) break;
 		
-		vars[vUNKWORD]		= 0;
-		vars[vOBJBORDER]		= 0;
-		vars[vOBJECT]		= 0;
+		vars[vUNKWORD]   = 0;
+		vars[vOBJBORDER] = 0;
+		vars[vOBJECT]    = 0;
 		ResetFlag(fPLAYERCOMMAND);
 		oldScore = vars[vSCORE];
 	}
@@ -809,37 +753,43 @@ bool vagi_main() {
 	
 	//if( (oldScore!=vars[vSCORE]) || (TestFlag(fSOUND)!=SOUND_ON) ) WriteStatusLine();
 	
-	vars[vOBJBORDER]		= 0;
-	vars[vOBJECT]		= 0;
+	vars[vOBJBORDER] = 0;
+	vars[vOBJECT]    = 0;
 	
 	ResetFlag(fNEWROOM);
 	ResetFlag(fRESTART);
 	ResetFlag(fRESTORE);
 	
-	//if(!TEXT_MODE) UpdateGfx();
+	/*
+	if(!TEXT_MODE) {
+		UpdateGfx();	// screenc: Calls UpdateVObj
+	}
+	*/
+	UpdateVObj();
 	
-	if(QUIT_FLAG) return false;
+	if (QUIT_FLAG) return false;
 	return true;
 }
 
-// Main entry point
+
+// Main entry point (called by vgldk_init / crt)
 #if VGLDK_SERIES == 0
-// app
+// Platform independent "apps" (VGLDK_SERIES=0) are invoked with arguments
 int main(int argc, char *argv[]) {
 	(void)argc;
 	(void)argv;
 	
 #else
-// regular ROM does not provide command line args
+// Regular ROM programs do not have any command line arguments
 void main() __naked {
 	
 #endif
 	
 	byte running = 1;
-	char c;
+	//char c;
 	//word i;
 	
-	printf("VAGI\n");
+	//printf("VAGI\n");
 	AGIVER.major = 2;
 	AGIVER.minor = 0;
 	
@@ -852,26 +802,80 @@ void main() __naked {
 	//test_draw_agi_combined(VAGI_START_PIC_NUM, false);	// Test rendering actual AGI PIC data
 	//printf("end of render."); getchar();
 	
+	byte i;
+	byte spinner = 0;
+	const char spinner_char[4] = { '-', '/', '|', '\\'};
 	
-	while(running) {
+	while (running) {
 		
-		//running = vagi_main();
-		QUIT_FLAG = FALSE;
-		vagi_main();
 		
+		// Clear top bar
+		//memset((byte *)LCD_ADDR, 0x55, (LCD_WIDTH/8) * 7);
+		
+		/*
+		// Write activity to top line
+		lcd_text_col = 0; lcd_text_row = 0;
+		//dump_vars();
+		for(int i = 0; i < 24; i++) {	// MAX_VARS
+			printf_x2(vars[i]);
+		}
+		for(int i = 0; i < 24; i++) {	// MAX_FLAGS/8
+			printf_x2(flags[i]);
+		}
+		*/
+		//for(i = 0; i < spinner; i++) putchar(' ');
+		//putchar('.');
+		//for(i = spinner; i < 4; i++) putchar(' ');
+		/*
+		putchar(spinner_char[spinner % 4]);
+		spinner = (spinner + 1) % 4;
+		putchar('\n');
+		*/
+		
+		// Dump vars/flags as pixels
+		word a = LCD_ADDR;
+		memcpy((byte *)a, &vars[0], MAX_VARS);
+		a += MAX_VARS;
+		memcpy((byte *)a, &flags[0], MAX_FLAGS/8);
+		a += MAX_FLAGS/8;
+		//memcpy((byte *)a, (byte *)&ViewObjs[0], MAX_VOBJ*sizeof(VOBJ));
+		
+		/*
+		lcd_text_col = 0;
+		//lcd_text_row = 0;
+		lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
+		printf("x="); printf_d(ViewObjs[0].x);
+		printf(" y="); printf_d(ViewObjs[0].y);
+		printf(" pri="); printf_d(ViewObjs[0].priority);
+		//printf(" dir="); printf_d(ViewObjs[0].direction);
+		*/
+		// Dump VOBJ state
+		VOBJ *v;
+		byte n = 12;	//MAX_VOBJ;
+		byte cols = 3+1 + 2+2+2 + 1 + 3+1+3;
+		for(i = 0; i < n; i++) {
+			v = &ViewObjs[i];
+			lcd_text_col = (LCD_WIDTH/font_char_width) - cols;
+			lcd_text_row = i;
+			printf_d(i); putchar(':');
+			printf_x2(v->flags);
+			printf_x2(v->motion);
+			printf_x2(v->stepCount);
+			putchar('|');
+			printf_d(v->x); putchar(','); printf_d(v->y);
+		}
+		lcd_text_col = 0;
+		lcd_text_row = 0;
+		
+		//running = vagi_loop();
+		vagi_loop();
+		
+		/*
 		//putchar('?');
 		printf('vagi>');
 		c = getchar();
 		
 		switch(c) {
-			case 13:
-			case 10:
-				break;
-			
-			case 'd':
-			case 'D':
-				test_draw_agi_combined(VAGI_START_PIC_NUM, true);
-				break;
 			
 			case 'q':
 			case 'Q':
@@ -907,7 +911,7 @@ void main() __naked {
 			//		printf_d(c); putchar('?');
 			//		break;
 		}
-		
+		*/
 	}
 	
 	#if VGLDK_SERIES == 0

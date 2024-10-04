@@ -136,9 +136,10 @@ word CallLogic(U8 num) {
 	word c2;
 	
 	#ifdef AGI_LOGIC_DEBUG
+		printf("Logic "); printf_d(num); printf("...\n");
 		//printf("CallLogic("); printf_d(num); printf(")...\n");
 		//getchar();
-		printf("CallLogic("); printf_d(num); printf(") {\n");
+		//printf("CallLogic("); printf_d(num); printf(") {\n");
 	#endif
 	
 	#ifdef _FULL_BLIT_RESFRESHES
@@ -404,8 +405,10 @@ void SkipANDFalse() {
 		}
 	}
 	//code += (S16)(bGetW(code)+2);	// address
-	code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h)) + 2;
-	vagi_res_seek_to(curLog->res_h, code_ofs);
+	
+	//code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h)) + 2;
+	//vagi_res_seek_to(curLog->res_h, code_ofs);
+	vagi_res_skip(curLog->res_h, code_get_word());
 }
 
 
@@ -417,7 +420,7 @@ U8 *NewRoom(U8 num) {
 		printf("NewRoom(");
 		printf_d(num);
 		printf(")...");
-		getchar();
+		//getchar();
 	#endif
 	
 	//for (vObj=ViewObjs; vObj<&ViewObjs[MAX_VOBJ]; vObj++) {
@@ -449,7 +452,7 @@ U8 *NewRoom(U8 num) {
 	
 	vars[vROOMPREV]		= vars[vROOMNUM];
 	vars[vROOMNUM]		= num;
-	vars[vOBJECT]		=
+	vars[vOBJECT]		= 0;	//?
 	vars[vOBJBORDER]	= 0;
 	vars[vMEMORY]		= 10;
 	vars[vEGOVIEWNUM]	= ViewObjs[0].view;

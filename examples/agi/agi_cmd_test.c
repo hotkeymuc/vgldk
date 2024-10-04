@@ -185,16 +185,17 @@ void cController() {
 void cHaveKey() {
 	int k;
 	
-	if(!(k = vars[vKEYPRESSED])) {
-		//while((k = PollKey()) == -1);
-		while((k = keyboard_inkey()) == KEY_CHARCODE_NONE);
-	}
+	// Get key (non-blocking).
+	// k = getchar();	// Blocking!
+	k = keyboard_inkey();
 	
-	if(k) {
+	if (k == KEY_CHARCODE_NONE) {
+		IF_RESULT = FALSE;
+	} else {
 		vars[vKEYPRESSED] = k;
 		IF_RESULT = TRUE;
-	} else
-		IF_RESULT = FALSE;
+	}
+	
 }
 
 //if (said(“word1”,”word2”....”wordn”)) { .....
@@ -241,6 +242,7 @@ void cHaveKey() {
 //	you test for said(“kill”,”rol”) then the result will be true if the player
 //	enters “kill lion”, “kill lion with sword”, etc.
 void cSaid() {
+	
 	int i,curWord,wordCnt;
 	int m = inpos;
 	#ifdef AGI_LOGIC_DEBUG_IFS

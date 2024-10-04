@@ -31,7 +31,7 @@
 #include "agi_commands.h"
 
 /*****************************************************************************/
-char sztmp[256];
+//char sztmp[256];
 void UnimplementedBox(U8 id) {
 	//sprintf(sztmp,"Unimplemented command:\n%s()", agiCommands[id].name);
 	//MessageBox(sztmp);
@@ -326,13 +326,12 @@ void cDrawPic() {
 	U8 code_0 = code_get();
 	
 	U8 pic_num = vars[ code_0 ];
-	printf("cDrawPic(v["); printf_d(code_0); printf("] ("); printf_d(pic_num); printf("))...\n");
-	
+	//printf("cDrawPic(v["); printf_d(code_0); printf("] ("); printf_d(pic_num); printf("))...\n");
 	vagi_draw_pic(pic_num);
 }
 
 //show.pic();
-//	The current off scren picture buffer in drawn on the screen filling the
+//	The current off screen picture buffer is drawn on the screen filling the
 //	whole graphical play area with a background.
 void cShowPic() {
 	ResetFlag(fPRINTMODE);
@@ -341,6 +340,9 @@ void cShowPic() {
 	cCloseWindow();
 	ShowPic();
 	*/
+	
+	//draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, true);
+	
 	PIC_VISIBLE = TRUE;
 }
 
@@ -438,11 +440,14 @@ void cDiscardView() {
 //	cycle to cyNORMAL, and direction to drNONE.
 void cAnimateObj() {
 	U8 code_0 = code_get();
+	
+	if (code_0 >= MAX_VOBJ) {
+		//@FIXME: This error happens in SQ2 at the "broom scene"
+		//ErrorMessage(ERR_VOBJ_NUM, code_0);
+		return;
+	}
+	
 	VOBJ *v = &ViewObjs[code_0];
-	
-	if(code_0 >= MAX_VOBJ)
-		ErrorMessage(ERR_VOBJ_NUM, code_0);
-	
 	if(!(v->flags & oANIMATE)) {
 		v->flags		= oUPDATE|oCYCLE|oANIMATE;
 		v->motion		= mtNONE;
@@ -457,6 +462,7 @@ void cUnanimateAll() {
 	VOBJ *v;
 	int i;
 	EraseBlitLists();
+	
 	//for(v=ViewObjs; v<&ViewObjs[MAX_VOBJ]; v++)
 	for(i=0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
@@ -765,7 +771,7 @@ void cForceUpdate() {
 	U8 code_0 = code_get();
 	EraseBlitLists();
 	DrawBlitLists();
-	UpdateBlitLists();
+	//UpdateBlitLists();
 }
 
 //ignore.horizon(oA);
@@ -1154,7 +1160,7 @@ void cObserveBlocks() {
 //block(X1,Y1,X2,Y2);
 //	Turns on view object blocking and sets the block to the region specified by
 //	the X1, Y1, X2 and Y2 coordinates. Objects that observe blocks will be
-//	contrained to this area.
+//	constrained to this area.
 void cBlock() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
@@ -1469,10 +1475,14 @@ void cGetString() {
 	U8 code_3 = code_get();
 	U8 code_4 = code_get();
 	//@TODO: Implement
-	printf("cGetString");
+	//printf("cGetString!\n");
 	/*
 	ExecuteGetStringDialog(FALSE,code_0,GetMessage(curLog,code_1),code_4+1);
 	*/
+	
+	//MessageBoxXY(GetMessage(curLog,code_1), code_3, code_2);
+	printf("GetString: ["); printf(GetMessage(curLog,code_1)); printf("]: ");
+	gets(strings[code_0]);
 }
 
 //word.to.string(wA,sB);
@@ -1492,12 +1502,13 @@ void cParse() {
 	U8 code_0 = code_get();
 	ResetFlag(fPLAYERCOMMAND);
 	ResetFlag(fSAIDOK);
+	
 	//@TODO: Implement
-	printf("cParse!");
-	/*
-	if(code_0<MAX_STRINGS)
+	//printf("cParse!\n");
+	if(code_0 < MAX_STRINGS) {
+		printf("cParse: \""); printf(strings[code_0]); printf("\"");
 		ParseInput(strings[code_0]);
-	*/
+	}
 }
 
 //get.num(mPROMPT,vNUM);
@@ -1812,7 +1823,7 @@ void cScriptSize() {
 	DrawBlitLists();
 #endif
 	U8 code_0 = code_get();
-	printf("cScriptSize="); printf_d(code_0);
+	//printf("cScriptSize="); printf_d(code_0);
 }
 
 //set.game.id(mID);

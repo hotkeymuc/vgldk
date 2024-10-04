@@ -27,6 +27,8 @@
 #define BUFFER_WIDTH 160
 #define BUFFER_HEIGHT 100
 #define BUFFER_ADDR 0xc000	// Will always be banked there
+#define BUFFER_BANK_VIS 3
+#define BUFFER_BANK_PRI 1
 
 // Image/Frame processing options
 
@@ -279,6 +281,7 @@ void draw_buffer(
 }
 
 
+/*
 //void draw_buffer_combined(byte bank_vis, byte bank_pri, byte thresh, byte x_ofs, byte y_ofs, byte x_scale) {	//, byte y_scale) {
 void draw_buffer_combined(
 		byte bank_vis, byte bank_pri,
@@ -380,6 +383,7 @@ void draw_buffer_combined(
 		}
 	}
 }
+*/
 
 //void draw_buffer_combined(byte bank_vis, byte bank_pri, byte thresh, byte x_ofs, byte y_ofs, byte x_scale) {	//, byte y_scale) {
 void draw_buffer_sprite_priority(

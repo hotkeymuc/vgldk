@@ -34,12 +34,15 @@
 #include "agi_vars.h"
 
 VOBJ picView, ViewObjs[MAX_VOBJ], *viewPtrs[MAX_VOBJ];
-PVIEW pViews[MAX_PVIEWS], *pPView;
-BLIT blUpdate, blStatic;
+//PVIEW pViews[MAX_PVIEWS], *pPView;
+//BLIT blUpdate, blStatic;
 //BLIT blits[MAX_VOBJ];
+
 BOOL PRI_FIXED;         
 int priYList[MAX_VOBJ];   
 U8 priTable[172];
+
+vagi_res_handle_t view_res_h;	// Resource handle to read from (vagi_res.h)
 
 const int objDirTableX[] 	= { 0, 0, 1, 1, 1, 0,-1,-1,-1};
 const int objDirTableY[] 	= { 0,-1,-1, 0, 1, 1, 1, 0,-1};
@@ -68,7 +71,7 @@ void InitViewSystem() {
 	int i = 0;
 	VOBJ *v;
 	
-	pPView = pViews;
+	//pPView = pViews;
 	
 	PRI_FIXED = TRUE;
 	memcpy(priTable, priTableStart, sizeof(priTable));
@@ -77,7 +80,7 @@ void InitViewSystem() {
 	//for(v=ViewObjs; v<&ViewObjs[MAX_VOBJ]; v++) {
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
-		v->num = i++;
+		v->num = i;	//++;
 	}
 	/*
 	memset(&blUpdate, 0,sizeof(BLIT));
@@ -98,9 +101,15 @@ void UpdateVObj() {
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		
+		//printf("UpdateVObj");printf_d(i);printf("...");
+		//@FIXME: For now: Just always try drawing every ViewObj
+		BlitVObj(v);
+		
 		if((v->flags & (oDRAWN|oANIMATE|oUPDATE)) == (oDRAWN|oANIMATE|oUPDATE)) {
 			ANY_TO_DRAW = TRUE;
 			newLoop = lpIGNORE;
+			
+			//BlitVObj(v);
 			
 			if(!(v->flags & oFIXEDLOOP)) {
 				if( (v->totalLoops==2)||(v->totalLoops==3) )
@@ -127,14 +136,17 @@ void UpdateVObj() {
 					v->cycleCount = v->cycleTime;
 				}
 			}
+			
+			
 		}
 	}
 	
 	if(ANY_TO_DRAW) {
-		EraseBlitList(&blUpdate);
+		//EraseBlitList(&blUpdate);
 		UpdateObjsStep();
-		DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
-		UpdateBlitList(&blUpdate);
+		//DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
+		//UpdateBlitList(&blUpdate);
+		
 		ViewObjs[0].flags &= ~(oONLAND|oWATER);
 	}
 }     
@@ -202,6 +214,18 @@ void UpdateObjsStep() {
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		
+		// Copied here from UpdateBlitList:
+		if(v->stepCount == v->stepTime) {
+			if( (v->x == v->prevX) && (v->y == v->prevY) )
+				v->flags	|= oMOTIONLESS;
+			else {
+				v->prevX	= v->x;
+				v->prevY	= v->y;
+				v->flags	&= ~oMOTIONLESS;
+			}
+		}
+		
+		
 		if( (v->flags&(oDRAWN|oUPDATE|oANIMATE)) == (oDRAWN|oUPDATE|oANIMATE) ) {
 			if(v->stepCount <= 1) {
 				
@@ -242,15 +266,16 @@ void UpdateObjsStep() {
 				}
 				
 				if(border) {
-					if(!v->num)
+					if(!v->num) {
 						vars[vEGOBORDER]	= border;
-					else {
+					} else {
 						vars[vOBJECT]		= v->num;
 						vars[vOBJBORDER]	= border;
 					}
 					
-					if(v->motion == mtMOVE)
+					if(v->motion == mtMOVE) {
 						StopObjMoving(v);
+					}
 				}
 				
 				v->flags &= ~oREPOSITIONING;
@@ -287,9 +312,25 @@ BOOL CheckObjCollision(VOBJ *v1) {
 BOOL CheckObjControls(VOBJ *v) {
 	
 	//@TODO: Implement
-	/*
-	U8 *p = MAKE_PICBUF_PTR(v->x,v->y);
-	int flags = FLAG_CONTROL, x = v->pCel[0], pri;
+	
+	//U8 *p = MAKE_PICBUF_PTR(v->x,v->y);
+	buffer_switch(BUFFER_BANK_PRI);	// Map destination working buffer to 0xc000
+	
+	int px = v->x;
+	#ifdef BUFFER_PROCESS_HCROP
+		// 1:1 with crop/transform
+		int py = v->y;
+	#endif
+	#ifdef BUFFER_PROCESS_HCRUSH
+		// Scale (crush) 168 down to 100
+		int py = (v->y * 3) / 5;
+	#endif
+	
+	
+	int flags = FLAG_CONTROL;
+	int x = v->pCel[0];
+	int pri;
+	
 	
 	if(!(v->flags & oFIXEDPRIORITY))
 		v->priority = priTable[v->y];
@@ -297,7 +338,8 @@ BOOL CheckObjControls(VOBJ *v) {
 	if(v->priority != 15) {
 		flags |= FLAG_WATER;
 		do {
-			if(!(BOOL)(pri = (*p++ & 0xF0))) {
+			//if(!(BOOL)(pri = (*p++ & 0xF0))) {
+			if(!(BOOL)(pri = buffer_get_pixel_4bit(px++, py))) {
 				flags &= ~FLAG_CONTROL;
 				break;
 			}
@@ -334,7 +376,7 @@ BOOL CheckObjControls(VOBJ *v) {
 	}
 	
 	return (flags&FLAG_CONTROL);
-	*/
+	
 }
 
 BOOL CheckObjInScreen(VOBJ *v) {
@@ -422,7 +464,7 @@ int DistanceVSStep(int distance, int step) {
 
 void UpdateObjWander(VOBJ *v) {
 	int count = v->wanderCount--;
-	if( (!count) || (v->flags & oMOTIONLESS) )	{
+	if( (!count) || (v->flags & oMOTIONLESS) ) {
 		v->direction = rand()%9;
 		if(v == &ViewObjs[0])
 			vars[vEGODIR]	= v->direction;
@@ -466,50 +508,84 @@ void UpdateObjFollow(VOBJ *v) {
 void SetObjView(VOBJ *v, int num) {
 	//@TODO: Implement
 	/*
-	if(!viewDir[num])
-		ErrorMessage(ERR_NO_VIEW,num);
+	if(!viewDir[num]) ErrorMessage(ERR_NO_VIEW,num);
 	
 	v->pView		= (U8*)viewDir[num]+5;
 	v->view			= num;
 	v->totalLoops	= v->pView[2];
+	*/
+	
+	
+	//v->pView		= (U8*)viewDir[num]+5;
+	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, num);
+	if (view_res_h < 0) {
+		printf("VIEW err=-"); printf_d(-view_res_h); printf("!\n");
+		getchar();
+		return;
+	}
+	v->pView = (U8 *)num;	// Just so it isn't NULL
+	v->view			= num;
+	
+	//v->totalLoops	= v->pView[2];
+	vagi_res_skip(view_res_h, 2);
+	v->totalLoops	= vagi_res_read(view_res_h);
+	vagi_res_close(view_res_h);
 	
 	SetObjLoop(v, (v->loop >= v->totalLoops)?0:v->loop);
-	*/
+	
 }
 
 void SetObjLoop(VOBJ *v, int loop) {
-	//@TODO: Implement
-	/*
+	
 	if(v->pView == NULL)
 		ErrorMessage(ERR_VOBJ_VIEW,v->num);
 	if(loop > v->totalLoops)
-		ErrorMessage(ERR_VOBJ_LOOP,v->num,loop);
+		ErrorMessage2(ERR_VOBJ_LOOP,v->num,loop);
 	if(loop == v->totalLoops)
 		loop = v->totalLoops - 1;
 	
 	v->loop			= loop;
-	v->pLoop		= v->pView + bGetW(v->pView + 5 + (loop << 1));
-	v->totalCels	= v->pLoop[0];
+	
+	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->num);
+	vagi_res_skip(view_res_h, 5 + (loop << 1));
+	word o = vagi_res_read_word(view_res_h);
+	v->pLoop		= (U8 *)o;	//@TODO: ... = v->pView + bGetW(v->pView + 5 + (loop << 1));
+	
+	vagi_res_seek_to(view_res_h, o);
+	v->totalCels	= vagi_res_read(view_res_h);	// = v->pLoop[0];
+	vagi_res_close(view_res_h);
 	
 	if(v->cel >= v->totalCels)
 		v->cel = 0;
 	
 	SetObjCel(v, v->cel);
-	*/
+	
 }
 
 void SetObjCel(VOBJ *v, int cel) {
-	//@TODO: Implement
-	/*
+	
 	if(v->pView == NULL)
-		ErrorMessage(ERR_VOBJ_VIEW,v->num);
+		ErrorMessage(ERR_VOBJ_VIEW, v->num);
 	if(cel > v->totalCels)
-		ErrorMessage(ERR_VOBJ_CEL,v->num,cel);
+		ErrorMessage2(ERR_VOBJ_CEL, v->num, cel);
 	
 	v->cel		= cel;
-	v->pCel		= v->pLoop + bGetW(v->pLoop + (cel<<1) + 1);
-	v->width	= v->pCel[0];
-	v->height	= v->pCel[1];
+	
+	//v->pLoop + bGetW(v->pLoop + (cel<<1) + 1);
+	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->num);
+	vagi_res_seek_to(view_res_h, (word)v->pLoop);
+	
+	vagi_res_skip(view_res_h, (cel << 1)+1);
+	word o = vagi_res_read_word(view_res_h);
+	
+	v->pCel		= (U8 *)o;
+	
+	//v->width	= v->pCel[0];
+	v->width	= vagi_res_read(view_res_h);	//sprite_width		//... = v->pCel[0];
+	//v->height	= v->pCel[1];
+	v->height	= vagi_res_read(view_res_h);	//sprite_height;	//... = v->pCel[1];
+	vagi_res_close(view_res_h);
+	
 	
 	if((v->x + v->width) > PIC_WIDTH ) {
 		v->flags |= oREPOSITIONING;
@@ -522,16 +598,15 @@ void SetObjCel(VOBJ *v, int cel) {
 		if((horizon > v->y) && (!(v->flags & oINGOREHORIZON)))
 			v->y = horizon + 1;
 	}
-	*/
+	
 }
 
 void DrawObj(int num) {
-	//@TODO: Implement
-	/*
 	VOBJ *v = &ViewObjs[ num ];
 	
 	if(num >= MAX_VOBJ)
 		ErrorMessage(ERR_VOBJ_NUM,num);
+	
 	if(v->pCel == NULL)
 		ErrorMessage(ERR_VOBJ_NO_CEL,num);
 	
@@ -543,42 +618,52 @@ void DrawObj(int num) {
 		v->prevX		= v->x;
 		v->prevY		= v->y;
 		
+		/*
 		EraseBlitList(&blUpdate);
+		*/
 		
 		v->flags		|= oDRAWN;
 		
+		BlitVObj(v);	//@FIXME: Blit right away?
+		/*
 		DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
 		
 		UpdateObjCel(v);
+		*/
+		
 		v->flags		&= ~oSKIPUPDATE;
 	}
-	*/
+	
+	
 }
 
 void EraseObj(int num) {
-	//@TODO: Implement
-	/*
 	BOOL NO_UPDATE;
 	VOBJ *v = &ViewObjs[ num ];
 	
 	if(num >= MAX_VOBJ)
 		ErrorMessage(ERR_VOBJ_NUM,num);
 	
+	//@TODO: Release vagi_res_handle_t
+	
 	if(v->flags & oDRAWN) {
+		/*
 		EraseBlitList(&blUpdate);
+		if((NO_UPDATE = !(v->flags & oUPDATE))!=FALSE) EraseBlitList(&blStatic);
+		*/
 		
-		if((NO_UPDATE = !(v->flags & oUPDATE))!=FALSE)
-			EraseBlitList(&blStatic);
+		// Partial redraw: Re-draw that section from buffer, since we won't be having enough RAM for background blits I think...
+		//draw_buffer(BUFFER_BANK_VIS, v->x,v->x+v->width, v->y, v->y+v->height, 0,0,true);
 		
 		v->flags &= ~oDRAWN;
-		
-		if(NO_UPDATE)
-			DrawBlitList(BuildBlitList(CheckStaticVObj, &blStatic));
+		/*
+		if (NO_UPDATE) DrawBlitList(BuildBlitList(CheckStaticVObj, &blStatic));
 		
 		DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
 		UpdateObjCel(v);
+		*/
 	}
-	*/
+	
 }
 
 void UpdateObjCel(VOBJ *v) {
@@ -636,8 +721,7 @@ void UpdateObjCel(VOBJ *v) {
 }
 
 void UpdateObjLoop(VOBJ *v) {
-	//@TODO: Implement
-	/*
+	
 	int cel,max;
 	
 	if(v->flags & oSKIPUPDATE)
@@ -675,12 +759,12 @@ void UpdateObjLoop(VOBJ *v) {
 		}
 		SetObjCel(v, cel);
 	}
-	*/
+	
 }
 
+/*
 void SaveBlit(BLIT *b) {
 	//@TODO: Implement
-	/*
 	U8 *pBuf = MAKE_PICBUF_PTR(b->x,b->y), *bBuf = b->buffer;
 	int y = b->height;
 	
@@ -689,12 +773,15 @@ void SaveBlit(BLIT *b) {
 		pBuf += PIC_WIDTH;
 		bBuf += b->width;
 	} while(--y);
-	*/
+	
 }
 
+
 void RestoreBlit(BLIT *b) {
-	//@TODO: Implement
-	/*
+	//@TODO: Partial redraw: Re-draw that section from buffer, since we won't be having enough RAM for background blits I think...
+	//draw_buffer(BUFFER_BANK_VIS, b->x,b->x+b->width, b->y, b->y+b->height, 0,0,true);
+	
+	
 	U8 *pBuf = MAKE_PICBUF_PTR(b->x,b->y), *bBuf = b->buffer;
 	int y = b->height;
 	
@@ -703,8 +790,9 @@ void RestoreBlit(BLIT *b) {
 		pBuf += PIC_WIDTH;
 		bBuf += b->width;
 	} while(--y);
-	*/
+	
 }
+*/
 
 #define CHECK_PIC_PRI()\
 	if((pri = *pBuf & 0xF0) < 0x30) {\
@@ -731,6 +819,7 @@ int CheckPicPri(U8 *pBuf, U8 *pBufEnd, int celPri) {
 		pri = (pri>celPri)?-1:celPri;
 	return pri;
 }     */
+
 
 void BlitVObj(VOBJ *v) {
 	//@TODO: Implement
@@ -791,6 +880,54 @@ void BlitVObj(VOBJ *v) {
 			ResetFlag(fEGOHIDDEN);
 	}
 	*/
+	
+	// Test: draw a sprite!
+	int x, y;
+	// Transform sprite coordinate to screen coordinate
+	#ifdef BUFFER_DRAW_W160
+		x = v->x;	// 1:1
+	#endif
+	#ifdef BUFFER_DRAW_W192
+		//x2 = (x * 5) / 6;	// stretch 160 to 192
+		x = (v->x * 6) / 5;
+	#endif
+	#ifdef BUFFER_DRAW_W240
+		//x2 = (x * 2) / 3;	// stretch 160 to 240
+		x = (v->x * 3) / 2;
+	#endif
+	#ifdef BUFFER_DRAW_W320
+		x = v->x * 2;
+	#endif
+	
+	
+	#ifdef BUFFER_PROCESS_HCROP
+		// 1:1 with crop/transform
+		//y2 = y + y_src;
+		y = v->y;
+	#endif
+	#ifdef BUFFER_PROCESS_HCRUSH
+		// Scale (crush) 168 down to 100
+		//y2 = (y * 5) / 3;
+		y = (v->y * 3) / 5;
+	#endif
+	
+	//printf("blit("); printf_d(x); putchar(','); printf_d(y); printf(")");
+	
+	draw_buffer_sprite_priority(
+		BUFFER_BANK_PRI,
+		
+		&sprite_data[0], sprite_width, sprite_height,
+		sprite_transparency,	// trans
+		
+		//v->x, v->y,
+		x, y,
+		
+		v->priority,
+		
+		0,0, true
+	);
+	
+	
 }
 
 BOOL CheckUpdateVObj(VOBJ *v) {
@@ -804,17 +941,29 @@ BOOL CheckStaticVObj(VOBJ *v) {
 
 
 void EraseBlitLists() {
-	EraseBlitList(&blUpdate);
-	EraseBlitList(&blStatic);
+	//EraseBlitList(&blUpdate);
+	//EraseBlitList(&blStatic);
+	
+	// Refresh all backgrounds?
 }
 
 
 void DrawBlitLists() {
-	DrawBlitList(BuildBlitList(CheckStaticVObj, &blStatic));
-	DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
+	//DrawBlitList(BuildBlitList(CheckStaticVObj, &blStatic));
+	//DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
+	
+	// Cheap! Draw all sprites
+	// Partial redraw: Re-draw that section from buffer, since we won't be having enough RAM for background blits I think...
+	//draw_buffer(BUFFER_BANK_VIS, v->x,v->x+v->width, v->y, v->y+v->height, 0,0,true);
+	VOBJ *v;
+	byte i;
+	for(i = 0; i < MAX_VOBJ; i++) {
+		v = &ViewObjs[i];
+		BlitVObj(v);
+	}
 }
 
-
+/*
 void UpdateBlitLists() {
 	UpdateBlitList(&blStatic);
 	UpdateBlitList(&blUpdate);
@@ -822,7 +971,7 @@ void UpdateBlitLists() {
 
 void EraseBlitList(BLIT *b) {
 	//@TODO: Implement
-	/*
+	
 	BLIT *blit, *next;
 	
 	blit=b->prev;
@@ -841,12 +990,12 @@ void EraseBlitList(BLIT *b) {
 	
 	b->next = NULL;
 	b->prev = NULL;
-	*/
+	
 }
 
 BLIT *BuildBlitList( BOOL(*f)(VOBJ *) , BLIT *blParent) {
 	//@TODO: Implement
-	/*
+	
 	int blitPri, i, j, num, plast;
 	VOBJ *s;
 	int si;
@@ -878,12 +1027,12 @@ BLIT *BuildBlitList( BOOL(*f)(VOBJ *) , BLIT *blParent) {
 	}
 	
 	return blParent;
-	*/
+	
 }
 
 void AddBlit(VOBJ *v, BLIT *blParent) {
 	//@TODO: Implement
-	/*
+	
 	BLIT *blNew, *blPrev;
 	
 	if((BOOL) ((blNew = NewBlit(v))->prev = blParent->prev)) {
@@ -893,12 +1042,12 @@ void AddBlit(VOBJ *v, BLIT *blParent) {
 	blParent->prev = blNew;
 	if(!blParent->next)
 		blParent->next = blNew;
-	*/
+	
 }
 
 BLIT *NewBlit(VOBJ *v) {
 	//@TODO: Implement
-	/*
+	
 	BLIT *b;
 	
 	for(b=blits;b->v&&b<blits+MAX_VOBJ;b++);
@@ -915,24 +1064,24 @@ BLIT *NewBlit(VOBJ *v) {
 	b->height	= v->height;
 	
 	return (BLIT *)(v->blit = b);
-	*/
+	
 }
 
 void DrawBlitList(BLIT *blParent) {
 	//@TODO: Implement
-	/*
+	
 	BLIT *b=blParent->next;
 	while(b) {
 		SaveBlit(b);
 		BlitVObj(b->v);
 		b=b->next;
 	}
-	*/
+	
 }
 
 void UpdateBlitList(BLIT *blParent) {
 	//@TODO: Implement
-	/*
+	
 	VOBJ *v;
 	BLIT *b=blParent->prev;
 	while(b) {
@@ -948,9 +1097,9 @@ void UpdateBlitList(BLIT *blParent) {
 		}
 		b = b->prev;
 	}
-	*/
+	
 }
-
+*/
 
 void AddToPic(U8 num, U8 loop, U8 cel, U8 x, U8 y, U8 pri) {
 	//@TODO: Implement
@@ -958,6 +1107,7 @@ void AddToPic(U8 num, U8 loop, U8 cel, U8 x, U8 y, U8 pri) {
 	SetObjView(&picView, num);
 	SetObjLoop(&picView, loop);
 	SetObjCel(&picView, cel);
+	
 	
 	picView.prevHeight				= picView.pCel[1];
 	picView.prevWidth				= picView.pCel[0];

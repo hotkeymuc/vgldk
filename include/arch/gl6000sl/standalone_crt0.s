@@ -115,7 +115,8 @@ init:
 	;call	gsinit	; Initialise global variables
 	
 	;; GL6000SL
-	ld sp, #0xff87	; GL6000: ld sp, #0xff87 - leave just a little bit more
+	;ld sp, #0xff87	; GL6000: ld sp, #0xff87 - leave just a little bit more
+	ld sp, #0xfffd	; GL6000: ld sp, #0xff87 - leave just a little bit more
 	;ld a, #0
 	;ld i, a
 	

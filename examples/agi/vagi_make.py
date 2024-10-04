@@ -18,6 +18,8 @@ and the game data mounted as an external cartridge.
 VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
 GENERATE_MAME_ROM = True	# Generate a fake system ROM for use in MAME (required for MAME emulation)
 EMULATE_IN_MAME = True	# Start MAME
+EMULATION_SPEED = 8.0	#2.0
+
 MAME_ROMS_DIR = './roms'
 
 GAMES_PATH = '/z/apps/_games/_SCUMM'
@@ -27,7 +29,7 @@ GAMES_PATH = '/z/apps/_games/_SCUMM'
 #GAME_ID = 'LSL1'
 #GAME_ID = 'CAULDRON'
 #GAME_ID = 'SQ1'
-GAME_ID = 'SQ2'	# my fav!
+GAME_ID = 'SQ2'	# my fav! (AGIv2)
 #GAME_ID = 'PQ1'
 # Not working:
 ##GAME_ID = 'Enclosure'
@@ -121,10 +123,11 @@ def vagi_make():
 	loc_cart = 0x8000
 	loc_internal_ram = 0xc000
 	
-	loc_code = 0x0100	# Put compiled code after the CRT0 zero page
+	#loc_code = 0x100	# Put compiled code after the CRT0 zero page
+	loc_code = 0x080	# Put compiled code after the CRT0
 	#loc_data = loc_internal_ram	# Put heap in regular banked RAM
-	#loc_data = 0xebb8	# Put static heap in non-banked upper segment, right after VRAM
-	loc_data = 0xec00	# Put static heap in non-banked upper segment
+	loc_data = 0xebb8	# Put static heap in non-banked upper segment, right after VRAM
+	#loc_data = 0xec00	# Put static heap in non-banked upper segment
 	
 	# Set-up layout
 	#cart_eeprom_size = 8192	# Size of EEPROM you are planning to use
@@ -285,7 +288,8 @@ def vagi_emulate(cart_filename=None):
 	cmd += ' -sleep'
 	cmd += ' -volume -24'
 	cmd += ' -skip_gameinfo'
-	cmd += ' -speed 2.00'
+	#cmd += ' -speed 2.00'
+	cmd += ' -speed %.2f' % EMULATION_SPEED
 	cmd += ' -nomouse'
 	put('"%s"...' % cmd)
 	os.system(cmd)

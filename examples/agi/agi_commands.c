@@ -14,7 +14,7 @@
 
 #ifdef AGI_COMMANDS_NO_NAMES
 	// Safe space (no names)
-	#define DEF_AGI_COMMAND(name, func, params, flags) {"", func, params, flags}
+	#define DEF_AGI_COMMAND(name, func, params, flags) {func, params, flags}
 #else
 	// Normal:
 	#define DEF_AGI_COMMAND(name, func, params, flags) {name, func, params, flags}
