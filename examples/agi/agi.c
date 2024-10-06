@@ -145,7 +145,7 @@ U8 rand() {
 
 
 // from GBAGI:parse.c:
-word get_word_id(char *szWord) {
+word get_word_id(char *szWord, byte *word_len) {
 	romfs_handle_t tok_h;
 	byte b;
 	byte c;
@@ -155,7 +155,7 @@ word get_word_id(char *szWord) {
 	char *w;	// Current pointer in generated word
 	char *p;	// Current pointer in szWord
 	
-	byte word_len;
+	//byte word_len;
 	byte matches;
 	bool matching;
 	
@@ -169,7 +169,7 @@ word get_word_id(char *szWord) {
 	
 	// Stream in all words
 	word[0] = 0;
-	word_len = 0;
+	//word_len = 0;
 	w = &word[0];
 	while(!romfs_feof(tok_h)) {
 		
@@ -178,9 +178,9 @@ word get_word_id(char *szWord) {
 		
 		// Take prefix bytes from previous word
 		w = &word[b];
-		word_len = b;
-		if (word_len <= matches) {
-			matches = word_len;	// Reduce number of matching chars if prefix is smaller
+		//word_len = b;
+		if (b <= matches) {
+			matches = b;	// Reduce number of matching chars if prefix is smaller
 			matching = true;
 		}
 		p = &szWord[b];
@@ -199,6 +199,8 @@ word get_word_id(char *szWord) {
 				c = ' ';
 			}
 			*w++ = c;
+			//word_len ++;
+			
 			if (matching) {
 				if (*p == c) matches++;
 				else matching = false;
@@ -215,12 +217,19 @@ word get_word_id(char *szWord) {
 			
 			//put(f'#{word_id}: {str(word)}')
 			//printf("word #"); printf_x2(num_words >> 8); printf_x2(num_words & 0xff);
-			printf("id="); printf_x2(word_id >> 8); printf_x2(word_id & 0xff);
-			printf(" \""); printf(&word[0]); printf("\"\n");
+			//printf("id="); printf_x2(word_id >> 8); printf_x2(word_id & 0xff);
+			//printf(" \""); printf(&word[0]); printf("\"\n");
+			
+			*word_len = w - &word[0];
 			
 			// Check if whole input word was covered
-			if (*p == 0) {
+			//if (*p == 0) {
+			if ((*p & ~0x20) == 0) {	// handles 0x00 (end-of-word) and 0x20 (space)
 				// Full match!
+				
+				printf("Found id="); printf_x2(word_id >> 8); printf_x2(word_id & 0xff);
+				printf(" \""); printf(&word[0]); printf("\"\n");
+				
 				//return word_id;
 				break;
 			}
@@ -230,6 +239,7 @@ word get_word_id(char *szWord) {
 	}
 	
 	romfs_fclose(tok_h);
+	
 	if (matching)
 		return word_id;
 	
@@ -308,34 +318,51 @@ void InitParseSystem() {
 	//word word_id = get_word_id(&szInput[0]);
 	//getchar();
 	
+	printf("Enter input:"); gets(&szInput[0]);
+	ParseInput(&szInput[0]);
+	getchar();
+	
 }
 
 char *ParseInput(char *sStart) {
-	//@TODO: Split input into words, look them up, store beginning-pointers in wordStrings[] and word-group-numbers in input[]
-	printf("ParseInput: \""); printf(sStart); printf("\"");
+	char *s;
+	word word_id;
+	byte word_len;
 	
+	//@TODO: Split input into words, look them up, store beginning-pointers in wordStrings[] and word-group-numbers in input[]
+	printf("ParseInput: \""); printf(sStart); printf("\"...\n");
+	
+	s = sStart;
 	wordCount = 0;
-	/*
-	char *s=StripInput(sStart),*szWord;
-	int l,group;
+	
 	while(*s) {
-		l=0;
-		if((szWord = FindWordN(s))==NULL) {
+		// Skip white space
+		if (*s == ' ') {
+			s++;
+			continue;
+		}
+		
+		// Check word(s)
+		word_id = get_word_id(s, &word_len);
+		if (word_id == -1) {
+			printf("Unknown word: \""); printf(s); printf("\"!");
 			vars[vUNKWORD] = ++wordCount;
 			break;
 		}
 		
-		group = bGetW(szWord-2)&0x1FFF;
-		l = szWord[-3]-4;
-		if(group!=9999) {
-			wordStrings[wordCount] = s;
-			input[wordCount++] = group;
-		}
-		if(!s[l]) break;
-		s[l] = '\0';
-		s+=l+1;
+		//printf_d(word_id);
+		
+		wordStrings[wordCount] = s;
+		input[wordCount++] = word_id;
+		
+		// Skip over found word
+		s += word_len;
+		if (*s == 0) break;
+		
+		// Terminate the found word in input string...
+		*s++ = '\0';
+		// ...and continue at next word (skip the space/zero)
 	}
-	*/
 	
 	if (wordCount) SetFlag(fPLAYERCOMMAND);
 	
