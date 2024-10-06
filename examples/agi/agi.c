@@ -162,7 +162,6 @@ word get_word_id(char *szWord, byte *word_len) {
 	tok_h = romfs_fopen(r_words_tok);	// Open WORDS.TOK
 	romfs_fskip(tok_h, 52);	// Skip header
 	
-	
 	p = szWord;
 	matching = true;
 	matches = 0;
@@ -227,8 +226,8 @@ word get_word_id(char *szWord, byte *word_len) {
 			if ((*p & ~0x20) == 0) {	// handles 0x00 (end-of-word) and 0x20 (space)
 				// Full match!
 				
-				printf("Found id="); printf_x2(word_id >> 8); printf_x2(word_id & 0xff);
-				printf(" \""); printf(&word[0]); printf("\"\n");
+				//printf("Found id="); printf_x2(word_id >> 8); printf_x2(word_id & 0xff);
+				//printf(" \""); printf(&word[0]); printf("\"\n");
 				
 				//return word_id;
 				break;
@@ -330,7 +329,7 @@ char *ParseInput(char *sStart) {
 	byte word_len;
 	
 	//@TODO: Split input into words, look them up, store beginning-pointers in wordStrings[] and word-group-numbers in input[]
-	printf("ParseInput: \""); printf(sStart); printf("\"...\n");
+	//printf("ParseInput: \""); printf(sStart); printf("\"...\n");
 	
 	s = sStart;
 	wordCount = 0;
