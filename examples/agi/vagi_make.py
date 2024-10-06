@@ -17,7 +17,7 @@ and the game data mounted as an external cartridge.
 #VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
 VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
 GENERATE_MAME_ROM = True	# Generate a fake system ROM for use in MAME (required for MAME emulation)
-CODE_SEGMENTED = True	# Create a segmented ROM? Might not fit a single 32KB one.
+CODE_SEGMENTED = not True	# Create a segmented ROM? Might not fit a single 32KB one.
 
 EMULATE_IN_MAME = True	# Start MAME
 EMULATION_SPEED = 8.0	#2.0

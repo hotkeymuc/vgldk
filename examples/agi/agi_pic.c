@@ -13,37 +13,35 @@ based on scummvm's agi implementation 2024-09-14
 
 #include "agi_pic.h"
 
-/*
+
 // Connections to the outer world:
 //const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
 //word _dataOffset = 0;
 //word _dataSize = 0;
-bool _dataOffsetNibble = 0;
-
+bool _dataOffsetNibble; // = 0;
 vagi_res_handle_t pic_res_h;	// Resource handle to read from (vagi_res.h)
 
 
 // PictureMgr
-
 uint8 _patCode;
 uint8 _patNum;
-uint8 _scrOn = 0;
-uint8 _priOn = 0;
-uint8 _scrColor = 0;
-uint8 _priColor = 0;
+uint8 _scrOn; // = 0;
+uint8 _priOn; // = 0;
+uint8 _scrColor; // = 0;
+uint8 _priColor; // = 0;
 
-uint8 _minCommand = 0xf0;
+uint8 _minCommand; // = 0xf0;
 
 //AgiPictureVersion _pictureVersion;
 byte _pictureVersion;
 
-int16 _width = 160;
-int16 _height = 168;
+int16 _width; // = 160;
+int16 _height; // = 168;
 //int16 _xOffset, _yOffset;
 
 int _flags;
 int _currentStep;
-*/
+
 
 
 void putVirtPixel(int x, int y) {
@@ -913,7 +911,7 @@ void drawPictureV2(word pic_num) {
 		
 		if ((curByte < 0xf0) || (curByte > 0xfa)) {	// GBAGI only recognizes 0xf0-0xfa
 		//if (curByte < 0xf0) {
-			printf("PIC code err");
+			printf("PIC err");
 			break;
 		}
 		

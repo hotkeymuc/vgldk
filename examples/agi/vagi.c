@@ -120,37 +120,40 @@ byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kin
 	// Include known entry points in segment 1
 	#include "code_segment_1.h"
 	
-	// Provide stubs ("trampolines") to functions in the other bank
+	//#define SKIP_BANKED_DRAW	// For debugging memory corruptions
 	
+	// Provide stubs ("trampolines") to functions in the other bank
 	void vagi_pic_draw(byte pic_num) {
 		// Call entry point of "vagi_pic_draw()" in other segment
 		
-		//@FIXME: Calling works, but when returning things get weird...
-		//printf("Calling segment...");
-		//code_segment_call_b(code_segment_1__vagi_pic_draw_addr, pic_num);
-		//printf("back from segment!");
-		
-		printf("vagi_pic_draw OFF!");	//getchar();
-		(void)pic_num;
-		buffer_switch(BUFFER_BANK_VIS);
-		buffer_clear(0xf);
-		buffer_switch(BUFFER_BANK_PRI);
-		buffer_clear(0x4);
-		
+		#ifdef SKIP_BANKED_DRAW
+			printf("vagi_pic_draw OFF!");	//getchar();
+			(void)pic_num;
+			buffer_switch(BUFFER_BANK_VIS);
+			buffer_clear(0xf);
+			buffer_switch(BUFFER_BANK_PRI);
+			buffer_clear(0x4);
+		#else
+			//@FIXME: Calling works, but when returning things get weird...
+			printf("Call seg. pic_draw...");
+			code_segment_call_b(code_segment_1__vagi_pic_draw_addr, pic_num);
+			printf("back from pic_draw segment!"); getchar();
+		#endif
 		
 	}
 	
 	void vagi_pic_show() {
 		// Call entry point of "vagi_pic_show()" in other segment
 		
-		//@FIXME: Calling works, but when returning things get weird...
-		//printf("Calling segment...");
-		//code_segment_call(code_segment_1__vagi_pic_show_addr);
-		//printf("back from segment!");
-		
-		lcd_clear();
-		printf("vagi_pic_show OFF!");	//getchar();
-		
+		#ifdef SKIP_BANKED_DRAW
+			lcd_clear();
+			printf("vagi_pic_show OFF!");	//getchar();
+		#else
+			//@FIXME: Calling works, but when returning things get weird...
+			printf("Call seg. pic_show...");
+			code_segment_call(code_segment_1__vagi_pic_show_addr);
+			printf("back from pic_show segment!"); getchar();
+		#endif
 	}
 	
 #endif
@@ -309,6 +312,7 @@ void vagi_handle_input() {
 				// fPLAYERCOMMAND and fSAIDOK are Reset in game loop before calling vagi_handle_input
 				ParseInput(&szInput[0]);	// agi.c:ParseInput
 				// This will automatically set the flag SetFlag(fPLAYERCOMMAND);
+				lcd_text_col = 0; lcd_text_row = 0;
 			}
 			
 			// Set controllers (if they have a key associated)
@@ -475,7 +479,7 @@ void main() __naked {
 		
 		//for(i = 0; i < spinner; i++) putchar(' '); putchar('.'); for(i = spinner; i < 4; i++) putchar(' ');
 		
-		
+		/*
 		// Dump vars/flags as pixels
 		word a = LCD_ADDR;
 		memcpy((byte *)a, &vars[0], MAX_VARS);
@@ -483,9 +487,9 @@ void main() __naked {
 		memcpy((byte *)a, &flags[0], MAX_FLAGS/8);
 		a += MAX_FLAGS/8;
 		memcpy((byte *)a, (byte *)&ViewObjs[0], MAX_VOBJ*sizeof(VOBJ));
+		*/
 		
-		
-		
+		/*
 		lcd_text_col = 0;
 		//lcd_text_row = 0;
 		lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
@@ -493,8 +497,9 @@ void main() __naked {
 		printf(" y="); printf_d(ViewObjs[0].y);
 		printf(" pri="); printf_d(ViewObjs[0].priority);
 		//printf(" dir="); printf_d(ViewObjs[0].direction);
+		*/
 		
-		
+		/*
 		// Dump VOBJ state
 		VOBJ *v;
 		//byte cols = 3+1 + 2+2+2 + 1 + 3+1+3;
@@ -516,19 +521,21 @@ void main() __naked {
 			if (y > 15) break;
 			
 			printf_x2(i); putchar(':');
-			printf_x2(v->flags);
+			//printf_x2(v->flags);
+			printf_x2(ViewObjs[i].flags);
 			//printf_x2(v->motion);
 			//printf_x2(v->stepCount);
 			putchar(':');
-			printf_x2(v->x); putchar(','); printf_x2(v->y);
+			//printf_x2(v->x); putchar(','); printf_x2(v->y);
+			printf_x2(ViewObjs[i].x); putchar(','); printf_x2(ViewObjs[i].y);
 			
 		}
 		lcd_text_col = 0;
 		lcd_text_row = 0;
+		*/
 		
 		//running = vagi_loop();
 		vagi_loop();
-		
 		
 		
 	}

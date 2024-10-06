@@ -50,32 +50,29 @@ enum AgiPictureFlags {
 //const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
 //word _dataOffset = 0;
 //word _dataSize = 0;
-bool _dataOffsetNibble;	// = 0;
-
-vagi_res_handle_t pic_res_h;	// Resource handle to read from (vagi_res.h)
+extern bool _dataOffsetNibble;	// = 0;
+extern vagi_res_handle_t pic_res_h;	// Resource handle to read from (vagi_res.h)
 
 
 // PictureMgr
+extern uint8 _patCode;
+extern uint8 _patNum;
+extern uint8 _scrOn;	// = 0;
+extern uint8 _priOn;	// = 0;
+extern uint8 _scrColor;	// = 0;
+extern uint8 _priColor;	// = 0;
 
-uint8 _patCode;
-uint8 _patNum;
-uint8 _scrOn;	// = 0;
-uint8 _priOn;	// = 0;
-uint8 _scrColor;	// = 0;
-uint8 _priColor;	// = 0;
-
-uint8 _minCommand;	// = 0xf0;
+extern uint8 _minCommand;	// = 0xf0;
 
 //AgiPictureVersion _pictureVersion;
-byte _pictureVersion;
+extern byte _pictureVersion;
 
-int16 _width;	// = 160;
-int16 _height;	// = 168;
+extern int16 _width;	// = 160;
+extern int16 _height;	// = 168;
 //int16 _xOffset, _yOffset;
 
-int _flags;
-int _currentStep;
-
+extern int _flags;
+extern int _currentStep;
 
 
 
