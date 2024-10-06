@@ -103,7 +103,10 @@ void UpdateVObj() {
 		
 		//printf("UpdateVObj");printf_d(i);printf("...");
 		//@FIXME: For now: Just always try drawing every ViewObj
-		BlitVObj(v);
+		if (v->flags & oDRAWN) {
+			BlitVObj(v);
+		}
+		
 		
 		if((v->flags & (oDRAWN|oANIMATE|oUPDATE)) == (oDRAWN|oANIMATE|oUPDATE)) {
 			ANY_TO_DRAW = TRUE;
@@ -364,7 +367,7 @@ BOOL CheckObjControls(VOBJ *v) {
 		}
 	}
 	
-	if(!v->num) { // ego
+	if (v->num == 0) { // ego
 		if(flags&FLAG_SIGNAL)
 			SetFlag(fEGOONSIGNAL);
 		else
@@ -393,10 +396,12 @@ void SolidifyObjPosition(VOBJ *v) {
 	if((v->y <= horizon) && (!(v->flags&oINGOREHORIZON)))
 		v->y = horizon+1;
 	
+	//@FIXME: This freezes!
+	/*
 	if( CheckObjInScreen(v)	&& (!CheckObjCollision(v)) && CheckObjControls(v) )
 		return;
 	
-	while( (!CheckObjInScreen(v)) || CheckObjCollision(v) || (!CheckObjControls(v)) )
+	while( (!CheckObjInScreen(v)) || CheckObjCollision(v) || (!CheckObjControls(v)) ) {
 		switch(checkDir) {
 			case dirLEFT:
 				v->x--;
@@ -429,6 +434,8 @@ void SolidifyObjPosition(VOBJ *v) {
 				}
 				break;
 		}
+	}
+	*/
 }
 
 void UpdateObjMove(VOBJ *v) {
@@ -537,10 +544,9 @@ void SetObjView(VOBJ *v, int num) {
 
 void SetObjLoop(VOBJ *v, int loop) {
 	
-	if(v->pView == NULL)
-		ErrorMessage(ERR_VOBJ_VIEW,v->num);
-	if(loop > v->totalLoops)
-		ErrorMessage2(ERR_VOBJ_LOOP,v->num,loop);
+	if(v->pView == NULL) ErrorMessage(ERR_VOBJ_VIEW, v->num);
+	if(loop > v->totalLoops) ErrorMessage2(ERR_VOBJ_LOOP, v->num, loop);
+	
 	if(loop == v->totalLoops)
 		loop = v->totalLoops - 1;
 	
@@ -613,8 +619,8 @@ void DrawObj(int num) {
 	if(!(v->flags & oDRAWN)) {
 		v->flags		|= oUPDATE;
 		SolidifyObjPosition(v);
-		v->prevWidth	= v->pCel[0];
-		v->prevHeight	= v->pCel[1];
+		//v->prevWidth	= v->pCel[0];
+		//v->prevHeight	= v->pCel[1];
 		v->prevX		= v->x;
 		v->prevY		= v->y;
 		

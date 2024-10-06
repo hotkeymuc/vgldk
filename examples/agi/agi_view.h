@@ -84,8 +84,10 @@ enum {
 
 typedef struct {
 	U8	num;
-	S16	x,y,prevX,prevY;
-	U8	width,height,prevWidth,prevHeight;
+	S16	x,y;
+	S16 prevX,prevY;
+	U8	width,height;
+	//U8 prevWidth,prevHeight;
 	
 	U8	view;
 	U8	loop,totalLoops;
@@ -101,7 +103,7 @@ typedef struct {
 	
 	U8	*pView,*pLoop,*pCel;
 	
-	struct _BLIT *blit;
+	//struct _BLIT *blit;
 	
 	union {
 		struct {
@@ -146,7 +148,7 @@ extern PVIEW pViews[MAX_PVIEWS], *pPView;
 extern U8 priTable[172];
 
 //#define MAX_VOBJ			32 // erm..can be set to higher in the object file, but none use it more than 17 AFAIK (save me RAM!)
-#define MAX_VOBJ			18	// GBAGI default: 32, SQ2 references #36
+#define MAX_VOBJ			18	// GBAGI default: 32
 
 
 //#define TEST_Y(x1,x2,y)	((x1 >= code[1]) && (y >= code[2]) && (x2 <= code[3]) && (y <= code[4]))

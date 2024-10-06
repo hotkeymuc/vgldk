@@ -12,12 +12,12 @@
 //#include "gbagi.h"
 //#include "commands.h"
 
-#ifdef AGI_COMMANDS_NO_NAMES
-	// Safe space (no names)
-	#define DEF_AGI_COMMAND(name, func, params, flags) {func, params, flags}
-#else
+#ifdef AGI_COMMANDS_INCLUDE_NAMES
 	// Normal:
 	#define DEF_AGI_COMMAND(name, func, params, flags) {name, func, params, flags}
+#else
+	// Safe space (no names)
+	#define DEF_AGI_COMMAND(name, func, params, flags) {func, params, flags}
 #endif
 
 const AGITEST testCommands[MAX_TESTCMD] = {

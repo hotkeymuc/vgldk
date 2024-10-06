@@ -28,15 +28,25 @@
 #include "agi_pic.h"
 
 
-LOGIC *curLog,*log0;
+LOGIC *curLog;
+//LOGIC *log0;
+
 BOOL IF_RESULT;
+BOOL new_room_called;
+
+const char AGI_MESSAGES_KEY[] = "Avis Durgan";
+
+#define AGI_MAX_MESSAGE_LENGTH 128	//MAX_STRINGS_LEN	//40	agi_vars.h:MAX_STRINGS_LEN
+char agi_message_buf[AGI_MAX_MESSAGE_LENGTH];	// Buffer for GetMessage()
+
+
 
 #ifdef _WINDOWS
 #define _PRINT_LOG
 #endif
 
 //U8 *code;	//@TODO: We need to re-direct this to agi_res_read()
-word code_ofs;
+//word code_ofs;
 U16 logScan[256];	// Stores offset inside given logic
 
 
@@ -59,9 +69,6 @@ void code_term() {
 	vagi_res_close(curLog->msg_res_h);
 }
 
-const char AGI_MESSAGES_KEY[] = "Avis Durgan";
-#define AGI_MAX_MESSAGE_LENGTH MAX_STRINGS_LEN	//40	agi_vars.h:MAX_STRINGS_LEN
-char agi_message_buf[AGI_MAX_MESSAGE_LENGTH];
 
 char *GetMessage(LOGIC *log, int num) {
 	//return (char*)( log->messages + bGetW(log->messages+(num<<1)) );
@@ -75,7 +82,8 @@ char *GetMessage(LOGIC *log, int num) {
 	// u16[]    string offsets (relative to message section + 1)
 	// string[] strings (null terminated, possibly encrypted)
 	
-	vagi_res_seek_to(log->msg_res_h, log->ofs_messages + 1 + 2 + (num << 1));
+	//vagi_res_seek_to(log->msg_res_h, log->ofs_messages + 1 + 2 + (num << 1));
+	vagi_res_seek_to(log->msg_res_h, log->ofs_messages + 1 + 0 + (num << 1));
 	word o = vagi_res_read_word(log->msg_res_h);	// Read offset of desired message
 	//printf("o="); printf_x2(o >> 8); printf_x2(o & 0xff); getchar();
 	
@@ -89,7 +97,7 @@ char *GetMessage(LOGIC *log, int num) {
 	char *p = &agi_message_buf[0];	// Destination pointer
 	byte l = 0;	// Length counter
 	
-	while(l < MAX_STRINGS_LEN) {
+	while(l < AGI_MAX_MESSAGE_LENGTH) {
 		byte b = vagi_res_read(log->msg_res_h);	// Get raw byte
 		b ^= AGI_MESSAGES_KEY[k];	// XOR with key
 		if (b == 0) break;	// Terminate on NULL
@@ -121,7 +129,7 @@ char *GetMessage(LOGIC *log, int num) {
 
 void InitLogicSystem() {
 	curLog 			= NULL;
-	log0			= NULL;
+	//log0			= NULL;
 	
 	memset(logScan, 0, sizeof(logScan));
 }
@@ -129,17 +137,18 @@ void InitLogicSystem() {
 
 //U8 *CallLogic(U8 num) {
 word CallLogic(U8 num) {
-	LOGIC *prevLog,log;
+	LOGIC *prevLog;
+	LOGIC log;
 	
 	//U8 *c=code,*c2;
-	word c = code_ofs;
+	//word c = code_ofs;
+	//word c = vagi_res_tell(curLog->res_h);
 	word c2;
 	
 	#ifdef AGI_LOGIC_DEBUG
-		printf("Logic "); printf_d(num); printf("...\n");
-		//printf("CallLogic("); printf_d(num); printf(")...\n");
+		//printf("Logic "); printf_d(num); printf("...\n");
+		printf("CallLogic("); printf_d(num); printf(") {\n");
 		//getchar();
-		//printf("CallLogic("); printf_d(num); printf(") {\n");
 	#endif
 	
 	#ifdef _FULL_BLIT_RESFRESHES
@@ -153,15 +162,18 @@ word CallLogic(U8 num) {
 	//log.code		= pLog+7;
 	//log.messages	= log.code+bGetW(pLog+5);	// Note: "pLog+5" = first byte in actual resource data (First 5 bytes: 0x12 0x34, vol, size_lo, size_hi)
 	//log.msgTotal	= *log.messages++;
+	
+	// Open handle for reading code
 	log.res_h = vagi_res_open(AGI_RES_KIND_LOG, num);
 	if (log.res_h < 0) {
 		//printf("LOG open ERR\n");
 		printf("LOG open err=-"); printf_d(-log.res_h); putchar('\n');
 		return 0;
 	}
-	log.ofs_code = 2;	//vagi_res_tell(log.res_h);
 	word code_size = vagi_res_read_word(log.res_h);
+	log.ofs_code = 2;	//vagi_res_tell(log.res_h);
 	
+	// Open handle for reading messages
 	log.msg_res_h = vagi_res_open(AGI_RES_KIND_LOG, num);	// Exclusively for reading messages (skip around)
 	log.ofs_messages = log.ofs_code + code_size;	// Put ofs_messages right at the message section header
 	vagi_res_seek_to(log.msg_res_h, log.ofs_messages);
@@ -171,8 +183,7 @@ word CallLogic(U8 num) {
 	// set the active pointer
 	prevLog			= curLog;
 	curLog			= &log;
-	if (num == 0)
-		log0 = curLog;
+	//if (num == 0) log0 = curLog;
 	
 	c2 = ExecuteLogic(curLog);
 	
@@ -188,12 +199,12 @@ word CallLogic(U8 num) {
 	
 	curLog = prevLog;
 	//code = c;
-	code_ofs = c;
+	//code_ofs = c;
 	
 	#ifdef AGI_LOGIC_DEBUG
 		//printf("end-of-logic("); printf_d(num); printf(")\n");
 		//getchar();
-		printf("}\n");
+		printf("} EOC\n");
 	#endif
 	
 	// release the pointer
@@ -213,21 +224,27 @@ word ExecuteLogic(LOGIC *log) {
 	int i,l;
 	cmdnum = 0;
 #endif
+	#ifdef AGI_LOGIC_DEBUG
+		//printf("ExecLogic("); printf_d(log->num); printf(") <\n");
+	#endif
 	//code = log->code+logScan[log->num];
-	code_ofs = log->ofs_code + logScan[log->num];
-	vagi_res_seek_to(log->res_h, code_ofs);
+	//code_ofs = log->ofs_code + logScan[log->num];
+	vagi_res_seek_to(log->res_h, log->ofs_code + logScan[log->num]);
 	
 	//while(code && (BOOL)(op = *code++)) {
-	while((!vagi_res_eof(log->res_h)) && (BOOL)(op = vagi_res_read(log->res_h))) {
-		#ifdef AGI_LOGIC_DEBUG
+	//while((!vagi_res_eof(log->res_h)) && (BOOL)(op = vagi_res_read(log->res_h))) {
+	while(!vagi_res_eof(log->res_h)) {
+		op = vagi_res_read(log->res_h);
+		#ifdef AGI_LOGIC_DEBUG_OPS
 			printf("op=");
-			#ifdef AGI_COMMANDS_NO_NAMES
-				printf_d(op);
-			#else
+			#ifdef AGI_COMMANDS_INCLUDE_NAMES
 				printf(agiCommands[op].name);
+			#else
+				printf_d(op);
 			#endif
 			//for(i=0;i<agiCommands[op].nParams;i++) { code_peek()....
-			printf("...");
+			//printf("...");
+			//getchar();
 		#endif
 		
 #ifdef _WINDOWS
@@ -272,17 +289,32 @@ word ExecuteLogic(LOGIC *log) {
 		#ifdef AGI_LOGIC_DEBUG_IFS
 			//if (IF_RESULT) printf("TRUE\n"); else printf("FALSE\n");
 		#endif
+		#ifdef AGI_LOGIC_DEBUG_OPS
+			printf(".\n");
+		#endif
+		if (op == 0) return 1;	// op #0 = "return"
+		if (new_room_called) return 0;
 	}
 	
+	#ifdef AGI_LOGIC_DEBUG
+		//printf(">EOX\n");
+		if (log->num == 2) getchar();	// Debug SQ2 "broom"
+	#endif
+	
 	//return code;
-	return code_ofs;
+	//return code_ofs;
+	return 0;
+	//return vagi_res_eof(log->res_h);	// Main function loops until we return TRUE
 }
 
 
 void ExecuteGoto() {
 	//code += (S16)(bGetW(code)+2);
-	code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
-	vagi_res_seek_to(curLog->res_h, code_ofs);
+	//code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
+	//vagi_res_seek_to(curLog->res_h, code_ofs);
+	
+	word o = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
+	vagi_res_seek_to(curLog->res_h, o);
 }
 
 
@@ -334,7 +366,10 @@ void ExecuteIF() {
 		}
 		l=strlen(zs);
 #endif
+			
+			// Actually execute operation
 			testCommands[op].func();
+			
 			#ifdef AGI_LOGIC_DEBUG_IFS
 				printf("(res="); printf_d(IF_RESULT); printf(")");
 			#endif
@@ -356,6 +391,9 @@ void ExecuteIF() {
 					printf("(HIT)");
 				#endif
 				if (orCnt) {
+					#ifdef AGI_LOGIC_DEBUG_IFS
+						printf("(skip or)");
+					#endif
 					orCnt = 0;
 					SkipORTrue();
 				}
@@ -383,7 +421,7 @@ void SkipORTrue() {
 	while((op = code_get()) != 0xFC) {
 		if(op <= 0xFC) {
 			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
-			if (op == 0xe)	vagi_res_skip(curLog->res_h, code_get() << 1);
+			if (op == 0xe)	vagi_res_skip(curLog->res_h, (code_peek() << 1) + 1);
 			else			vagi_res_skip(curLog->res_h, testCommands[op].nParams);
 		}
 	}
@@ -420,7 +458,7 @@ U8 *NewRoom(U8 num) {
 		printf("NewRoom(");
 		printf_d(num);
 		printf(")...");
-		//getchar();
+		getchar();
 	#endif
 	
 	//for (vObj=ViewObjs; vObj<&ViewObjs[MAX_VOBJ]; vObj++) {
@@ -430,7 +468,7 @@ U8 *NewRoom(U8 num) {
 		vObj->flags			|= oUPDATE;
 		vObj->pCel			= NULL;
 		vObj->pView			= NULL;
-		vObj->blit			= NULL;
+		//vObj->blit			= NULL;
 		vObj->stepTime		= 1;
 		vObj->stepCount		= 1;
 		vObj->cycleCount	= 1;
@@ -469,6 +507,7 @@ U8 *NewRoom(U8 num) {
 			break;
 		case bdLEFT:	// coming from the left, go to the right
 			ViewObjs[0].x = PIC_WIDTH - ViewObjs[0].width;
+			break;
 	}
 	vars[vEGOBORDER] = bdNONE;
 	
@@ -477,8 +516,9 @@ U8 *NewRoom(U8 num) {
 	ClearControllers();
 	
 	//htk:
-	vagi_draw_pic(num);
-	WriteStatusLine();
+	new_room_called = true;
+	//vagi_draw_pic(num);	//@FIXME: This should be triggered through LOGIC code!!!
+	//WriteStatusLine();
 	
 	return NULL;
 }

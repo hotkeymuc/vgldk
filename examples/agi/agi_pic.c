@@ -13,7 +13,7 @@ based on scummvm's agi implementation 2024-09-14
 
 #include "agi_pic.h"
 
-
+/*
 // Connections to the outer world:
 //const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
 //word _dataOffset = 0;
@@ -43,7 +43,7 @@ int16 _height = 168;
 
 int _flags;
 int _currentStep;
-
+*/
 
 
 void putVirtPixel(int x, int y) {
@@ -111,7 +111,7 @@ void plotPattern(int x, int y) {
 		0, 1, 4, 9, 16, 25, 37, 50
 	};
 	
-	static uint16 circle_data[] = {
+	static uint16 circle_data[] = {	// Not const! It will be patched depending on game
 		0x8000,
 		0xE000, 0xE000, 0xE000,
 		0x7000, 0xF800, 0x0F800, 0x0F800, 0x7000,
@@ -853,7 +853,9 @@ void drawPictureV2(word pic_num) {
 	//bool nibbleMode = false;	// false for SQ2, it uses separate bytes for color value of 0xf0 / 0xf2
 	//bool mickeyCrystalAnimation = false;
 	//int  mickeyIteration = 0;
+	#ifdef AGI_PIC_SHOW_PROGRESS
 	byte status = 0;	// Status countdown
+	#endif
 	
 	
 	// Open resource
@@ -870,8 +872,8 @@ void drawPictureV2(word pic_num) {
 	//_dataOffset = 0;
 	_dataOffsetNibble = 0;
 	
-	_width = 160;
-	_height = 168;
+	_width = 160;	//PIC_WIDTH;	//160;
+	_height = 168;	//PIC_HEIGHT;	//168;
 	
 	_patCode = 0;
 	_patNum = 0;
@@ -884,7 +886,6 @@ void drawPictureV2(word pic_num) {
 	//_pictureVersion = AGIPIC_V15;
 	_pictureVersion = AGIPIC_V2;
 	_minCommand = 0xf0;
-	
 	
 	
 	//debugC(8, kDebugLevelMain, "Drawing V2/V3 picture");
@@ -910,8 +911,14 @@ void drawPictureV2(word pic_num) {
 		//printf(" = "); printf_d(curByte); putchar('\n'); getchar();
 		//printf_x2(curByte); //putchar('\n'); getchar();
 		
-		switch (curByte) {
-			case 0xf0:
+		if ((curByte < 0xf0) || (curByte > 0xfa)) {	// GBAGI only recognizes 0xf0-0xfa
+		//if (curByte < 0xf0) {
+			printf("PIC code err");
+			break;
+		}
+		
+		switch (curByte & 0x0f) {
+			case 0x0:	// 0xf0 = VisEnable
 				/*
 				if (!nibbleMode) {
 					draw_SetColor();
@@ -926,10 +933,10 @@ void drawPictureV2(word pic_num) {
 				#endif
 				_scrOn = true;
 				break;
-			case 0xf1:
+			case 0x1:	// 0xf1 = VisDisable
 				_scrOn = false;
 				break;
-			case 0xf2:
+			case 0x2:	// 0xf2 = PriEnable
 				/*
 				if (!nibbleMode) {
 					draw_SetPriority();
@@ -944,26 +951,28 @@ void drawPictureV2(word pic_num) {
 				#endif
 				_priOn = true;
 				break;
-			case 0xf3:
+			case 0x3:	// 0xf3 = PriDisable
 				_priOn = false;
 				break;
-			case 0xf4:
+			case 0x4:	// 0xf4 = YCorner
 				draw_yCorner(false);	//@FIXME: true or false?
 				break;
-			case 0xf5:
+			case 0x5:	// 0xf5 = XCorner
 				draw_xCorner(false);	//@FIXME: true or false?
 				break;
-			case 0xf6:
+			case 0x6:	// 0xf6 = AbsLine
 				draw_LineAbsolute();
 				break;
-			case 0xf7:
+			case 0x7:	// 0xf7 = RelLine
 				draw_LineShort();
 				break;
-			case 0xf8:
+			case 0x8:	// 0xf8 = Fill
 				draw_Fill();
-				status = 0;	// Force status
+				#ifdef AGI_PIC_SHOW_PROGRESS
+				status = 0;	// Force status update
+				#endif
 				break;
-			case 0xf9:
+			case 0x9:	// 0xf9 = ChangePen
 				// TODO: should this be getNextParamByte()?
 				_patCode = getNextByte();
 				/*
@@ -971,16 +980,18 @@ void drawPictureV2(word pic_num) {
 					plotBrush();
 				*/
 				break;
-			case 0xfa:
-				plotBrush();
+			case 0xa:
+				plotBrush();	// 0xfa = PlotPen
 				break;
-			case 0xfc:
+			case 0xc:	// 0xfc = ?? fill2?
 				draw_SetColor();
 				draw_SetPriority();
 				draw_Fill();
-				status = 0;	// Force status
+				#ifdef AGI_PIC_SHOW_PROGRESS
+				status = 0;	// Force status update
+				#endif
 				break;
-			case 0xff: // end of data
+			case 0xf: // 0xff = end of data
 				vagi_res_close(pic_res_h);
 				return;
 			default:
@@ -1015,7 +1026,7 @@ void drawPictureV2(word pic_num) {
 		buffer_switch(AGI_FRAME_BANK_LO);
 		draw_buffer(AGI_FRAME_BANK_LO, 0,0, false);
 		*/
-		
+		#ifdef AGI_PIC_SHOW_PROGRESS
 		if (status == 0) {	// Only when status variable overflows
 			// Status bar
 			// 240 pixels with 8 pixel chunks = 30 chunks
@@ -1045,7 +1056,9 @@ void drawPictureV2(word pic_num) {
 			}
 		}
 		status++;
+		#endif
 	}
+	
 	
 	// Close the resource handle
 	vagi_res_close(pic_res_h);

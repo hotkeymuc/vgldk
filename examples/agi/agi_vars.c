@@ -35,18 +35,23 @@ U16 ABS(int x) {
 }
 
 void SetFlag(U8 num) {
+	//if (num == fNEWROOM) {	printf("SetFlag NEWROOM");getchar();	}
+	
 	flags[num>>3] |= 0x80>>(num&7);
 }
 
 void ResetFlag(U8 num) {
+	//if (num == fNEWROOM) {	printf("ResetFlag NEWROOM");getchar();	}
 	flags[num>>3] &= ~(0x80>>(num&7));
 }
 
 void ToggleFlag(U8 num) {
+	//if (num == fNEWROOM) {	printf("ToggleFlag NEWROOM");getchar();	}
 	flags[num>>3] ^= 0x80>>(num&7);
 }
 
 BOOL TestFlag(U8 num) {
+	//if (num == fNEWROOM) {	printf("TestFlag NEWROOM="); printf_d( flags[num>>3] & (0x80>>(num&7)) ); getchar();	}
 	return (flags[num>>3] & (0x80>>(num&7)))?TRUE:FALSE;
 }
 

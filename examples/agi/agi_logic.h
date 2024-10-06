@@ -28,9 +28,12 @@ typedef struct {
 	word ofs_messages;
 } LOGIC;
 
-extern LOGIC *curLog,*log0;
+extern LOGIC *curLog;
+//extern LOGIC *log0;
 extern BOOL IF_RESULT;
 extern U16 logScan[256];
+
+extern BOOL new_room_called;	// VAGI
 
 // Helpers:
 U8 code_get();

@@ -258,6 +258,8 @@ int vagi_res_read(vagi_res_handle_t h) {
 	return romfs_fread(vagi_res_states[h].romfs_handle);
 }
 word vagi_res_read_word(vagi_res_handle_t h) {
+	//vagi_res_states[h].offset += 2;	// agi_res_size != R_FILES[].size, because a RES is just a part of a big VOL file
+	//return romfs_fread_word(vagi_res_states[h].romfs_handle);
 	word r;
 	r = vagi_res_read(h);	// LO
 	r |= vagi_res_read(h) << 8;	// HI

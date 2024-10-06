@@ -17,10 +17,19 @@ and the game data mounted as an external cartridge.
 #VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
 VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
 GENERATE_MAME_ROM = True	# Generate a fake system ROM for use in MAME (required for MAME emulation)
+CODE_SEGMENTED = True	# Create a segmented ROM? Might not fit a single 32KB one.
+
 EMULATE_IN_MAME = True	# Start MAME
 EMULATION_SPEED = 8.0	#2.0
 
 MAME_ROMS_DIR = './roms'
+if   VGLDK_SERIES == 4000: MAME_SYS = 'gl4000'	# MAME system name
+elif VGLDK_SERIES == 6000: MAME_SYS = 'gl6000sl'	# MAME system name
+elif VGLDK_SERIES == 7007: MAME_SYS = 'gl7007sl'	# MAME system name
+else:
+	put('At the moment, only generation of gl4000/gl6000sl/gl7007sl ROMs is implemented, not %s' % VGLDK_SERIES)
+	sys.exit(1)
+
 
 GAMES_PATH = '/z/apps/_games/_SCUMM'
 #GAME_ID = 'KQ1'
@@ -54,6 +63,7 @@ sys.path.append('../../tools')
 import sdcc	# for custom compilation
 import mame	# for creating MAME system ROMs
 import romfs_gen	# For creating the game ROM
+import noi2h	# For extracting segment information for multi-segment code
 
 # Import MONITOR tools for uploading output to real hardware
 #sys.path.append('../monitor')
@@ -72,6 +82,7 @@ def game_make(game_path, cart_filename):
 		f'{game_path}/PICDIR',
 		f'{game_path}/SNDDIR',
 		f'{game_path}/VIEWDIR',
+		f'{game_path}/WORDS.TOK',
 		f'{game_path}/VOL.*',
 	]
 	
@@ -98,23 +109,17 @@ def game_make(game_path, cart_filename):
 	
 
 
-def vagi_make():
+def vagi_make(out_name='vagi', more_defines={}):
 	"""Main VAGI make process"""
 	
 	vgldk_series = VGLDK_SERIES	# Model of VTech Genius Leader to build for
-	if   vgldk_series == 4000: mame_sys = 'gl4000'	# MAME system name
-	elif vgldk_series == 6000: mame_sys = 'gl6000sl'	# MAME system name
-	elif vgldk_series == 7007: mame_sys = 'gl7007sl'	# MAME system name
-	else:
-		put('At the moment, only generation of gl4000/gl6000sl/gl7007sl ROMs is implemented, not %s' % vgldk_series)
-		sys.exit(1)
 	
 	src_path = '.'	# source directory
 	out_path = 'out'	# Output directory for the compiler
 	lib_paths = []
 	include_paths = [
 		#'../../include/arch/gl%d'%vgldk_series,	# Architecture specific drivers
-		'../../include/arch/%s' % mame_sys,	# Architecture specific drivers
+		'../../include/arch/%s' % MAME_SYS,	# Architecture specific drivers
 		'../../include',	# General hardware drivers
 	]
 	
@@ -142,6 +147,7 @@ def vagi_make():
 		#'KEYBOARD_MINIMAL': 1,	# Use minimal keyboard (no modifiers, no buffer) to save code space
 		#'SOFTUART_BAUD': softuart_baud,	# SoftUART baud rate. Currently supported (2023-08) are 9600 or 19200
 		
+		**more_defines	# Optional arguments
 	}
 	
 	
@@ -152,8 +158,8 @@ def vagi_make():
 		os.mkdir(out_path)
 	
 	### Compile
-	hex_filename  = '%s/vagi_%d.hex' % (out_path, vgldk_series)
-	bin_filename  = '%s/vagi_%d.bin' % (out_path, vgldk_series)
+	hex_filename  = '%s/%s.hex' % (out_path, out_name)
+	bin_filename  = '%s/%s.bin' % (out_path, out_name)
 	#ram_filename  = '%s/vagi_%d_ram.bin' % (out_path, vgldk_series)
 	#cart_filename = '%s/vagi_%d_cart.bin' % (out_path, vgldk_series)
 	#cart_filename = '%s/vagi.cart.1024kb_SQ2.bin' % out_path
@@ -165,9 +171,9 @@ def vagi_make():
 		crt_s_files = [
 			#'%s/_crt0_%d.s' % (src_path, vgldk_series)
 			#'../../include/arch/standalone_crt0.s'
-			'../../include/arch/%s/standalone_crt0.s' % mame_sys
+			'../../include/arch/%s/standalone_crt0.s' % MAME_SYS
 		],
-		crt_rel_file = '%s/vagi_%d_standalone_crt0.rel' % (out_path, vgldk_series),
+		crt_rel_file = '%s/%s_standalone_crt0.rel' % (out_path, out_name),
 		
 		source_files = [
 			# The crt_rel_file is automatically prepended by compile()
@@ -239,29 +245,6 @@ def vagi_make():
 	
 	# MAME settings (used for system ROM generation and emulation)
 	
-	if GENERATE_MAME_ROM:
-		### Create MAME sys ROM for emulation
-		put('Creating MAME sys ROM for emulation...')
-		
-		# Get system ROM data
-		with open(bin_filename, 'rb') as h_rom:
-			data_sysrom = h_rom.read()
-		
-		# Make sure ROMs directory exists
-		if not os.path.isdir(MAME_ROMS_DIR):
-			put('Creating ROMs directory "%s", because it does not exits, yet...' % MAME_ROMS_DIR)
-			os.mkdir(MAME_ROMS_DIR)
-			put('Don\'t forget to copy the required additional driver ROMs (e.g. hd44780_a00.zip) there, too!') 
-		
-		# Create the ZIP file
-		output_file_sysromzip = '%s/%s.zip' % (MAME_ROMS_DIR, mame_sys)
-		put('Creating MAME system ROM zip at "%s"...' % output_file_sysromzip)
-		mame.create_sysrom_zip(
-			rom_data=data_sysrom,
-			mame_sys=mame_sys,
-			zip_filename=output_file_sysromzip
-		)
-	#
 	
 #
 
@@ -270,9 +253,6 @@ def vagi_emulate(cart_filename=None):
 	
 	## Emulate in MAME
 	vgldk_series = VGLDK_SERIES	# Model of VTech Genius Leader to build for
-	if   vgldk_series == 4000: mame_sys = 'gl4000'	# MAME system name
-	elif vgldk_series == 6000: mame_sys = 'gl6000sl'	# MAME system name
-	elif vgldk_series == 7007: mame_sys = 'gl7007sl'	# MAME system name
 	
 	# Run MAME manually
 	MAMECMD = '/z/data/_code/_c/mame.git/mame64'
@@ -280,7 +260,7 @@ def vagi_emulate(cart_filename=None):
 	cmd = MAMECMD
 	cmd += ' -nodebug'
 	cmd += ' -rompath "%s"' % MAME_ROMS_DIR	#MAME_ROMS_DIR
-	cmd += ' %s' % mame_sys
+	cmd += ' %s' % MAME_SYS
 	if cart_filename is not None: cmd += ' -cart "%s"' % cart_filename
 	cmd += ' -window'
 	cmd += ' -nomax'
@@ -308,7 +288,7 @@ def vagi_emulate(cart_filename=None):
 		mame_roms_dir = MAME_ROMS_DIR	# Use the newly created sysrom
 		#mame_roms_dir = None	# Use stock ROM
 		
-		driver = bdos_host.Driver_MAME(rompath=mame_roms_dir, emusys=mame_sys, cart_file=cpm_cart_filename)
+		driver = bdos_host.Driver_MAME(rompath=mame_roms_dir, emusys=MAME_SYS, cart_file=cpm_cart_filename)
 	elif 'HOST_DRIVER_SOFTUART' in cpm_defines:
 		driver = bdos_host.Driver_serial(baud=softuart_baud, stopbits=2)	# More stopbits = more time to process?
 	elif 'HOST_DRIVER_SOFTSERIAL' in cpm_defines:
@@ -347,7 +327,61 @@ if __name__ == '__main__':
 	game_make(game_path=GAME_PATH, cart_filename=GAME_CART_FILENAME)
 	
 	# Compile the VAGI runtime
-	vagi_make()
+	
+	if CODE_SEGMENTED:
+		# Compile extended code segment
+		put('Compiling extended segment binary...')
+		vagi_make('vagi_segment_1', {'CODE_SEGMENT': 1, 'CODE_SEGMENT_1': 1})
+		# Extract entry addresses
+		noi2h.noi2h('out/vagi_segment_1.noi', 'code_segment_1.h', 'code_segment_1_')
+		
+		# Compile main code segment
+		put('Compiling main segment binary...')
+		vagi_make('vagi_segment_0', {'CODE_SEGMENT': 0, 'CODE_SEGMENT_0': 1})
+		
+		# Get system ROM data
+		put('Combining binaries...')
+		with open('out/vagi_segment_0.bin', 'rb') as h:
+			data_segment_0 = h.read(0x8000)
+			if len(data_segment_0) < 0x8000: data_segment_0 += bytes([0xff] * (0x8000 - len(data_segment_0)))
+		with open('out/vagi_segment_1.bin', 'rb') as h:
+			data_segment_1 = h.read(0x8000)
+			if len(data_segment_1) < 0x8000: data_segment_1 += bytes([0xff] * (0x8000 - len(data_segment_1)))
+		
+		# Combine
+		data_sysrom = data_segment_0[:0x8000] + data_segment_1[:0x8000]
+		with open('out/vagi_combined.bin', 'wb') as h:
+			h.write(data_sysrom)
+	
+	else:
+		# Compile a non-segmented, single binary
+		put('Compiling single-segment binary...')
+		vagi_make('vagi_all', {'CODE_SEGMENT':1, 'CODE_SEGMENT_0': 1, 'CODE_SEGMENT_1': 1})	# Compile all
+		
+		# Get system ROM data
+		with open('out/vagi_all.bin', 'rb') as h:
+			data_sysrom = h.read()	#(0x8000)
+	
+	# Create final image
+	if GENERATE_MAME_ROM:
+		### Create MAME sys ROM for emulation
+		put('Creating MAME sys ROM for emulation...')
+		
+		# Make sure ROMs directory exists
+		if not os.path.isdir(MAME_ROMS_DIR):
+			put('Creating ROMs directory "%s", because it does not exits, yet...' % MAME_ROMS_DIR)
+			os.mkdir(MAME_ROMS_DIR)
+			put('Don\'t forget to copy the required additional driver ROMs (e.g. hd44780_a00.zip) there, too!') 
+		
+		# Create the ZIP file
+		output_file_sysromzip = '%s/%s.zip' % (MAME_ROMS_DIR, MAME_SYS)
+		put('Creating MAME system ROM zip at "%s"...' % output_file_sysromzip)
+		mame.create_sysrom_zip(
+			rom_data=data_sysrom,
+			mame_sys=MAME_SYS,
+			zip_filename=output_file_sysromzip
+		)
+	#
 	
 	# Emulate
 	if EMULATE_IN_MAME:

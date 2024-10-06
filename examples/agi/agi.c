@@ -30,6 +30,7 @@ U16 input[MAX_INPUT],inpos;
 int wordCount;
 BOOL MORE_MODE;
 char *wordStrings[MAX_INPUT];
+char szInput[64];
 
 
 // more:
@@ -40,11 +41,13 @@ void dump_vars() {
 	for(int i = 0; i < 20; i++) {
 		printf_x2(vars[i]);
 	}
-	//putchar("\n");
+	putchar('\n');
 }
 
 void WriteStatusLine() {
 	if (!STATUS_VISIBLE) return;
+	lcd_text_col = 0;
+	lcd_text_row = 0;
 	printf("STATS:");
 	dump_vars();
 }
@@ -52,10 +55,10 @@ void WriteStatusLine() {
 bool MessageBox(char *t) {
 	bool r;
 	
-	printf("MessageBox: [");
+	//printf("MessageBox: [");
+	putchar('[');
 	printf(t);
-	printf("]\n");
-	
+	putchar(']');
 	//putchar('\n');
 	
 	r = true;
@@ -67,7 +70,7 @@ bool MessageBox(char *t) {
 			byte delay = vars[vPRINTDURATION];
 			
 			//@TODO: Delay (while checking for user reply)...
-			r = (getchar() == 10);	//@FIXME: Must be non-blocking with TIMEOUT!
+		//	r = (getchar() == 10);	//@FIXME: Must be non-blocking with TIMEOUT!
 			
 			vars[vPRINTDURATION] = 0;
 			
@@ -142,8 +145,174 @@ U8 rand() {
 
 
 // from GBAGI:parse.c:
+word get_word_id(char *szWord) {
+	romfs_handle_t tok_h;
+	byte b;
+	byte c;
+	word word_id;
+	
+	char word[MAX_STRINGS_LEN];	// Holding currently generated word (SQ2: Longest word = 24)
+	char *w;	// Current pointer in generated word
+	char *p;	// Current pointer in szWord
+	
+	byte word_len;
+	byte matches;
+	bool matching;
+	
+	tok_h = romfs_fopen(r_words_tok);	// Open WORDS.TOK
+	romfs_fskip(tok_h, 52);	// Skip header
+	
+	
+	p = szWord;
+	matching = true;
+	matches = 0;
+	
+	// Stream in all words
+	word[0] = 0;
+	word_len = 0;
+	w = &word[0];
+	while(!romfs_feof(tok_h)) {
+		
+		// Read prefix length
+		b = romfs_fread(tok_h);
+		
+		// Take prefix bytes from previous word
+		w = &word[b];
+		word_len = b;
+		if (word_len <= matches) {
+			matches = word_len;	// Reduce number of matching chars if prefix is smaller
+			matching = true;
+		}
+		p = &szWord[b];
+		
+		// Get rest of characters
+		b = 0;
+		while (b <= 127) {
+			b = romfs_fread(tok_h);
+			
+			if (b < 32) {
+				c = (b ^ 127);
+			} else if (b > 127) {
+				c = ((b - 128) ^ 127);
+				//break!
+			} else if (b == 95) {
+				c = ' ';
+			}
+			*w++ = c;
+			if (matching) {
+				if (*p == c) matches++;
+				else matching = false;
+				p++;
+			}
+		}
+		*w = 0;	// Terminate
+		
+		// Get word number (This time, it is HI, LO for a change!)
+		word_id = (U16)romfs_fread(tok_h) << 8;	// HI
+		word_id |= romfs_fread(tok_h);	// LO
+		
+		if (matching) {
+			
+			//put(f'#{word_id}: {str(word)}')
+			//printf("word #"); printf_x2(num_words >> 8); printf_x2(num_words & 0xff);
+			printf("id="); printf_x2(word_id >> 8); printf_x2(word_id & 0xff);
+			printf(" \""); printf(&word[0]); printf("\"\n");
+			
+			// Check if whole input word was covered
+			if (*p == 0) {
+				// Full match!
+				//return word_id;
+				break;
+			}
+			
+		}
+		
+	}
+	
+	romfs_fclose(tok_h);
+	if (matching)
+		return word_id;
+	
+	return -1;
+}
+
+
+/*
+// Test: Show all words in WORDS.TOK
+void show_all_words() {
+	romfs_handle_t tok_h;
+	byte b;
+	word num_words;
+	word word_id;
+	
+	char word[MAX_STRINGS_LEN];	// Holding currently generated word (SQ2: Longest word = 24)
+	char *w;	// Current pointer in generated word
+	
+	num_words = 0;
+	
+	tok_h = romfs_fopen(r_words_tok);	// Open WORDS.TOK
+	romfs_fskip(tok_h, 52);	// Skip header
+	
+	word[0] = 0;
+	w = &word[0];
+	while(!romfs_feof(tok_h)) {
+		
+		// Read prefix length
+		b = romfs_fread(tok_h);
+		//if not b: break
+		
+		// Take prefix bytes from previous word
+		w = &word[b];
+		
+		// Get rest of characters
+		while(1) {
+			b = romfs_fread(tok_h);
+			
+			if (b < 32) {
+				*w++ = (b ^ 127);
+			} else if (b > 127) {
+				*w++ = ((b - 128) ^ 127);
+				break;
+			} else if (b == 95) {
+				*w++ = ' ';
+			}
+		}
+		*w = 0;	// Terminate
+		
+		// Get word number (This time, it is HI, LO for a change!)
+		word_id = (U16)romfs_fread(tok_h) << 8;	// HI
+		word_id |= romfs_fread(tok_h);	// LO
+		
+		//put(f'#{word_id}: {str(word)}')
+		printf("word #"); printf_x2(num_words >> 8); printf_x2(num_words & 0xff);
+		printf(": id="); printf_x2(word_id >> 8); printf_x2(word_id & 0xff);
+		printf(" \""); printf(&word[0]); printf("\"\n");
+		
+		num_words ++;
+	}
+	romfs_fclose(tok_h);
+}
+*/
+
+void InitParseSystem() {
+	//memset(input,0,sizeof(input));
+	//inpos = wordCount = 0;
+	//memset(wordStrings,0,sizeof(wordStrings));
+	
+	wordCount = 0;
+	szInput[0]='\0';
+	
+	//show_all_words();
+	
+	//printf("Enter word:"); gets(&szInput[0]);
+	//word word_id = get_word_id(&szInput[0]);
+	//getchar();
+	
+}
+
 char *ParseInput(char *sStart) {
-	//@TODO: Implement: Split input into words, look them up, store in wordStrings[] and input[]
+	//@TODO: Split input into words, look them up, store beginning-pointers in wordStrings[] and word-group-numbers in input[]
+	printf("ParseInput: \""); printf(sStart); printf("\"");
 	
 	wordCount = 0;
 	/*

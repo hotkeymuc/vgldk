@@ -30,8 +30,8 @@
 #include "agi_logic.h"
 #include "agi_commands.h"
 
-/*****************************************************************************/
 //char sztmp[256];
+
 void UnimplementedBox(U8 id) {
 	//sprintf(sztmp,"Unimplemented command:\n%s()", agiCommands[id].name);
 	//MessageBox(sztmp);
@@ -43,6 +43,7 @@ void InvalidBox() {
 
 void cReturn() {
 	//NULL
+	code_term();	// End current code to return?
 }
 
 //increment(vA);
@@ -237,6 +238,7 @@ void cNewRoom() {
 	
 	//code = NewRoom( code_0 );
 	NewRoom( code_0 );	// NewRoom always returns NULL, which exits current logic
+	
 	code_term();	// Terminate current code
 }
 
@@ -248,6 +250,7 @@ void cNewRoomV() {
 	
 	//code = NewRoom(vars[ code_0 ]);
 	NewRoom(vars[ code_0 ]);	// NewRoom always returns NULL, which exits current logic
+	
 	code_term();	// Terminate current code
 }
 
@@ -285,7 +288,9 @@ void cLoadLogicsV() {
 void cCall() {
 	U8 code_0 = code_get();
 	if(CallLogic( code_0 )) {
+		
 	} else {
+		//printf("call-term"); getchar();
 		//code = NULL;
 		code_term();	// Terminate current code
 	}
@@ -297,7 +302,9 @@ void cCall() {
 void cCallV() {
 	U8 code_0 = code_get();
 	if(CallLogic( vars[ code_0 ] )) {
+		
 	} else {
+		//printf("callV-term"); getchar();
 		//code = NULL;
 		code_term();	// Terminate current code
 	}
@@ -326,8 +333,14 @@ void cDrawPic() {
 	U8 code_0 = code_get();
 	
 	U8 pic_num = vars[ code_0 ];
-	//printf("cDrawPic(v["); printf_d(code_0); printf("] ("); printf_d(pic_num); printf("))...\n");
-	vagi_draw_pic(pic_num);
+	
+	//printf("cDrawPic(v["); printf_d(code_0); printf("] ("); printf_d(pic_num); printf("))...");
+	//getchar();
+	
+	// Only render (and process), do not show.
+	vagi_pic_draw(pic_num);
+	//printf("Back from cDrawPic..."); getchar();
+	//vagi_pic_show();
 }
 
 //show.pic();
@@ -341,6 +354,8 @@ void cShowPic() {
 	ShowPic();
 	*/
 	
+	//printf("cShowPic!"); getchar();
+	vagi_pic_show();
 	//draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, true);
 	
 	PIC_VISIBLE = TRUE;
@@ -371,6 +386,13 @@ void cOverlayPic() {
 	/*
 	OverlayPic( vars[ code_0 ] );
 	*/
+	U8 pic_num = vars[ code_0 ];
+	
+	printf("cOverlayPic(v["); printf_d(code_0); printf("] ("); printf_d(pic_num); printf("))");
+	getchar();
+	
+	//@TODO: Only render (and process), do not show.
+	vagi_pic_draw(pic_num);
 }
 
 //show.pri.screen();
@@ -442,7 +464,6 @@ void cAnimateObj() {
 	U8 code_0 = code_get();
 	
 	if (code_0 >= MAX_VOBJ) {
-		//@FIXME: This error happens in SQ2 at the "broom scene"
 		//ErrorMessage(ERR_VOBJ_NUM, code_0);
 		return;
 	}
@@ -1315,31 +1336,28 @@ void cPrintV() {
 //	Displays a string of text (message number Message) on the screen using the
 //	current text color attributes and positions it at Row and Col.
 void cDisplay() {
-	U8 code_0 = code_get();
-	U8 code_1 = code_get();
-	U8 code_2 = code_get();
-	
-	//@TODO: Implement
+	U8 code_0 = code_get();	// row
+	U8 code_1 = code_get();	// col
+	U8 code_2 = code_get();	// msg
 	/*
 	SET_ROWCOL(code_0, code_1);
 	DrawAGIString(GetMessage(curLog,code_2));
 	*/
-	MessageBox(GetMessage(curLog, code_2));
+	MessageBoxXY(GetMessage(curLog, code_2), code_1, code_0, 32);
 }
 
 //display.v(vROW,vCOLUMN,vMESSAGE);
 //	Displays a string of text (message number vMessage) on the screen using the
 //	current text color attributes and positions it at vRow and vCol.
 void cDisplayV() {
-	U8 code_0 = code_get();
-	U8 code_1 = code_get();
-	U8 code_2 = code_get();
-	//@TODO: Implement
+	U8 code_0 = code_get();	// row
+	U8 code_1 = code_get();	// col
+	U8 code_2 = code_get();	// msg
 	/*
 	SET_ROWCOL(vars[ code_0 ], vars[ code_1 ]);
 	DrawAGIString(GetMessage(curLog,vars[ code_2 ]));
 	*/
-	MessageBox(GetMessage(curLog,vars[ code_2 ]));
+	MessageBoxXY(GetMessage(curLog, vars[ code_2 ]), code_1, code_0, 32);
 }
 
 //clear.lines(TOP,BOTTOM,COLOUR);
@@ -1368,6 +1386,8 @@ void cTextScreen() {
 	SET_ROWCOL(0,0);
 	ClearScreen(((textColour>>4)|(textColour&0xF0))&0x77);
 	*/
+	lcd_clear();
+	
 #ifdef _WINDOWS
 	SystemUpdate();
 #endif
@@ -1380,6 +1400,7 @@ void cGraphics() {
 	TEXT_MODE	= FALSE;
 	//@TODO: Implement
 	//RedrawScreen();
+	
 	
 #ifdef _WINDOWS
 	SystemUpdate();
@@ -1469,19 +1490,20 @@ void cSetString() {
 //	Row,Col. The string entered will be limited to maxLen, and then stored in
 //	sDest.
 void cGetString() {
-	U8 code_0 = code_get();
-	U8 code_1 = code_get();
-	U8 code_2 = code_get();
-	U8 code_3 = code_get();
-	U8 code_4 = code_get();
+	U8 code_0 = code_get();	// sDest
+	U8 code_1 = code_get();	// msg
+	U8 code_2 = code_get();	// y
+	U8 code_3 = code_get();	// x
+	U8 code_4 = code_get();	// maxLen
 	//@TODO: Implement
 	//printf("cGetString!\n");
 	/*
 	ExecuteGetStringDialog(FALSE,code_0,GetMessage(curLog,code_1),code_4+1);
 	*/
 	
-	//MessageBoxXY(GetMessage(curLog,code_1), code_3, code_2);
-	printf("GetString: ["); printf(GetMessage(curLog,code_1)); printf("]: ");
+	MessageBoxXY(GetMessage(curLog,code_1), code_3, code_2, 80);
+	//printf("GetString: ["); printf(GetMessage(curLog,code_1)); printf("]: ");
+	putchar('>');	//@TODO: Use the defined char (there's a AGI command to set that!)
 	gets(strings[code_0]);
 }
 
@@ -1506,7 +1528,7 @@ void cParse() {
 	//@TODO: Implement
 	//printf("cParse!\n");
 	if(code_0 < MAX_STRINGS) {
-		printf("cParse: \""); printf(strings[code_0]); printf("\"");
+		//printf("cParse: \""); printf(strings[code_0]); printf("\"");
 		ParseInput(strings[code_0]);
 	}
 }
@@ -1521,10 +1543,17 @@ void cGetNum() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
 	//@TODO: Implement
-	printf("cGetNum!");
 	/*
 	ExecuteGetStringDialog(TRUE,code_1,GetMessage(curLog,code_0),3);
 	*/
+	printf("cGetNum!");
+	printf(GetMessage(curLog,code_0));
+	
+	//@FIXME: Implement number entry!
+	//gets(sztmp);
+	//vars[code_1] = atoi(sztmp);
+	vars[code_1] = 1;
+	
 }
 
 //prevent.input();
@@ -1550,6 +1579,8 @@ void cSetKey() {
 	U8 code_0w = code_get_word();
 	U8 code_2 = code_get();
 	int i;
+	
+	//printf("ctrl["); printf_d(code_2); printf("]="); printf_x2(code_0w >> 8); printf_x2(code_0w & 0xff);
 	for(i=0; i<MAX_CONTROLLERS-1; i++) {
 		if(!ctlMap[i].key) {
 			ctlMap[i].key = code_0w;	//bGetW(code);
@@ -1837,6 +1868,8 @@ void cSetGameId() {
 	U8 code_0 = code_get();
 	strncpy(szGameID, GetMessage(curLog,code_0),MAX_ID_LEN);
 	szGameID[MAX_ID_LEN] = '\0';
+	
+	//printf("Game ID: \""); printf(szGameID); printf("\"\n");
 }
 
 //log(mLOGMESSAGE);
@@ -1855,7 +1888,10 @@ void cLog() {
 //	this command was called rather than the beginning of the logic.
 void cSetScanStart() {
 	//logScan[curLog->num] = (U16)(code-curLog->code);
-	printf("cSetScanStart");
+	
+	//@TODO: Check if correct!
+	printf("cSetScanStart");getchar();
+	
 	U16 code_now = vagi_res_tell(curLog->res_h);
 	logScan[curLog->num] = (U16)(code_now - curLog->ofs_code);
 }
@@ -1864,7 +1900,10 @@ void cSetScanStart() {
 //	Clears the bookmark in the current logic. When the logic is called again,
 //	it will begin execution from the beginning of the logic as it would normally.
 void cResetScanStart() {
-	printf("cResetScanStart");
+	
+	//@TODO: Check if correct!
+	printf("cResetScanStart");getchar();
+	
 	logScan[curLog->num] = 0;
 }
 

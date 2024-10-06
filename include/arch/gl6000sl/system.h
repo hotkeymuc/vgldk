@@ -193,10 +193,11 @@ Intro sound port accesses at 0x2x?:
 // Keyboard
 #include "keyboard.h"
 
-
-// Sound
-#include "sound.h"
-
+//#define VGLDK_NO_SOUND
+#ifndef VGLDK_NO_SOUND
+	// Sound
+	#include "sound.h"
+#endif
 
 // Publish function NAMES for STDIO
 #define VGLDK_STDOUT_PUTCHAR lcd_putchar
@@ -235,7 +236,9 @@ void vgldk_init() __naked {
 	
 	keyboard_init();
 	
-	sound_off();
+	#ifndef VGLDK_NO_SOUND
+		sound_off();
+	#endif
 	
 	//main();
 	__asm

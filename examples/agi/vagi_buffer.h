@@ -34,13 +34,13 @@
 
 // Chose one draw scaling option:
 //#define BUFFER_DRAW_W160	// Draw width 1:1 (does not fill the full screen width)
-//#define BUFFER_DRAW_W192	// Stretch width to 192 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH)
-#define BUFFER_DRAW_W240	// Stretch width to 240 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH)
-//#define BUFFER_DRAW_W320	// Draw width X2 with crop/scroll (fast, but requires scrolling)
+//#define BUFFER_DRAW_W192	// Stretch width to 192 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
+#define BUFFER_DRAW_W240	// Stretch width to 240 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
+//#define BUFFER_DRAW_W320	// Draw width X2 with crop (fast, but requires scrolling)
 
 // Chose one frame processing option:
-//#define BUFFER_PROCESS_HCROP	// Just extract 100 pixels in height and use scrolling
-#define BUFFER_PROCESS_HCRUSH	// Crush the 168 frame height down to 100?
+//#define BUFFER_PROCESS_HCROP	// Just extract 100 pixels in height (and employ scrolling with re-rendering)
+#define BUFFER_PROCESS_HCRUSH	// Crush the 168 frame height down to 100
 
 // Chose one pixel drawing option:
 //#define BUFFER_DRAW_MONO	// Use 1 bit on/off
@@ -58,8 +58,9 @@ void inline buffer_switch(byte bank) {
 	// Mount a different RAM segment to BUFFER_ADDR (0xc000)
 	bank_0xc000_port = bank;
 }
-void buffer_clear() {
-	memset((byte *)BUFFER_ADDR, 0x00, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
+void buffer_clear(byte c) {
+	//memset((byte *)BUFFER_ADDR, 0x00, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
+	memset((byte *)BUFFER_ADDR, c * 0x11, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
 }
 void buffer_add_pixel_4bit(byte x, byte y, byte c) {
 	// Add 4 bit color value of the working buffer at 0xc000
@@ -101,65 +102,6 @@ byte buffer_get_pixel_4bit(byte x, byte y) {
 	*/
 	if (x & 1)	return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) >> 4;
 	else		return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) & 0x0f;
-}
-
-
-void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
-	// Crop/scale/scroll full frame into working buffer (can re-use source bank as destination!)
-	byte x;
-	byte y;
-	byte x2;
-	byte y2;
-	byte c;
-	
-	// Clear destination buffer (Cuation! When re-using the same bank for frame and buffer, this will clear the frame!)
-	//bank_0xc000_port = dest_bank;	// Map destination working buffer to 0xc000
-	//buffer_switch(dest_bank);
-	//buffer_clear();
-	
-	// Copy (and transform) pixels from full frame to reduced buffer
-	for(y = 0; y < BUFFER_HEIGHT; y++) {
-		
-		// Transform y coordinate here!
-		#ifdef BUFFER_PROCESS_HCROP
-			// 1:1 with crop/transform
-			y2 = y + y_src;
-		#endif
-		#ifdef BUFFER_PROCESS_HCRUSH
-			// Scale (crush) 168 down to 100
-			(void)y_src;
-			y2 = (y * 5) / 3;
-		#endif
-		
-		for(x = 0; x < BUFFER_WIDTH; x++) {
-			// Transform x coordinate here!
-			
-			// 1:1
-			//x2 = x;
-			
-			// 1:1 with crop/transform
-			x2 = x + x_src;
-			
-			// Get pixel from frame
-			
-			/*
-			#ifdef AGI_FRAME_CONTIGUOUS
-				// Get pixel from contiguous frame
-				//bank_0xc000_port = AGI_FRAME_CONTIGUOUS_BANK;	// Map contiguous lower bank to 0xc000
-				buffer_switch(AGI_FRAME_CONTIGUOUS_BANK);
-				c = frame_contiguous_get_pixel_4bit(x2, y2);
-			#else
-				// Get pixel from banked frame
-				c = frame_banked_get_pixel_4bit(x2, y2);
-			#endif
-			*/
-			c = frame_get_pixel_4bit(x2, y2);
-			
-			// Write to final working buffer
-			buffer_switch(dest_bank);	// Map destination working buffer to 0xc000
-			buffer_set_pixel_4bit(x, y, c);
-		}
-	}
 }
 
 

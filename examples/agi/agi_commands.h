@@ -224,10 +224,10 @@ void SkipORTrue(void);
 void SkipANDFalse(void);
 
 typedef struct {
-	#ifdef AGI_COMMANDS_NO_NAMES
-	// no name field to safe space
-	#else
+	#ifdef AGI_COMMANDS_INCLUDE_NAMES
 	char *name;
+	#else
+	// no name field to safe space
 	#endif
 	void (*func)(void);
 	U8 nParams;
@@ -235,10 +235,10 @@ typedef struct {
 } AGICMD;
 
 typedef struct {
-	#ifdef AGI_COMMANDS_NO_NAMES
-	// no name field to safe space
-	#else
+	#ifdef AGI_COMMANDS_INCLUDE_NAMES
 	char *name;
+	#else
+	// no name field to safe space
 	#endif
 	void (*func)(void);
 	U8 nParams;
