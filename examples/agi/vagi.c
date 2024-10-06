@@ -123,32 +123,34 @@ byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kin
 	// Provide stubs ("trampolines") to functions in the other bank
 	
 	void vagi_pic_draw(byte pic_num) {
-		//printf("vagi_pic_draw: segmented!\n");
-		
-		//buffer_switch(BUFFER_BANK_VIS);
-		//buffer_clear(0xf);
-		//buffer_switch(BUFFER_BANK_PRI);
-		//buffer_clear(0x4);
-		
 		// Call entry point of "vagi_pic_draw()" in other segment
-		//printf("Calling segment...");
+		
 		//@FIXME: Calling works, but when returning things get weird...
+		//printf("Calling segment...");
 		//code_segment_call_b(code_segment_1__vagi_pic_draw_addr, pic_num);
+		//printf("back from segment!");
+		
 		printf("vagi_pic_draw OFF!");	//getchar();
 		(void)pic_num;
-		//printf("back from segment!");
+		buffer_switch(BUFFER_BANK_VIS);
+		buffer_clear(0xf);
+		buffer_switch(BUFFER_BANK_PRI);
+		buffer_clear(0x4);
+		
+		
 	}
 	
 	void vagi_pic_show() {
-		//printf("vagi_pic_show: segmented!\n");
-		
 		// Call entry point of "vagi_pic_show()" in other segment
-		//printf("Calling segment...");
+		
 		//@FIXME: Calling works, but when returning things get weird...
-		lcd_clear();
+		//printf("Calling segment...");
 		//code_segment_call(code_segment_1__vagi_pic_show_addr);
-		printf("vagi_pic_show OFF!");	//getchar();
 		//printf("back from segment!");
+		
+		lcd_clear();
+		printf("vagi_pic_show OFF!");	//getchar();
+		
 	}
 	
 #endif
@@ -296,11 +298,9 @@ void vagi_handle_input() {
 				// Re-set ego
 				ViewObjs[0].x = 30;
 				ViewObjs[0].y = 80;
-				ViewObjs[0].priority = 14;
-			}
-			
-			//if ((INPUT_ENABLED) && (key == ' ')) {
-			if (INPUT_ENABLED) {
+				ViewObjs[0].priority = 12;
+			} else
+			if ((INPUT_ENABLED) && (key == ' ')) {
 				lcd_text_col = 0;
 				lcd_text_row = inputPos;	//0;
 				printf(">");
@@ -454,8 +454,7 @@ void main() __naked {
 #endif
 	
 	byte running = 1;
-	//char c;
-	word i;
+	byte i;
 	
 	//printf("VAGI\n");
 	AGIVER.major = 2;
@@ -463,55 +462,30 @@ void main() __naked {
 	
 	vagi_init();
 	
-	
 	//test_draw_combined();	// Test drawing combined vis & prio
 	//test_draw_agi_scroll();	// Test partial redraw
 	//test_draw_agi_combined(VAGI_START_PIC_NUM, true);	// Test rendering actual AGI PIC data
 	//test_draw_agi_combined(VAGI_START_PIC_NUM, false);	// Test rendering actual AGI PIC data
 	//printf("end of render."); getchar();
-	/*
-	byte i;
-	byte spinner = 0;
-	const char spinner_char[4] = { '-', '/', '|', '\\'};
-	*/
 	
 	while (running) {
-		
 		
 		// Clear top bar
 		//memset((byte *)LCD_ADDR, 0x55, (LCD_WIDTH/8) * 7);
 		
-		/*
-		// Write activity to top line
-		lcd_text_col = 0; lcd_text_row = 0;
-		//dump_vars();
-		for(int i = 0; i < 24; i++) {	// MAX_VARS
-			printf_x2(vars[i]);
-		}
-		for(int i = 0; i < 24; i++) {	// MAX_FLAGS/8
-			printf_x2(flags[i]);
-		}
-		*/
-		//for(i = 0; i < spinner; i++) putchar(' ');
-		//putchar('.');
-		//for(i = spinner; i < 4; i++) putchar(' ');
-		/*
-		putchar(spinner_char[spinner % 4]);
-		spinner = (spinner + 1) % 4;
-		putchar('\n');
-		*/
+		//for(i = 0; i < spinner; i++) putchar(' '); putchar('.'); for(i = spinner; i < 4; i++) putchar(' ');
 		
-		/*
+		
 		// Dump vars/flags as pixels
 		word a = LCD_ADDR;
 		memcpy((byte *)a, &vars[0], MAX_VARS);
 		a += MAX_VARS;
 		memcpy((byte *)a, &flags[0], MAX_FLAGS/8);
 		a += MAX_FLAGS/8;
-		//memcpy((byte *)a, (byte *)&ViewObjs[0], MAX_VOBJ*sizeof(VOBJ));
-		*/
+		memcpy((byte *)a, (byte *)&ViewObjs[0], MAX_VOBJ*sizeof(VOBJ));
 		
-		/*
+		
+		
 		lcd_text_col = 0;
 		//lcd_text_row = 0;
 		lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
@@ -519,12 +493,13 @@ void main() __naked {
 		printf(" y="); printf_d(ViewObjs[0].y);
 		printf(" pri="); printf_d(ViewObjs[0].priority);
 		//printf(" dir="); printf_d(ViewObjs[0].direction);
-		*/
+		
+		
 		// Dump VOBJ state
 		VOBJ *v;
 		//byte cols = 3+1 + 2+2+2 + 1 + 3+1+3;
-		byte cols = 3+1 + 2+ + 1 + 3+1+3;
-		byte x = (LCD_WIDTH/font_char_width) - cols;
+		byte cols = 2+1 + 2+ 1 + 2+1+2;
+		byte x = (LCD_WIDTH/font_char_width) - cols - 1;
 		byte y = 0;
 		
 		lcd_text_col = x; lcd_text_row = y++;
@@ -540,12 +515,12 @@ void main() __naked {
 			lcd_text_col = x; lcd_text_row = y++;
 			if (y > 15) break;
 			
-			printf_d(i); putchar(':');
+			printf_x2(i); putchar(':');
 			printf_x2(v->flags);
 			//printf_x2(v->motion);
 			//printf_x2(v->stepCount);
 			putchar(':');
-			printf_d(v->x); putchar(','); printf_d(v->y);
+			printf_x2(v->x); putchar(','); printf_x2(v->y);
 			
 		}
 		lcd_text_col = 0;
@@ -554,48 +529,8 @@ void main() __naked {
 		//running = vagi_loop();
 		vagi_loop();
 		
-		/*
-		//putchar('?');
-		printf('vagi>');
-		c = getchar();
 		
-		switch(c) {
-			
-			case 'q':
-			case 'Q':
-				// Soft reset
-				__asm
-					;rst0
-					call #0x0000
-				__endasm;
-				break;
-			
-			case 'x':
-			case 'X':
-				// Exit
-				__asm
-					;rst0
-					;call #0x8002
-					;return
-				__endasm;
-				running = 0;
-				break;
-			
-			case 'h':
-				// Help
-				break;
-			
-			case 0x1b:	// LEFT
-				break;
-			case 0x1a:	// RIGHT
-				break;
-			
-			//	default:
-			//		//printf_x2(c); putchar('?');
-			//		printf_d(c); putchar('?');
-			//		break;
-		}
-		*/
+		
 	}
 	
 	#if VGLDK_SERIES == 0

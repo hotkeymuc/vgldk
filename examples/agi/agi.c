@@ -208,7 +208,7 @@ word get_word_id(char *szWord, byte *word_len) {
 	matching = true;
 	matches = 0;
 	full_matches = 0;
-	full_word_id = -1;
+	full_word_id = 0xffff;	//-1;
 	
 	// Stream in all words
 	word[0] = 0;
@@ -401,7 +401,7 @@ char *ParseInput(char *sStart) {
 		//printf("Parsing \""); printf(s); printf("\"...\n");
 		
 		word_id = get_word_id(s, &word_len);
-		if (word_id == -1) {
+		if (word_id == 0xffff) {	//-1) {
 			printf("word: \""); printf(s); printf("\"?");
 			vars[vUNKWORD] = ++wordCount;
 			break;

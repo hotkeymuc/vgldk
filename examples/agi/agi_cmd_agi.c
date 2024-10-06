@@ -35,6 +35,7 @@
 void UnimplementedBox(U8 id) {
 	//sprintf(sztmp,"Unimplemented command:\n%s()", agiCommands[id].name);
 	//MessageBox(sztmp);
+	(void)id;
 }
 void InvalidBox() {
 	//sprintf(sztmp,"Invalid command:\ncmd_unknown%03d()", code[-1]);
