@@ -248,19 +248,18 @@ void cSaid() {
 	#ifdef AGI_LOGIC_DEBUG_IFS
 		printf("cSaid()...");
 	#endif
+	
 	wordCnt = code_get();
+	
 	if(inpos&&(!TestFlag(fSAIDOK))&&TestFlag(fPLAYERCOMMAND)) {
 		i=0;
 		while(wordCnt) {
-			//curWord = bGetW(code);
-			//code+=2;
 			curWord = code_get_word();
 			#ifdef AGI_LOGIC_DEBUG_IFS
 				printf_d(curWord);printf("...");
 			#endif
 			wordCnt--;
-			if(curWord==9999) {
-				//code += wordCnt<<1;
+			if(curWord == 9999) {	// Rest of line
 				code_skip( wordCnt << 1);
 				wordCnt=m=0;
 				break;
@@ -279,9 +278,7 @@ void cSaid() {
 		SetFlag(fSAIDOK);
 		IF_RESULT = TRUE;
 	} else {
-		//code += wordCnt << 1;
-		code_skip( wordCnt << 1);
-		
+		code_skip( wordCnt << 1);	// Skip rest of parameters
 		IF_RESULT = FALSE;
 	}
 }

@@ -97,6 +97,7 @@ extern RECT8 objBlock;
 extern char cursorChar;
 
 #define MAX_ID_LEN 7
+extern char szGameID[MAX_ID_LEN+1];
 //...
 
 
@@ -121,6 +122,7 @@ extern char szInput[64];
 // more:
 void dump_vars();
 void WriteStatusLine();
+void vagi_printf(char *p);
 bool MessageBox(char *t);
 bool MessageBoxXY(char *t, byte x, byte y, byte w);
 void ErrorMessage(int msg, int param);

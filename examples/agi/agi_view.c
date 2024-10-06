@@ -49,6 +49,7 @@ const int objDirTableY[] 	= { 0,-1,-1, 0, 1, 1, 1, 0,-1};
 const int vObjDirs[]		= {dirUPLEFT, dirUP, dirUPRIGHT,  dirLEFT, dirNONE, dirRIGHT,  dirDOWNLEFT, dirDOWN, dirDOWNRIGHT};
 const int loopDirsFull[]	= {lpIGNORE,lpIGNORE,lpRIGHT,lpRIGHT,lpRIGHT,lpIGNORE,lpLEFT,lpLEFT,lpLEFT,lpRIGHT};
 const int loopDirsSingle[]	= {lpIGNORE,lpUP,lpRIGHT,lpRIGHT,lpRIGHT,lpDOWN,lpLEFT,lpLEFT,lpLEFT,lpRIGHT};
+/*
 const U8 priTableStart[172] = {
 	 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
 	 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
@@ -66,6 +67,7 @@ const U8 priTableStart[172] = {
 	14,14,14,14,14,14,14,14,14,14,14,14,
 	0,0,0,0
 };
+*/
 
 void InitViewSystem() {
 	int i = 0;
@@ -74,13 +76,23 @@ void InitViewSystem() {
 	//pPView = pViews;
 	
 	PRI_FIXED = TRUE;
-	memcpy(priTable, priTableStart, sizeof(priTable));
+	
+	// Populate priTable:
+	//memcpy(priTable, priTableStart, sizeof(priTable));
+	// 12* 4,4,4,4, 5-14
+	memset(&priTable[0], 0, 172);	//sizeof(priTable));
+	for(i = 0; i < 14; i++) {
+		memset(&priTable[i*12], (i<3) ? 4 : i+1, 12);
+	}
+	//memset(&priTable[168], 0, 4);
+	
+	
 	
 	memset((byte *)&ViewObjs[0], 0, sizeof(ViewObjs));
 	//for(v=ViewObjs; v<&ViewObjs[MAX_VOBJ]; v++) {
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
-		v->num = i;	//++;
+		v->num = i;
 	}
 	/*
 	memset(&blUpdate, 0,sizeof(BLIT));
@@ -139,7 +151,6 @@ void UpdateVObj() {
 					v->cycleCount = v->cycleTime;
 				}
 			}
-			
 			
 		}
 	}
@@ -314,8 +325,6 @@ BOOL CheckObjCollision(VOBJ *v1) {
 
 BOOL CheckObjControls(VOBJ *v) {
 	
-	//@TODO: Implement
-	
 	//U8 *p = MAKE_PICBUF_PTR(v->x,v->y);
 	buffer_switch(BUFFER_BANK_PRI);	// Map destination working buffer to 0xc000
 	
@@ -391,13 +400,15 @@ BOOL CheckObjInScreen(VOBJ *v) {
 }
 
 void SolidifyObjPosition(VOBJ *v) {
+	
+	//@FIXME: This freezes!
+	
+	/*
 	int checkDir = dirLEFT, checkCnt = 1, checkLen = 1;
 	
 	if((v->y <= horizon) && (!(v->flags&oINGOREHORIZON)))
 		v->y = horizon+1;
 	
-	//@FIXME: This freezes!
-	/*
 	if( CheckObjInScreen(v)	&& (!CheckObjCollision(v)) && CheckObjControls(v) )
 		return;
 	
@@ -544,8 +555,8 @@ void SetObjView(VOBJ *v, int num) {
 
 void SetObjLoop(VOBJ *v, int loop) {
 	
-	if(v->pView == NULL) ErrorMessage(ERR_VOBJ_VIEW, v->num);
-	if(loop > v->totalLoops) ErrorMessage2(ERR_VOBJ_LOOP, v->num, loop);
+	//if(v->pView == NULL) ErrorMessage(ERR_VOBJ_VIEW, v->num);
+	//if(loop > v->totalLoops) ErrorMessage2(ERR_VOBJ_LOOP, v->num, loop);
 	
 	if(loop == v->totalLoops)
 		loop = v->totalLoops - 1;
@@ -570,12 +581,16 @@ void SetObjLoop(VOBJ *v, int loop) {
 
 void SetObjCel(VOBJ *v, int cel) {
 	
-	if(v->pView == NULL)
-		ErrorMessage(ERR_VOBJ_VIEW, v->num);
-	if(cel > v->totalCels)
-		ErrorMessage2(ERR_VOBJ_CEL, v->num, cel);
+	//if(v->pView == NULL) ErrorMessage(ERR_VOBJ_VIEW, v->num);
+	//if(cel > v->totalCels) ErrorMessage2(ERR_VOBJ_CEL, v->num, cel);
 	
 	v->cel		= cel;
+	
+	//@FIXME: Activate loading cel and clamping in frame
+	v->width = sprite_width;
+	v->height = sprite_height;
+	
+	/*
 	
 	//v->pLoop + bGetW(v->pLoop + (cel<<1) + 1);
 	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->num);
@@ -604,17 +619,20 @@ void SetObjCel(VOBJ *v, int cel) {
 		if((horizon > v->y) && (!(v->flags & oINGOREHORIZON)))
 			v->y = horizon + 1;
 	}
-	
+	*/
 }
 
 void DrawObj(int num) {
-	VOBJ *v = &ViewObjs[ num ];
+	VOBJ *v;
 	
-	if(num >= MAX_VOBJ)
+	if(num >= MAX_VOBJ) {
 		ErrorMessage(ERR_VOBJ_NUM,num);
+		//return;
+	}
 	
-	if(v->pCel == NULL)
-		ErrorMessage(ERR_VOBJ_NO_CEL,num);
+	v = &ViewObjs[ num ];
+	
+	//if(v->pCel == NULL) ErrorMessage(ERR_VOBJ_NO_CEL,num);
 	
 	if(!(v->flags & oDRAWN)) {
 		v->flags		|= oUPDATE;
@@ -644,12 +662,14 @@ void DrawObj(int num) {
 }
 
 void EraseObj(int num) {
-	BOOL NO_UPDATE;
-	VOBJ *v = &ViewObjs[ num ];
+	//BOOL NO_UPDATE;
+	VOBJ *v;
 	
-	if(num >= MAX_VOBJ)
+	if(num >= MAX_VOBJ) {
 		ErrorMessage(ERR_VOBJ_NUM,num);
+	}
 	
+	v = &ViewObjs[ num ];
 	//@TODO: Release vagi_res_handle_t
 	
 	if(v->flags & oDRAWN) {
@@ -888,34 +908,6 @@ void BlitVObj(VOBJ *v) {
 	*/
 	
 	// Test: draw a sprite!
-	int x, y;
-	// Transform sprite coordinate to screen coordinate
-	#ifdef BUFFER_DRAW_W160
-		x = v->x;	// 1:1
-	#endif
-	#ifdef BUFFER_DRAW_W192
-		//x2 = (x * 5) / 6;	// stretch 160 to 192
-		x = (v->x * 6) / 5;
-	#endif
-	#ifdef BUFFER_DRAW_W240
-		//x2 = (x * 2) / 3;	// stretch 160 to 240
-		x = (v->x * 3) / 2;
-	#endif
-	#ifdef BUFFER_DRAW_W320
-		x = v->x * 2;
-	#endif
-	
-	
-	#ifdef BUFFER_PROCESS_HCROP
-		// 1:1 with crop/transform
-		//y2 = y + y_src;
-		y = v->y;
-	#endif
-	#ifdef BUFFER_PROCESS_HCRUSH
-		// Scale (crush) 168 down to 100
-		//y2 = (y * 5) / 3;
-		y = (v->y * 3) / 5;
-	#endif
 	
 	//printf("blit("); printf_d(x); putchar(','); printf_d(y); printf(")");
 	
@@ -925,8 +917,7 @@ void BlitVObj(VOBJ *v) {
 		&sprite_data[0], sprite_width, sprite_height,
 		sprite_transparency,	// trans
 		
-		//v->x, v->y,
-		x, y,
+		v->x, v->y,
 		
 		v->priority,
 		

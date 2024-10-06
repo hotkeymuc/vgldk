@@ -1503,7 +1503,7 @@ void cGetString() {
 	
 	MessageBoxXY(GetMessage(curLog,code_1), code_3, code_2, 80);
 	//printf("GetString: ["); printf(GetMessage(curLog,code_1)); printf("]: ");
-	putchar('>');	//@TODO: Use the defined char (there's a AGI command to set that!)
+	putchar(cursorChar);	// Use the defined char (there's a AGI command to set that!)
 	gets(strings[code_0]);
 }
 
@@ -1602,13 +1602,13 @@ void cSetKey() {
 //	of one pixel high, and as high as the view or the next priority line (which
 //	ever is shorter).
 void cAddToPic() {
-	U8 code_0 = code_get();
-	U8 code_1 = code_get();
-	U8 code_2 = code_get();
-	U8 code_3 = code_get();
-	U8 code_4 = code_get();
-	U8 code_5 = code_get();
-	U8 code_6 = code_get();
+	U8 code_0 = code_get();	// view
+	U8 code_1 = code_get();	// loop
+	U8 code_2 = code_get();	// cell
+	U8 code_3 = code_get();	// x
+	U8 code_4 = code_get();	// y
+	U8 code_5 = code_get();	// pri
+	U8 code_6 = code_get();	// margin
 	AddToPic( code_0 , code_1 , code_2 , code_3 , code_4 , code_5 | (code_6<<4) );
 }
 
@@ -1624,13 +1624,13 @@ void cAddToPic() {
 //	of one pixel high, and as high as the view or the next priority line (which
 //	ever is shorter).
 void cAddToPicV() {
-	U8 code_0 = code_get();
-	U8 code_1 = code_get();
-	U8 code_2 = code_get();
-	U8 code_3 = code_get();
-	U8 code_4 = code_get();
-	U8 code_5 = code_get();
-	U8 code_6 = code_get();
+	U8 code_0 = code_get();	// view
+	U8 code_1 = code_get();	// loop
+	U8 code_2 = code_get();	// cell
+	U8 code_3 = code_get();	// x
+	U8 code_4 = code_get();	// y
+	U8 code_5 = code_get();	// pri
+	U8 code_6 = code_get();	// margin
 	
 	AddToPic( vars[code_0] , vars[code_1] , vars[code_2] , vars[code_3] , vars[code_4] , vars[code_5]|(vars[code_6]<<4) );
 }
@@ -1644,6 +1644,7 @@ void cAddToPicV() {
 //	and it's description. Otherwise it's simply a list of the items.
 void cStatus() {
 	//@TODO: Implement
+	
 	printf("cStatus");
 	//ExecuteInvDialog();
 }
@@ -1688,11 +1689,11 @@ void cInitDisk() {
 //	generally using it to know whether to start in the first room or from the
 //	title screen, whether to set up the menu, assign the controller keys, etc.
 void cRestartGame() {
+	//@TODO: Implement
+	/*
 	if(	TestFlag(fRESTARTMODE) ||
 		MessageBox("Restart?")
 	) {
-		//@TODO: Implement
-		/*
 		cCancelLine();
 		AGIInit(TRUE);
 		ticks = 0;
@@ -1700,8 +1701,8 @@ void cRestartGame() {
 		SetFlag(fRESTART);
 		//code = NULL;
 		code_term();
-		*/
 	}
+	*/
 }
 
 //show.obj(VIEWNO);
@@ -1748,6 +1749,7 @@ void cPlayerControl() {
 //	and step size.
 void cObjStatusV() {
 	U8 code_0 = code_get();
+	
 	VOBJ *v = &ViewObjs[ vars[code_0] ];
 	//@TODO: Implement
 	/*
@@ -1772,7 +1774,9 @@ void cObjStatusV() {
 void cQuit() {
 	U8 code_0 = code_get();
 	
+	#ifdef AGI_LOGIC_DEBUG
 	printf("cQuit!"); getchar();
+	#endif
 	
 	if(code_0 || MessageBox("Really quit?")) {
 		//AGIExit();
@@ -1785,14 +1789,14 @@ void cQuit() {
 //	Displays the current memory information such as how much memory is being
 //	used, the maximum that has been used, etc.
 void cShowMem() {
-	MessageBox("Memory cool!");
+	//MessageBox("Memory cool!");
 }
 
 //pause();
 //	Simply pauses the game by displaying a message box and waits for the player
 //	to press a button or key to close it.
 void cPause() {
-	MessageBox("Game paused.");
+	//MessageBox("Game paused.");
 }
 
 //echo.line();
@@ -1836,7 +1840,7 @@ void cVersion() {
 	MessageBox(
 		"VAGI based on\n"
 		"GBAGI v"BUILD_VERSION"\n\n"
-		"By  Brian Provinciano\n"
+		"By Brian Provinciano\n"
 		"http://www.bripro.com"
 	);
 }
@@ -1890,8 +1894,9 @@ void cSetScanStart() {
 	//logScan[curLog->num] = (U16)(code-curLog->code);
 	
 	//@TODO: Check if correct!
+	#ifdef AGI_LOGIC_DEBUG
 	printf("cSetScanStart");getchar();
-	
+	#endif
 	U16 code_now = vagi_res_tell(curLog->res_h);
 	logScan[curLog->num] = (U16)(code_now - curLog->ofs_code);
 }
@@ -1902,7 +1907,9 @@ void cSetScanStart() {
 void cResetScanStart() {
 	
 	//@TODO: Check if correct!
+	#ifdef AGI_LOGIC_DEBUG
 	printf("cResetScanStart");getchar();
+	#endif
 	
 	logScan[curLog->num] = 0;
 }
@@ -2196,7 +2203,9 @@ void cSetSimple() {
 //	value onto the stack though, so if you use it twice, the previous saved
 //	value will be lost.
 void cPushScript() {
+	#ifdef AGI_LOGIC_DEBUG
 	printf("cPushScript");
+	#endif
 	//pushedScriptCount = scriptCount;
 	//code=code;
 }
@@ -2205,7 +2214,9 @@ void cPushScript() {
 //	push.script() and set it to the current position, discarding any elements
 //	added to the script after the push.script() command has been called.
 void cPopScript() {
+	#ifdef AGI_LOGIC_DEBUG
 	printf("cPopScript");
+	#endif
 	//scriptCount = pushedScriptCount;
 	//code=code;
 }

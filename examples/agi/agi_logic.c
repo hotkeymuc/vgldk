@@ -29,14 +29,14 @@
 
 
 LOGIC *curLog;
-//LOGIC *log0;
+LOGIC *log0;	// Only used for FormatString "%g..." to print message from logic0
 
 BOOL IF_RESULT;
 BOOL new_room_called;
 
 const char AGI_MESSAGES_KEY[] = "Avis Durgan";
 
-#define AGI_MAX_MESSAGE_LENGTH 128	//MAX_STRINGS_LEN	//40	agi_vars.h:MAX_STRINGS_LEN
+#define AGI_MAX_MESSAGE_LENGTH 255	//MAX_STRINGS_LEN	//40	agi_vars.h:MAX_STRINGS_LEN
 char agi_message_buf[AGI_MAX_MESSAGE_LENGTH];	// Buffer for GetMessage()
 
 
@@ -129,7 +129,7 @@ char *GetMessage(LOGIC *log, int num) {
 
 void InitLogicSystem() {
 	curLog 			= NULL;
-	//log0			= NULL;
+	log0			= NULL;
 	
 	memset(logScan, 0, sizeof(logScan));
 }
@@ -167,7 +167,7 @@ word CallLogic(U8 num) {
 	log.res_h = vagi_res_open(AGI_RES_KIND_LOG, num);
 	if (log.res_h < 0) {
 		//printf("LOG open ERR\n");
-		printf("LOG open err=-"); printf_d(-log.res_h); putchar('\n');
+		printf("LOG err=-"); printf_d(-log.res_h); putchar('\n');
 		return 0;
 	}
 	word code_size = vagi_res_read_word(log.res_h);
@@ -183,7 +183,7 @@ word CallLogic(U8 num) {
 	// set the active pointer
 	prevLog			= curLog;
 	curLog			= &log;
-	//if (num == 0) log0 = curLog;
+	if (num == 0) log0 = curLog;
 	
 	c2 = ExecuteLogic(curLog);
 	

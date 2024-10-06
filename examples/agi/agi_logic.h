@@ -29,7 +29,7 @@ typedef struct {
 } LOGIC;
 
 extern LOGIC *curLog;
-//extern LOGIC *log0;
+extern LOGIC *log0;
 extern BOOL IF_RESULT;
 extern U16 logScan[256];
 

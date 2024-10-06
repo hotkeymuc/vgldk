@@ -80,15 +80,17 @@ typedef word uint16;
 
 // Test sprite
 #define sprite_width 8
-#define sprite_height 12
+#define sprite_height 14
 #define sprite_transparency 3
-static const byte sprite_data[8*12] = {
-	  3,   3, 0xf, 0xf, 0xf, 0xf,   3,   3, 
-	  3,   3, 0xf, 0xf, 0xf, 0xf,   3,   3, 
+static const byte sprite_data[sprite_width*sprite_height] = {
+	  3,   3,   3, 0xf, 0xf,   3,   3,   3, 
+	  3,   3, 0xf, 0x0, 0x0, 0xf,   3,   3, 
 	  3, 0xf, 0x0, 0x0, 0x0, 0x0, 0xf,   3, 
 	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
 	0xf, 0x0, 0xf, 0x0, 0x0, 0xf, 0x0, 0xf, 
+	0xf, 0x0, 0xf, 0x0, 0x0, 0xf, 0x0, 0xf, 
 	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
+	0xf, 0x0, 0x0, 0x5, 0x5, 0x0, 0x0, 0xf, 
 	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
 	0xf, 0x0, 0xf, 0x0, 0x0, 0xf, 0x0, 0xf, 
 	0xf, 0x0, 0x0, 0xf, 0xf, 0x0, 0x0, 0xf, 
@@ -132,7 +134,7 @@ byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kin
 		//printf("Calling segment...");
 		//@FIXME: Calling works, but when returning things get weird...
 		//code_segment_call_b(code_segment_1__vagi_pic_draw_addr, pic_num);
-		printf("vagi_pic_draw is temporary disabled!");	//getchar();
+		printf("vagi_pic_draw OFF!");	//getchar();
 		(void)pic_num;
 		//printf("back from segment!");
 	}
@@ -144,8 +146,8 @@ byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kin
 		//printf("Calling segment...");
 		//@FIXME: Calling works, but when returning things get weird...
 		lcd_clear();
-		code_segment_call(code_segment_1__vagi_pic_show_addr);
-		//printf("vagi_pic_show is temporary disabled!");	//getchar();
+		//code_segment_call(code_segment_1__vagi_pic_show_addr);
+		printf("vagi_pic_show OFF!");	//getchar();
 		//printf("back from segment!");
 	}
 	
@@ -194,6 +196,10 @@ byte timer_frame;
 
 void vagi_init() {
 	vagi_res_init();	// calls romfs_init()
+	
+	szGameID[0] = '?';
+	szGameID[1] = '\0';
+	cursorChar = '>';
 	
 	timer_frame = 0;
 	
@@ -285,18 +291,24 @@ void vagi_handle_input() {
 			}
 		} else {
 			
-			//@TODO: Handle GUI
+			// Handle Input/GUI
 			if (key == 'r') {
 				// Re-set ego
 				ViewObjs[0].x = 30;
 				ViewObjs[0].y = 80;
 				ViewObjs[0].priority = 14;
 			}
-			if (key == ' ') {
-				lcd_text_col = 0; lcd_text_row = 0;
-				printf("INPUT >");
+			
+			//if ((INPUT_ENABLED) && (key == ' ')) {
+			if (INPUT_ENABLED) {
+				lcd_text_col = 0;
+				lcd_text_row = inputPos;	//0;
+				printf(">");
 				gets(&szInput[0]);
+				
+				// fPLAYERCOMMAND and fSAIDOK are Reset in game loop before calling vagi_handle_input
 				ParseInput(&szInput[0]);	// agi.c:ParseInput
+				// This will automatically set the flag SetFlag(fPLAYERCOMMAND);
 			}
 			
 			// Set controllers (if they have a key associated)
@@ -327,6 +339,7 @@ bool vagi_loop() {
 	
 	ResetFlag(fPLAYERCOMMAND);
 	ResetFlag(fSAIDOK);
+	
 	vars[vKEYPRESSED]	= 0;
 	vars[vUNKWORD]		= 0;
 	
@@ -351,7 +364,7 @@ bool vagi_loop() {
 	
 	//
 	if(QUIT_FLAG) {
-		printf("QUIT_FLAG");
+		//printf("QUIT_FLAG");
 		return false;	//break;
 	}
 	//SystemDoit();
@@ -442,7 +455,7 @@ void main() __naked {
 	
 	byte running = 1;
 	//char c;
-	//word i;
+	word i;
 	
 	//printf("VAGI\n");
 	AGIVER.major = 2;
@@ -456,10 +469,11 @@ void main() __naked {
 	//test_draw_agi_combined(VAGI_START_PIC_NUM, true);	// Test rendering actual AGI PIC data
 	//test_draw_agi_combined(VAGI_START_PIC_NUM, false);	// Test rendering actual AGI PIC data
 	//printf("end of render."); getchar();
-	
+	/*
 	byte i;
 	byte spinner = 0;
 	const char spinner_char[4] = { '-', '/', '|', '\\'};
+	*/
 	
 	while (running) {
 		

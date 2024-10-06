@@ -47,17 +47,64 @@ void dump_vars() {
 void WriteStatusLine() {
 	if (!STATUS_VISIBLE) return;
 	lcd_text_col = 0;
-	lcd_text_row = 0;
-	printf("STATS:");
+	lcd_text_row = statusRow;	//0;
+	//printf("STATS:");
+	printf(&szGameID[0]);
 	dump_vars();
 }
+
+
+
+char *parse_int(char *p, int *r) {
+	char c;
+	int i;
+	
+	i = 0;
+	while(c = *p) {
+		if ((c < '0') || (c > '9')) break;
+		i = (i*10) + (c - '0');
+		p++;
+	}
+	
+	*r = i;
+	return p;
+}
+
+void vagi_printf(char *p) {
+	// Print while handling AGI special constructs, like "%s4" to print string 4
+	char c;
+	int i;
+	
+	//printf(s);
+	while(c = *p++) {
+		if (c != '%') {
+			putchar(c);
+			continue;
+		}
+		c = *p++;
+		p = parse_int(p, &i);
+		if      (c == 's') vagi_printf(strings[i]);	//printf(strings[i]);
+		else if (c == 'v') printf_d(vars[i]);
+		else if (c == 'w') printf(wordStrings[i-1]);	// nth typed in word (1-based!)
+		else if (c == 'm') vagi_printf(GetMessage(curLog, i));
+		else if (c == 'g') vagi_printf(GetMessage(log0, i));
+		//else if (c == 'o') objNames[i];
+		else {
+			putchar('<'); putchar(c); printf_d(i); putchar('>');
+		}
+	}
+	
+}
+
+
 
 bool MessageBox(char *t) {
 	bool r;
 	
 	//printf("MessageBox: [");
 	putchar('[');
-	printf(t);
+	//printf(t);
+	vagi_printf(t);	// Takes care of "%s4" etc.
 	putchar(']');
 	//putchar('\n');
 	
@@ -102,19 +149,11 @@ see agi.h:
 	ERR_ADDMENUITEM,
 	ERR_FINDMENUITEM,
 */
-void ErrorMessage(int msg, int param) {
-	printf("Error#");
-	printf_d(msg); printf(": "); printf_d(param);
-	getchar();
-}
-void ErrorMessage2(int msg, int param1, int param2) {
-	printf("Error#");
-	printf_d(msg); printf(": "); printf_d(param1); printf(", "); printf_d(param2);
-	getchar();
-}
+#define ErrorMessage(msg, param) ErrorMessage3(msg, param, 0,0)
+#define ErrorMessage2(msg, param1, param2) ErrorMessage3(msg, param1, param2, 0)
 void ErrorMessage3(int msg, int param1, int param2, int param3) {
-	printf("Error#");
-	printf_d(msg); printf(": "); printf_d(param1); printf(", "); printf_d(param2); printf(", "); printf_d(param3);
+	printf("Error #");
+	printf_d(msg); printf(": "); printf_d(param1); putchar('|'); printf_d(param2); putchar('|'); printf_d(param3);
 	getchar();
 }
 
@@ -159,12 +198,17 @@ word get_word_id(char *szWord, byte *word_len) {
 	byte matches;
 	bool matching;
 	
+	byte full_matches;	// to keeep on searching for longer matches
+	U16 full_word_id;
+	
 	tok_h = romfs_fopen(r_words_tok);	// Open WORDS.TOK
 	romfs_fskip(tok_h, 52);	// Skip header
 	
 	p = szWord;
 	matching = true;
 	matches = 0;
+	full_matches = 0;
+	full_word_id = -1;
 	
 	// Stream in all words
 	word[0] = 0;
@@ -178,6 +222,9 @@ word get_word_id(char *szWord, byte *word_len) {
 		// Take prefix bytes from previous word
 		w = &word[b];
 		//word_len = b;
+		
+		if (b < full_matches) break;	// Continue to find a longer match until the prefix is smaller than the best match
+		
 		if (b <= matches) {
 			matches = b;	// Reduce number of matching chars if prefix is smaller
 			matching = true;
@@ -196,12 +243,14 @@ word get_word_id(char *szWord, byte *word_len) {
 				//break!
 			} else if (b == 95) {
 				c = ' ';
-			}
+			} else continue;	//?
+			
 			*w++ = c;
 			//word_len ++;
 			
 			if (matching) {
-				if (*p == c) matches++;
+				//if (*p == c) matches++;
+				if ((*p | 0x20) == c) matches++;	// Convert input to lower case
 				else matching = false;
 				p++;
 			}
@@ -230,7 +279,12 @@ word get_word_id(char *szWord, byte *word_len) {
 				//printf(" \""); printf(&word[0]); printf("\"\n");
 				
 				//return word_id;
-				break;
+				//break;
+				// Remember that and keep searching for longer match
+				if (matches > full_matches) {
+					full_matches = matches;
+					full_word_id = word_id;
+				}
 			}
 			
 		}
@@ -239,10 +293,7 @@ word get_word_id(char *szWord, byte *word_len) {
 	
 	romfs_fclose(tok_h);
 	
-	if (matching)
-		return word_id;
-	
-	return -1;
+	return full_word_id;
 }
 
 
@@ -309,17 +360,20 @@ void InitParseSystem() {
 	//memset(wordStrings,0,sizeof(wordStrings));
 	
 	wordCount = 0;
+	inpos = 0;
 	szInput[0]='\0';
 	
 	//show_all_words();
 	
+	// Test word look-up:
 	//printf("Enter word:"); gets(&szInput[0]);
 	//word word_id = get_word_id(&szInput[0]);
 	//getchar();
 	
-	printf("Enter input:"); gets(&szInput[0]);
-	ParseInput(&szInput[0]);
-	getchar();
+	// Test sentence parser:
+	//printf("Enter input:"); gets(&szInput[0]);
+	//ParseInput(&szInput[0]);
+	//getchar();
 	
 }
 
@@ -328,10 +382,12 @@ char *ParseInput(char *sStart) {
 	word word_id;
 	byte word_len;
 	
-	//@TODO: Split input into words, look them up, store beginning-pointers in wordStrings[] and word-group-numbers in input[]
+	//@TODO: ignore case
+	
 	//printf("ParseInput: \""); printf(sStart); printf("\"...\n");
 	
 	s = sStart;
+	inpos = 0;
 	wordCount = 0;
 	
 	while(*s) {
@@ -342,17 +398,23 @@ char *ParseInput(char *sStart) {
 		}
 		
 		// Check word(s)
+		//printf("Parsing \""); printf(s); printf("\"...\n");
+		
 		word_id = get_word_id(s, &word_len);
 		if (word_id == -1) {
-			printf("Unknown word: \""); printf(s); printf("\"!");
+			printf("word: \""); printf(s); printf("\"?");
 			vars[vUNKWORD] = ++wordCount;
 			break;
 		}
 		
-		//printf_d(word_id);
-		
-		wordStrings[wordCount] = s;
-		input[wordCount++] = word_id;
+		// Add word_id, but skip group 0 (which contains common "filler" words, like "a")
+		// Group 0 = filler
+		// Group 1 = "any word"
+		// Group 9999 = "rol" (Rest of Line)
+		if (word_id > 0) {
+			wordStrings[wordCount] = s;
+			input[wordCount++] = word_id;
+		}
 		
 		// Skip over found word
 		s += word_len;
@@ -363,7 +425,9 @@ char *ParseInput(char *sStart) {
 		// ...and continue at next word (skip the space/zero)
 	}
 	
+	// Set flag for AGI!
 	if (wordCount) SetFlag(fPLAYERCOMMAND);
 	
+	inpos = wordCount;
 	return wordStrings[0];
 }

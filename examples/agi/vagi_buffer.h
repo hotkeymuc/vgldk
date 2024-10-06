@@ -358,10 +358,52 @@ void draw_buffer_sprite_priority(
 	int v_err;
 	#endif
 	
+	byte ssx;
+	byte ssy;
+	byte ssw;
+	byte ssh;
+	word syo;
+	#ifdef BUFFER_DRAW_W160
+		ssx = sprite_x;	// 1:1
+		ssw = sprite_w;
+	#endif
+	#ifdef BUFFER_DRAW_W192
+		//x2 = (x * 5) / 6;	// stretch 160 to 192
+		ssx = (sprite_x * 6) / 5;
+		ssw = (sprite_w * 6) / 5;
+	#endif
+	#ifdef BUFFER_DRAW_W240
+		//x2 = (x * 2) / 3;	// stretch 160 to 240
+		ssx = (sprite_x * 3) / 2;
+		ssw = (sprite_w * 3) / 2;
+	#endif
+	#ifdef BUFFER_DRAW_W320
+		ssx = sprite_x * (x_scale ? 2 : 1);
+		ssw = sprite_w * (x_scale ? 2 : 1);
+	#endif
+	
+	
+	#ifdef BUFFER_PROCESS_HCROP
+		// 1:1 with crop/transform
+		//y2 = y + y_src;
+		ssy = sprite_y;
+		ssh = sprite_h;
+	#endif
+	#ifdef BUFFER_PROCESS_HCRUSH
+		// Scale (crush) 168 down to 100
+		//y2 = (y * 5) / 3;
+		ssy = (sprite_y * 3) / 5;
+		ssh = (sprite_h * 3) / 5;
+	#endif
+	
+	
+	
+	
 	// Transfer (and optionally scale) all pixels to screen
-	for(byte iy = 0; iy < sprite_h; iy++) {
+	for(byte iy = 0; iy < ssh; iy++) {
 		// Transform source y-coordinate here!
-		y = sprite_y + iy;
+		//y = sprite_y + iy;
+		y = ssy + iy;
 		// 1:1
 		//y2 = y;
 		
@@ -374,24 +416,22 @@ void draw_buffer_sprite_priority(
 		
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
-		#ifdef BUFFER_DRAW_DITHER
-		//v_err = 0;
-		v_err = ((sprite_x * y) * 0x77) & 0x1f;	// Add some noise
+		#ifdef BUFFER_PROCESS_HCROP
+			syo = (iy * sprite_w);
+		#endif
+		#ifdef BUFFER_PROCESS_HCRUSH
+			syo = (((iy*5)/3) * sprite_w);
 		#endif
 		
-		#ifdef BUFFER_DRAW_W160
-		for(byte ix = 0; ix < sprite_w; ix++) {
+		
+		#ifdef BUFFER_DRAW_DITHER
+		//v_err = 0;
+		//v_err = ((sprite_x * y) * 0x77) & 0x1f;	// Add some noise
+		v_err = ((ssx * y) * 0x77) & 0x1f;	// Add some noise
 		#endif
-		#ifdef BUFFER_DRAW_W192
-		for(byte ix = 0; ix < (sprite_w * 6) / 5; ix++) {
-		#endif
-		#ifdef BUFFER_DRAW_W240
-		for(byte ix = 0; ix < (sprite_w * 3) / 2; ix++) {
-		#endif
-		#ifdef BUFFER_DRAW_W320
-		for(byte ix = 0; ix < (sprite_w * (x_scale ? 2 : 1)); ix++) {
-		#endif
-			x = sprite_x + ix;
+		
+		for(byte ix = 0; ix < ssw; ix++) {
+			x = ssx + ix;
 			
 			// Transform source x-coordinate here!
 			#ifdef BUFFER_DRAW_W160
@@ -423,18 +463,19 @@ void draw_buffer_sprite_priority(
 			// Optional: Skip drawing foreground pixels (faster, but requires visual pixel to be already there)
 			if (c_prio >= sprite_prio) continue;	// Just skip (and hope background is correct)
 			
+			//syo = (iy * sprite_w);
 			#ifdef BUFFER_DRAW_W160
-				c = sprite_data[(iy * sprite_w) + ix];
+				c = sprite_data[syo + ix];
 			#endif
 			#ifdef BUFFER_DRAW_W192
-				c = sprite_data[(iy * sprite_w) + (ix * 5) / 6];
+				c = sprite_data[syo + (ix * 5) / 6];
 			#endif
 			#ifdef BUFFER_DRAW_W240
-				c = sprite_data[(iy * sprite_w) + (ix * 2) / 3];
+				c = sprite_data[syo + (ix * 2) / 3];
 			#endif
 			#ifdef BUFFER_DRAW_W320
-				if (x_scale)	c = sprite_data[(iy * sprite_w) + (ix >> 1)];
-				else			c = sprite_data[(iy * sprite_w) + ix];
+				if (x_scale)	c = sprite_data[syo + (ix >> 1)];
+				else			c = sprite_data[syo + ix];
 			#endif
 			
 			// Optional: Skip drawing transparent pixels
