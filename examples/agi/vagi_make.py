@@ -17,7 +17,7 @@ and the game data mounted as an external cartridge.
 #VGLDK_SERIES = 4000	# System to compile for (e.g. 4000 for VTech Genius Leader 4000 series)
 VGLDK_SERIES = 6000	# System to compile for (e.g. 6000 for VTech Genius Leader 6000/700x SL series)
 GENERATE_MAME_ROM = True	# Generate a fake system ROM for use in MAME (required for MAME emulation)
-CODE_SEGMENTED = not True	# Create a segmented ROM? Might not fit a single 32KB one.
+CODE_SEGMENTED = True	# Create a segmented ROM? Might not fit a single 32KB one.
 
 EMULATE_IN_MAME = True	# Start MAME
 EMULATION_SPEED = 8.0	#2.0
@@ -133,6 +133,9 @@ def vagi_make(out_name='vagi', more_defines={}):
 	#loc_data = loc_internal_ram	# Put heap in regular banked RAM
 	loc_data = 0xebb8	# Put static heap in non-banked upper segment, right after VRAM
 	#loc_data = 0xec00	# Put static heap in non-banked upper segment
+	#if ('CODE_SEGMENT' in more_defines) and (more_defines['CODE_SEGMENT'] == 1):
+	#	# Re-locate data of segment 1 out of reach of segment 0
+	#	loc_data = 0xf900
 	
 	# Set-up layout
 	#cart_eeprom_size = 8192	# Size of EEPROM you are planning to use

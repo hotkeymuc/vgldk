@@ -40,16 +40,28 @@ enum AgiPictureFlags {
 #define FLAG_WATER		(0x04)
 
 
+// flood fill
+typedef struct {
+	byte x;
+	byte y;
+} fill_stack_t;
+//#define FILL_STACK_MAX 8
+#define FILL_STACK_MAX 16
+//#define FILL_STACK_MAX 32
+//#define FILL_STACK_MAX 128
+//#define FILL_STACK_MAX 172
+//#define FILL_STACK_MAX 250
+//extern fill_stack_t stack[FILL_STACK_MAX+1];	// extern or on stack?
+
 // Connections to the outer world
 //bool agi_res_eof() { return (_dataOffset >= _dataSize); }
 //bool agi_res_read() { return _data[_dataOffset++]; }
 //bool agi_res_peek() { return _data[_dataOffset]; }
 
-
-// Connections to the outer world:
-//const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
-//word _dataOffset = 0;
-//word _dataSize = 0;
+// Since we only have enough RAM to render EITHER the visual OR the priority frame, we need to keep track of the currently active frame type
+#define VAGI_STEP_VIS 0
+#define VAGI_STEP_PRI 1
+extern byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kind of PIC data to process: 0=visual, 1=priority)
 extern bool _dataOffsetNibble;	// = 0;
 extern vagi_res_handle_t pic_res_h;	// Resource handle to read from (vagi_res.h)
 
@@ -72,7 +84,7 @@ extern int16 _height;	// = 168;
 //int16 _xOffset, _yOffset;
 
 extern int _flags;
-extern int _currentStep;
+//extern int _currentStep;	// Only used in Mickey
 
 
 
@@ -91,17 +103,6 @@ void draw_SetNibblePriority();
 void draw_Line(int16 x1, int16 y1, int16 x2, int16 y2);
 void draw_LineShort();
 void draw_LineAbsolute();
-
-// flood fill
-typedef struct {
-	byte x;
-	byte y;
-} fill_stack_t;
-#define FILL_STACK_MAX 16
-//#define FILL_STACK_MAX 32
-//#define FILL_STACK_MAX 128
-//#define FILL_STACK_MAX 172
-//#define FILL_STACK_MAX 250
 
 
 bool inline draw_FillCheck(int16 x, int16 y);

@@ -81,8 +81,8 @@ typedef struct {
 	U8 major;
     U16 minor;
 } VERTYPE;
-extern VERTYPE AGIVER;
 
+extern VERTYPE AGIVER;
 
 // from agimain.h:
 extern BOOL PLAYER_CONTROL, TEXT_MODE, WINDOW_OPEN, REFRESH_SCREEN, MENU_SET, INPUT_ENABLED;

@@ -41,7 +41,8 @@ bool vagi_pic_render_frame(word pic_num, byte drawing_step) {
 void vagi_pic_draw(byte pic_num) {
 	// Render both frames and create working buffers
 	//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
-	//lcd_text_col = 0; lcd_text_row = 0; printf("Loading PIC "); printf_d(pic_num);
+	lcd_text_col = 0; lcd_text_row = 0;
+	//printf("Loading PIC "); printf_d(pic_num);
 	
 	// Render and process the VIS frame.
 	bool ok = vagi_pic_render_frame(pic_num, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)

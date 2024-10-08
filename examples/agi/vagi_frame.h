@@ -68,6 +68,11 @@ VAGI Frame functions (handling one full resolution AGI frame)
 	void frame_banked_set_pixel_4bit(byte x, byte y, byte c) {
 		// Set 4 bit color value of banked buffer at 0xc000
 		
+		// Range check...
+		//if (x >= AGI_FRAME_WIDTH) return;
+		//if (y >= AGI_FRAME_HEIGHT) return;
+		
+		// Convert to address
 		word a = ((y * AGI_FRAME_WIDTH) + x) >> 1;
 		
 		// Do the bank switching

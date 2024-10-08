@@ -48,11 +48,6 @@
 //#define BUFFER_DRAW_DITHER	// Use simple error dithering. Looks great, but is problematic for partial redraws!
 
 
-//#define RGB_TO_LCD_4BPP(r,g,b) (0xf - ((r+g+b)/(3*0x11)))
-//#define RGB_TO_LUMA_4BPP(r,g,b) ((r+g+b)/(3*0x11))
-//#define RGB_TO_LUMA(r,g,b) ((r+g+b) / 3)
-#define RGB_TO_LUMA(r,g,b) (0.299*r + 0.587*g + 0.114*b)
-
 
 void inline buffer_switch(byte bank) {
 	// Mount a different RAM segment to BUFFER_ADDR (0xc000)
@@ -105,6 +100,11 @@ byte buffer_get_pixel_4bit(byte x, byte y) {
 }
 
 
+
+//#define RGB_TO_LCD_4BPP(r,g,b) (0xf - ((r+g+b)/(3*0x11)))
+//#define RGB_TO_LUMA_4BPP(r,g,b) ((r+g+b)/(3*0x11))
+//#define RGB_TO_LUMA(r,g,b) ((r+g+b) / 3)
+#define RGB_TO_LUMA(r,g,b) (0.299*r + 0.587*g + 0.114*b)
 
 static const byte AGI_PALETTE_TO_LUMA[16] = {
 	RGB_TO_LUMA(0x00, 0x00, 0x00),

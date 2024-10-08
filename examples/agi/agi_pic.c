@@ -13,11 +13,8 @@ based on scummvm's agi implementation 2024-09-14
 
 #include "agi_pic.h"
 
-
 // Connections to the outer world:
-//const byte *_data = (const byte *)0x4000;	// Map directly to 0x4000 in memory
-//word _dataOffset = 0;
-//word _dataSize = 0;
+byte vagi_drawing_step;
 bool _dataOffsetNibble; // = 0;
 vagi_res_handle_t pic_res_h;	// Resource handle to read from (vagi_res.h)
 
@@ -39,8 +36,8 @@ int16 _width; // = 160;
 int16 _height; // = 168;
 //int16 _xOffset, _yOffset;
 
-int _flags;
-int _currentStep;
+int _flags;	// Contains flags for "special treatment" (e.g. "exit on command 0xf3")
+//int _currentStep;
 
 
 
@@ -522,8 +519,13 @@ typedef struct {
 	}
 #endif
 
-bool _draw_Fill(int16 x, int16 y) {
-	fill_stack_t stack[FILL_STACK_MAX];
+
+//fill_stack_t stack[FILL_STACK_MAX];	// extern
+
+// can be inline as long as it is only used once
+bool inline _draw_Fill(int16 x, int16 y) {
+	fill_stack_t stack[FILL_STACK_MAX];	// on stack
+	
 	byte stack_pos = 0;
 	//fill_stack_t p;
 	int16 px, py;
@@ -563,11 +565,6 @@ bool _draw_Fill(int16 x, int16 y) {
 	// Exit if stack is empty
 	//while (!stack.empty()) {
 	while (stack_pos > 0) {
-		if (stack_pos >= FILL_STACK_MAX) {
-			printf("FILL_STACK_MAX!");
-			//break;
-			return false;
-		}
 		
 		//Common::Point p = stack.pop();
 		//p = &stack[stack_pos--];
@@ -596,6 +593,11 @@ bool _draw_Fill(int16 x, int16 y) {
 					stack[stack_pos].y = py-1;
 					stack_pos++;
 					newspanUp = false;
+					
+					if (stack_pos >= FILL_STACK_MAX) {
+						//printf("FILL_STACK_MAX!");
+						return false;
+					}
 				}
 			} else {
 				newspanUp = true;
@@ -608,6 +610,11 @@ bool _draw_Fill(int16 x, int16 y) {
 					stack[stack_pos].y = py+1;
 					stack_pos++;
 					newspanDown = false;
+					
+					if (stack_pos >= FILL_STACK_MAX) {
+						//printf("FILL_STACK_MAX!");
+						return false;
+					}
 				}
 			} else {
 				newspanDown = true;
@@ -616,6 +623,7 @@ bool _draw_Fill(int16 x, int16 y) {
 	}
 	return true;
 }
+
 void draw_Fill() {
 	byte x1, y1;
 	bool cont = true;
@@ -625,6 +633,9 @@ void draw_Fill() {
 		
 		if (cont) {	// If an error occurs: Do not call drawFill again, something went wrong.
 			cont = _draw_Fill(x1, y1);
+			if (!cont) {
+				printf("FILL_STACK!");
+			}
 		}
 	}
 }

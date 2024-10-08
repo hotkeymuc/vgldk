@@ -106,10 +106,6 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 
 
 // PIC code
-// Since we only have enough RAM to render EITHER the visual OR the priority frame, we need to keep track of the currently active frame type
-#define VAGI_STEP_VIS 0
-#define VAGI_STEP_PRI 1
-byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kind of PIC data to process: 0=visual, 1=priority)
 
 //#define AGI_PIC_SHOW_PROGRESS	// Show progress bar while rendering PICs, requires ~400 (0x195) bytes
 
@@ -123,6 +119,58 @@ byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kin
 	//#define SKIP_BANKED_DRAW	// For debugging memory corruptions
 	
 	// Provide stubs ("trampolines") to functions in the other bank
+	
+	// Reserve RAM for other segment
+	byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kind of PIC data to process: 0=visual, 1=priority)
+	bool _dataOffsetNibble;	// = 0;
+	vagi_res_handle_t pic_res_h;	// Resource handle to read from (vagi_res.h)
+	
+	
+	// PictureMgr
+	uint8 _patCode;
+	uint8 _patNum;
+	uint8 _scrOn;	// = 0;
+	uint8 _priOn;	// = 0;
+	uint8 _scrColor;	// = 0;
+	uint8 _priColor;	// = 0;
+	
+	uint8 _minCommand;	// = 0xf0;
+	
+	//AgiPictureVersion _pictureVersion;
+	byte _pictureVersion;
+	
+	int16 _width;	// = 160;
+	int16 _height;	// = 168;
+	//int16 _xOffset, _yOffset;
+	
+	int _flags;
+	//int _currentStep;
+	
+	
+	/*
+	void vagi_pic_draw(byte pic_num) __naked {
+		(void) pic_num;
+		__asm
+			ld a, #2
+			ld c, #0x50
+			out	(c), a
+			ld a, #3
+			ld c, #0x51
+			out	(c), a
+			
+			call code_segment_1__vagi_pic_draw_addr
+			
+			ld a, #0
+			ld c, #0x50
+			out	(c), a
+			ld a, #1
+			ld c, #0x51
+			out	(c), a
+			ret
+		__endasm;
+	}
+	*/
+	
 	void vagi_pic_draw(byte pic_num) {
 		// Call entry point of "vagi_pic_draw()" in other segment
 		
@@ -135,14 +183,41 @@ byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kin
 			buffer_clear(0x4);
 		#else
 			//@FIXME: Calling works, but when returning things get weird...
+			lcd_text_col = 0; lcd_text_row = 0;
 			printf("Call seg. pic_draw...");
+			
+			//  Check if DATA for segment 0 is altered (AGIVER is first variable of segment 1 code)
+			AGIVER.minor = 44;
+			//printf("before:AGIVER=");
+			printf_d(AGIVER.minor);
+			
+			__asm
+				push af
+				push bc
+				push de
+				push hl
+			__endasm;
+			
 			code_segment_call_b(code_segment_1__vagi_pic_draw_addr, pic_num);
+			
+			__asm
+				pop hl
+				pop de
+				pop bc
+				pop af
+			__endasm;
+			
+			//printf("after:AGIVER=");
+			printf_d(AGIVER.minor);
+			
 			printf("back from pic_draw segment!"); getchar();
 		#endif
-		
 	}
 	
 	void vagi_pic_show() {
+		draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+		
+		/*
 		// Call entry point of "vagi_pic_show()" in other segment
 		
 		#ifdef SKIP_BANKED_DRAW
@@ -154,6 +229,7 @@ byte vagi_drawing_step;	// = VAGI_STEP_VIS;	// Current rendering step (which kin
 			code_segment_call(code_segment_1__vagi_pic_show_addr);
 			printf("back from pic_show segment!"); getchar();
 		#endif
+		*/
 	}
 	
 #endif
@@ -201,6 +277,9 @@ byte timer_frame;
 
 void vagi_init() {
 	vagi_res_init();	// calls romfs_init()
+	
+	AGIVER.major = 2;
+	AGIVER.minor = 0;
 	
 	szGameID[0] = '?';
 	szGameID[1] = '\0';
@@ -461,9 +540,6 @@ void main() __naked {
 	byte i;
 	
 	//printf("VAGI\n");
-	AGIVER.major = 2;
-	AGIVER.minor = 0;
-	
 	vagi_init();
 	
 	//test_draw_combined();	// Test drawing combined vis & prio

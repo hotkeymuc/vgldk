@@ -92,8 +92,9 @@ typedef struct {
 
 typedef int vagi_res_handle_t;	// Those are processed by user programs
 
-static vagi_res_state_t vagi_res_states[VAGI_RES_MAX_HANDLES];
 
+extern vagi_res_state_t vagi_res_states[VAGI_RES_MAX_HANDLES];
+vagi_res_state_t vagi_res_states[VAGI_RES_MAX_HANDLES];
 
 void vagi_res_init() {
 	romfs_init();
