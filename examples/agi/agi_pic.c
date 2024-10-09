@@ -920,9 +920,11 @@ void drawPictureV2(word pic_num) {
 		//printf(" = "); printf_d(curByte); putchar('\n'); getchar();
 		//printf_x2(curByte); //putchar('\n'); getchar();
 		
-		if ((curByte < 0xf0) || (curByte > 0xfa)) {	// GBAGI only recognizes 0xf0-0xfa
-		//if (curByte < 0xf0) {
-			printf("PIC err");
+		if (
+			(curByte < 0xf0)	// aka. _minCommand
+			|| (curByte > 0xfa)	// GBAGI only recognizes 0xf0-0xfa
+		) {
+			//printf("PIC err");
 			break;
 		}
 		

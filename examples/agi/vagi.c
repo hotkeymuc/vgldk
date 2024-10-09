@@ -300,6 +300,13 @@ void vagi_handle_input() {
 		
 		// Handle directions
 		int d = -1;
+		//@FIXME: Something got effed up with the keyboard scan codes!
+		//if (key == 0xbb) d = dirLEFT;
+		//if (key == 0xba) d = dirRIGHT;
+		//if (key == 0xb8) d = dirUP;
+		//if (key == 0xb9) d = dirDOWN;
+		
+		// It is supposed to be THIS:
 		if (key == KEY_LEFT) d = dirLEFT;
 		if (key == KEY_RIGHT) d = dirRIGHT;
 		if (key == KEY_UP) d = dirUP;
@@ -322,8 +329,13 @@ void vagi_handle_input() {
 				ViewObjs[0].y = 80;
 				ViewObjs[0].priority = 12;
 			} else
-			//if ((INPUT_ENABLED) && (key == ' ')) {
-			if (key == ' ') {
+			
+			if (
+				//(INPUT_ENABLED) && (	// Input is usually only available if INPUT_ENABLED is set
+				(key == ' ')
+				//|| (key == 0xc0)	//@FIXME: Something got effed up with the keyboard scan codes!
+				//)
+			){
 				//lcd_text_col = 0; lcd_text_row = inputPos; printf(">");
 				DrawAGIString(">", 0, inputPos);
 				gets(&szInput[0]);
@@ -552,11 +564,10 @@ void main() __naked {
 		lcd_text_row = 0;
 		*/
 		
-		//running = vagi_loop();
-		vagi_loop();
-		
-		
+		running = vagi_loop();
 	}
+	
+	printf("END-OF-ROM");
 	
 	#if VGLDK_SERIES == 0
 	return 42;	// Apps can return stuff

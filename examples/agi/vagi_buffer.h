@@ -177,7 +177,7 @@ byte inline game_to_screen_y(byte y) {
 	#define buffer_to_frame_x(x) (x)	// 1:1
 	#define screen_to_buffer_x(x) ((x_scale) ? (x >> 1) : x)	// stretch 160 to 320 if specified
 	#define screen_to_game_x(x) (x / (x_scale ? 2 : 1))
-	#define game_to_screen_x(x) (x * (x_scale ? 2 : 1))	//
+	#define game_to_screen_x(x) (x * (x_scale ? 2 : 1))
 #endif
 
 // Y
@@ -324,10 +324,12 @@ void draw_buffer(
 				v = AGI_PALETTE_TO_LUMA[c];
 				v += v_err;
 				if (v < 0x80) {
-					lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+					//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+					lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
 					v_err = (v - 0x00);
 				} else {
-					lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+					//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+					lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
 					v_err = (v - 0xff);
 				}
 			#endif
@@ -398,10 +400,12 @@ void draw_buffer_combined(
 				v = AGI_PALETTE_TO_LUMA[c];
 				v += v_err;
 				if (v < 0x80) {
-					lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+					//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+					lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
 					v_err = (v - 0x00);
 				} else {
-					lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+					//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+					lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
 					v_err = (v - 0xff);
 				}
 			#endif
@@ -454,10 +458,10 @@ void draw_buffer_sprite_priority(
 	for(byte iy = 0; iy < ssh; iy++) {
 		y = ssy + iy;
 		
-		y2 = screen_to_buffer_x(y) + y_ofs;
+		y2 = screen_to_buffer_y((word)y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
-		syo = screen_to_game_y(iy) * sprite_w;	// Sprite offset
+		syo = (word)sprite_w * screen_to_game_y((word)iy);	// Sprite offset
 		
 		
 		#ifdef BUFFER_DRAW_DITHER
@@ -469,18 +473,18 @@ void draw_buffer_sprite_priority(
 		for(byte ix = 0; ix < ssw; ix++) {
 			x = ssx + ix;
 			
-			x2 = screen_to_buffer_x(x) + x_ofs;
+			x2 = screen_to_buffer_x((word)x) + x_ofs;
 			if (x2 >= BUFFER_WIDTH) break;	// Beyond buffer
 			
 			// Get value from priority buffer
-			//buffer_switch(bank_pri);
+			//buffer_switch(bank_pri);	// Only do this once per call?
 			c_prio = buffer_get_pixel_4bit(x2, y2);
 			
 			// Optional: Skip drawing foreground pixels (faster, but requires visual pixel to be already there)
 			if (c_prio >= sprite_prio) continue;	// Just skip (and hope background is correct)
 			
 			// Get sprite pixel
-			c = sprite_data[syo + screen_to_game_x(ix)];
+			c = sprite_data[syo + screen_to_game_x((word)ix)];
 			
 			// Optional: Skip drawing transparent pixels
 			if (c == sprite_trans) continue;	// Just skip (and hope background is correct)
@@ -510,10 +514,12 @@ void draw_buffer_sprite_priority(
 				v = AGI_PALETTE_TO_LUMA[c];
 				v += v_err;
 				if (v < 0x80) {
-					lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+					//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+					lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
 					v_err = (v - 0x00);
 				} else {
-					lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+					//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+					lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
 					v_err = (v - 0xff);
 				}
 			#endif

@@ -8,8 +8,8 @@
 
 #define LCD_PIXEL_USE_MASK
 
-//#define LCD_PIXEL_INLINE inline // Inline the pixel set func (to potentially gain speed?)
-#define LCD_PIXEL_INLINE  // Do not inline the pixel set func (to potentially gain speed?)
+#define LCD_PIXEL_INLINE inline // Inline the pixel set func (to potentially gain speed?)
+//#define LCD_PIXEL_INLINE  // Do not inline the pixel set func (to potentially gain speed?)
 
 #define LCD_TEXT_ROWS (LCD_HEIGHT/font_char_height)
 #define LCD_TEXT_COLS (LCD_WIDTH/font_char_width)
@@ -38,6 +38,15 @@ void LCD_PIXEL_INLINE lcd_set_pixel_1bit(byte x, byte y, byte c) {
 	if (c)	*(byte *)(LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3)) |= lcd_pixel_mask_set[x & 0x07];
 	else	*(byte *)(LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3)) &= lcd_pixel_mask_clear[x & 0x07];
 }
+
+// Optimized versions that only turn on or off (to make the optimizer happy)
+void LCD_PIXEL_INLINE lcd_set_pixel_1bit_on(byte x, byte y) {
+	*(byte *)(LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3)) |= lcd_pixel_mask_set[x & 0x07];
+}
+void LCD_PIXEL_INLINE lcd_set_pixel_1bit_off(byte x, byte y) {
+	*(byte *)(LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3)) &= lcd_pixel_mask_clear[x & 0x07];
+}
+
 #else
 void LCD_PIXEL_INLINE lcd_set_pixel_1bit(byte x, byte y, byte c) {
 	// Draw to LCD VRAM (1bpp):

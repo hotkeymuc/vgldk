@@ -1056,7 +1056,7 @@ void cMoveObj() {
 	
 	if(v == &ViewObjs[0]) { // for the ego
 		PLAYER_CONTROL = FALSE;
-		printf("CONTROL=OFF!");getchar();
+		//printf("CONTROL=OFF!");getchar();
 	}
 	
 	UpdateObjMove(v);
@@ -1092,7 +1092,7 @@ void cMoveObjV() {
 	
 	if(v == &ViewObjs[0]) { // for the ego
 		PLAYER_CONTROL = FALSE;
-		printf("CONTROL=OFF!");getchar();
+		//printf("CONTROL=OFF!");getchar();
 	}
 	
 	UpdateObjMove(v);
@@ -1744,7 +1744,7 @@ void cRandom() {
 //	player.control(); is all that is needed.
 void cProgramControl() {
 	PLAYER_CONTROL		= FALSE;
-	printf("CONTROL=OFF! program");getchar();
+	//printf("CONTROL=OFF! program");getchar();
 }
 
 //player.control();
@@ -1753,7 +1753,7 @@ void cProgramControl() {
 void cPlayerControl() {
 	PLAYER_CONTROL		= TRUE;
 	ViewObjs[0].motion	= mtNONE;
-	printf("CONTROL=ON.");getchar();
+	//printf("CONTROL=ON.");getchar();
 }
 
 //obj.status.v(oA);

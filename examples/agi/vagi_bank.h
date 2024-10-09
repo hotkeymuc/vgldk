@@ -13,7 +13,7 @@
 //	0x53 = 0xc000 - 0xdfff
 //	0x54 = 0xe000 - 0xffff (VRAM at 0xe000 - 0xebb7)
 volatile __sfr __at 0x50 bank_0x0000_port;
-volatile __sfr __at 0x51 bank_0x4000_port;
+volatile __sfr __at 0x51 bank_0x4000_port;	// Careful! This one seems to have some specials. Had me scratch my head quite often...
 volatile __sfr __at 0x52 bank_0x8000_port;
 volatile __sfr __at 0x53 bank_0xc000_port;
 volatile __sfr __at 0x54 bank_0xe000_port;

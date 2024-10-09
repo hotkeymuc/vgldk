@@ -111,6 +111,50 @@ void printf_d(byte d) {
 	*/
 }
 
+/*
+
+char *gets(char *pc) {
+	char *pcs;
+	char c;
+	pcs = pc;
+	
+	//@TODO: Handle cursor position/insert/overwrite/del/backspace
+	byte add_char;
+	
+	//myscroll_counter = LCD_ROWS - lcd_y - 1;	// Reset scroll counter, i.e. user has enough time to read current page
+	while(1) {
+		c = getchar();
+		
+		if ( (c == 8) || (c == 127) ) {
+			// Backspace/DEL
+			if (pc <= pcs)  continue;	// Beep!
+			pc--;
+			add_char = 0;
+		} else {
+			add_char = 1;
+		}
+		
+		// Local echo
+		if (stdio_echo)
+			putchar(c);
+		
+		if ((c == '\n') || (c == '\r') || (c == 0)) {	// EOF?
+			// End of string
+			
+			// Terminate string
+			*pc = 0;
+			return pcs;
+		}
+		
+		if (add_char) {
+			// Add char
+			*pc++ = c;
+		}
+	}
+	//return pcs;
+}
+
+*/
 
 char *gets(char *pc) {
 	char *pcs;

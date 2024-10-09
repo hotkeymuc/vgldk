@@ -110,6 +110,10 @@ const word lcd_addr = LCD_ADDR;
 
 
 // Text mode cursor
+/*
+extern byte lcd_text_col;
+extern byte lcd_text_row;
+*/
 byte lcd_text_col;	// = 0;
 byte lcd_text_row;	// = 0;
 //#define lcd_text_cols (LCD_W/font_char_width)

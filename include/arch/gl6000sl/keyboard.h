@@ -154,11 +154,18 @@ const char KEY_MAP_SHIFT_TO[KEY_MAP_SHIFT_SIZE] = {
 #define KEYBOARD_MODIFIER_ALT 2
 #define KEYBOARD_MODIFIER_SYMBOL 4
 
-byte keyboard_modifiers;
+/*
+extern byte keyboard_modifiers;
+extern byte keyboard_num_pressed;
+extern scancode_t keyboard_pressed[KEYBOARD_PRESSED_MAX];
+extern byte keyboard_buffer_in;
+extern byte keyboard_buffer_out;
+extern char keyboard_buffer[KEYBOARD_BUFFER_MAX];
+*/
 
+byte keyboard_modifiers;
 byte keyboard_num_pressed;
 scancode_t keyboard_pressed[KEYBOARD_PRESSED_MAX];
-
 byte keyboard_buffer_in;
 byte keyboard_buffer_out;
 char keyboard_buffer[KEYBOARD_BUFFER_MAX];

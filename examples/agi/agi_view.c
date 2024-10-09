@@ -932,6 +932,8 @@ void BlitVObj(VOBJ *v) {
 	
 	//printf("blit("); printf_d(x); putchar(','); printf_d(y); printf(")");
 	
+	int y = v->y - v->height;
+	if (y < 0) return;
 	
 	draw_buffer_sprite_priority(
 		BUFFER_BANK_PRI,
@@ -939,15 +941,15 @@ void BlitVObj(VOBJ *v) {
 		&sprite_data[0], sprite_width, sprite_height,
 		sprite_transparency,	// trans
 		
-		v->x, v->y-v->height,	//sprite_height,
+		v->x, y,	//v->y - v->height,	//sprite_height,
 		
 		v->priority,
 		
 		0,0	//, true
 	);
 	
-	lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(v->y - v->height), ('0' + v->num));
-	
+	// Show VObj number
+	//lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(y), ('0' + v->num));
 	
 }
 
@@ -958,11 +960,22 @@ void UnBlitVObj(VOBJ *v) {
 	byte ssw = game_to_screen_x(v->prevWidth);
 	byte ssh = game_to_screen_y(v->prevHeight);
 	
+	// Widen (and crop)
+	byte b = 1;
+	if (ssx >= b) ssx -= b; else ssx = 0;
+	ssw += 2*b;
+	if (ssx+ssw >= LCD_WIDTH) ssw = LCD_WIDTH-ssx;
+	
+	// Redraw object background
+	int y = ssy - ssh - b;
+	if (y < 0) return;
+	//if (ssy >= b) ssy -= b; else ssy = 0;
+	
 	draw_buffer(
 		BUFFER_BANK_VIS,
 		
-		ssx - 1,       ssx + ssw + 1,
-		ssy - ssh - 1, ssy + 1,
+		ssx,       ssx + ssw,
+		y, ssy+b,	//ssy - ssh, ssy,
 		
 		0,0	//, true
 	);
