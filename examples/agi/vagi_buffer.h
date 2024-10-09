@@ -291,12 +291,20 @@ void draw_buffer(
 	int v_err;
 	#endif
 	
+	// Clip area
+	if (area_x1 >= LCD_WIDTH) return;
+	if (area_x2 > LCD_WIDTH) area_x2 = LCD_WIDTH;	//-1;
+	if (area_y1 >= LCD_HEIGHT) return;
+	if (area_y2 > LCD_HEIGHT) area_y2 = LCD_HEIGHT;	//-1;
+	
 	// Map working buffer to 0xc000
 	//bank_0xc000_port = bank;
 	buffer_switch(bank);
 	
 	// Transfer (and optionally scale) all pixels to screen
 	for(y = area_y1; y < area_y2; y++) {
+		//if (y >= LCD_HEIGHT) break;	// Beyond screen (already checked before loop)
+		
 		y2 = screen_to_buffer_y(y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
@@ -306,6 +314,8 @@ void draw_buffer(
 		#endif
 		
 		for(x = area_x1; x < area_x2; x++) {
+			//if (x >= LCD_WIDTH) break;	// Beyond screen (already checked before loop)
+			
 			x2 = screen_to_buffer_x(x) + x_ofs;
 			if (x2 >= BUFFER_WIDTH) break;	// Beyond buffer
 			
@@ -451,12 +461,19 @@ void draw_buffer_sprite_priority(
 	byte ssw = game_to_screen_x(sprite_w);
 	byte ssh = game_to_screen_y(sprite_h);
 	
+	// Clip area
+	if (ssx >= LCD_WIDTH) return;
+	if (ssx+ssw > LCD_WIDTH) ssw = LCD_WIDTH - ssx;
+	if (ssy >= LCD_HEIGHT) return;
+	if (ssy+ssh > LCD_HEIGHT) ssh = LCD_HEIGHT - ssy;
+	
 	// We need priority now
 	buffer_switch(bank_pri);
 	
 	// Transfer (and optionally scale) all pixels to screen
 	for(byte iy = 0; iy < ssh; iy++) {
 		y = ssy + iy;
+		if (y >= LCD_HEIGHT) break;	// Beyond screen
 		
 		y2 = screen_to_buffer_y((word)y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
@@ -472,6 +489,7 @@ void draw_buffer_sprite_priority(
 		
 		for(byte ix = 0; ix < ssw; ix++) {
 			x = ssx + ix;
+			//if (x >= LCD_WIDTH) break;	// Beyond screen (already checked before loop)
 			
 			x2 = screen_to_buffer_x((word)x) + x_ofs;
 			if (x2 >= BUFFER_WIDTH) break;	// Beyond buffer

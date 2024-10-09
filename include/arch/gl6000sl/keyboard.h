@@ -1,6 +1,16 @@
 #ifndef __KEYBOARD_H
 #define __KEYBOARD_H
 
+
+
+//#define KEYBOARD_DEBUG	// Show verbose key down events and code conversion info
+
+#ifdef KEYBOARD_DEBUG
+	// Include hex dump before it is usually included
+	#define putchar(c) lcd_putchar(c)
+	#include <hex.h>	// provides printf_x2
+#endif
+
 /*
 Keyboard matrix for the VTech Genius LEADER 6000SL / PreComputer Prestige
 
@@ -107,7 +117,7 @@ __endasm;
 typedef byte keycode_t;
 typedef byte scancode_t;
 
-// Map SCANCODE to KEYCODE (which can be the final char)
+// Map SCANCODE to KEYCODE (which can or can't be the final charcode)
 const keycode_t KEY_CODES[8*8*2] = {
 	KEY_MOUSE_LMB,  '1', '9', 'e', '(', 'g', KEY_LEFT_SHIFT, ',',
 	KEY_MOUSE_RMB,  '2', '0', 'r', '+', 'h', 'z', '.',
@@ -130,8 +140,36 @@ const keycode_t KEY_CODES[8*8*2] = {
 
 
 // Translation when pressing SHIFT. Translates keycodes to charcodes
-#define KEY_MAP_SHIFT_SIZE 17
+typedef struct {
+	keycode_t key_from;
+	char char_to;
+} keycode_shift_t;
+
 // German
+#define KEY_MAP_SHIFT_SIZE 17
+const keycode_shift_t KEY_MAP_SHIFT[KEY_MAP_SHIFT_SIZE] = {
+	{'1',	'!'},
+	{'2',	'"'},
+	{'3',	'ß'},
+	{'4',	'$'},
+	{'5',	'%'},
+	{'6',	'&'},
+	{'7',	'/'},
+	{'8',	'('},
+	{'9',	')'},
+	{'0',	'='},
+	{',',	';'},
+	{'.',	':'},
+	{'-',	'_'},
+	{'ä',	'Ä'},
+	{'ü',	'Ü'},
+	{'ö',	'Ö'},
+	//{KEY_CURSOR_LEFT,	'<'},
+	//{KEY_CURSOR_RIGHT,	'>'},
+	{KEY_ENTER,	'\n'},
+};
+
+/*
 const keycode_t KEY_MAP_SHIFT_FROM[KEY_MAP_SHIFT_SIZE] = {
 	'1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
 	',', '.', '-', 'ä', 'ü', 'ö',
@@ -144,7 +182,7 @@ const char KEY_MAP_SHIFT_TO[KEY_MAP_SHIFT_SIZE] = {
 	//'<', '>',
 	'\n',
 };
-
+*/
 
 #define KEYBOARD_PRESSED_MAX 6
 #define KEYBOARD_BUFFER_MAX 8
@@ -218,7 +256,11 @@ void keyboard_update() {
 	byte mx, my;
 	byte b1;
 	byte b2;
-	int i, j;
+	
+	int i;
+	//signed char i;
+	byte j;
+	
 	scancode_t scancode;
 	keycode_t keycode;
 	char charcode;
@@ -291,7 +333,14 @@ void keyboard_update() {
 		// Remove (copy last element there)
 		keyboard_pressed[i] = keyboard_pressed[--keyboard_num_pressed];
 		i--;
+	}
+	
+	// Reset state
+	if (keyboard_num_pressed_new == 0) {
+		// No key is currently held down - reset!
 		
+		keyboard_modifiers = 0;	// Make sure no modifier gets stuck
+		return;	// Nothing more to do
 	}
 	
 	// Check for key presses (i.e. scancodes in keyboard_pressed_new[] that are not in keyboard_pressed[])
@@ -307,28 +356,42 @@ void keyboard_update() {
 		
 		// Key was freshly pressed
 		
-		// Handle key press
+		// Convert scancode to keycode
 		keycode = KEY_CODES[scancode];
 		if (keycode == KEY_NONE) continue;
 		
+		#ifdef KEYBOARD_DEBUG
 		//printf("KeyDown%02X", scancode);
-		//putchar('D'); printf_x2(scancode);
-		switch(keycode) {
-		case KEY_LEFT_SHIFT:  keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
-		case KEY_RIGHT_SHIFT: keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT; break;
-		case KEY_ALT:         keyboard_modifiers |= KEYBOARD_MODIFIER_ALT; break;
-		case KEY_SYMBOL:      keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL; break;
-		default:
+		putchar('D'); printf_x2(scancode);
+		#endif
+		
+		//switch(keycode) {
+		if      (keycode == KEY_LEFT_SHIFT ) keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
+		else if (keycode == KEY_RIGHT_SHIFT) keyboard_modifiers |= KEYBOARD_MODIFIER_SHIFT;
+		else if (keycode == KEY_ALT        ) keyboard_modifiers |= KEYBOARD_MODIFIER_ALT;
+		else if (keycode == KEY_SYMBOL     ) keyboard_modifiers |= KEYBOARD_MODIFIER_SYMBOL;
+		else {
 			
-			// Normal key
-			charcode = keycode;
+			// Normal (non-modifier) key
 			
+			// Convert keycode to charcode
+			//charcode = keycode;
+			
+			// Apply modifiers
 			if ((keyboard_modifiers & KEYBOARD_MODIFIER_SYMBOL) > 0) {
 				// Symbol
+				#ifdef KEYBOARD_DEBUG
+				putchar('$');
+				#endif
 				charcode = keycode - 'a' + 0x01;
 			} else
 			if ((keyboard_modifiers & KEYBOARD_MODIFIER_SHIFT) > 0) {
 				// Shift
+				#ifdef KEYBOARD_DEBUG
+				putchar('S');
+				#endif
+				charcode = keycode;	// Start with default
+				
 				if ((keycode >= 'a') && (keycode <= 'z')) {
 					charcode = 'A' + (keycode - 'a');
 				} else {
@@ -337,28 +400,45 @@ void keyboard_update() {
 						charcode = '!' + (keycode - '1');
 					}
 					*/
-					// Check and apply KEY_MAP_SHIFT
+					// Apply KEY_MAP_SHIFT
 					for (j = 0; j < KEY_MAP_SHIFT_SIZE; j++) {
+						if (keycode == KEY_MAP_SHIFT[j].key_from) {
+							charcode = KEY_MAP_SHIFT[j].char_to;
+							break;
+						}
+						/*
 						if (keycode == KEY_MAP_SHIFT_FROM[j]) {
 							charcode = KEY_MAP_SHIFT_TO[j];
 							break;
 						}
+						*/
 					}
 				}
 			} else
 			if (keycode == KEY_ENTER) {
 				// ENTER to NewLine
+				#ifdef KEYBOARD_DEBUG
+				putchar('E');
+				#endif
 				charcode = '\n';
 			} else {
-				// Char code equals key code
+				// Regular key: Char code equals key code
+				#ifdef KEYBOARD_DEBUG
+				putchar('=');
+				#endif
 				charcode = keycode;
 			}
+			
+			#ifdef KEYBOARD_DEBUG
+			printf_x2(charcode); putchar('.');
+			#endif
 			
 			// Store CHARCODE to buffer
 			keyboard_buffer[keyboard_buffer_in] = charcode;
 			keyboard_buffer_in = (keyboard_buffer_in + 1) % KEYBOARD_BUFFER_MAX;
 			// if (keyboard_buffer_in == keyboard_buffer_out) { FULL! }
 		}
+		
 		
 		// Store SCANCODE as "pressed"
 		if (keyboard_num_pressed < KEYBOARD_PRESSED_MAX)

@@ -2,9 +2,9 @@
 #define __VAGI_LCD_H__
 // LCD functions
 
-#define LCD_WIDTH 240
-#define LCD_HEIGHT 100
-#define LCD_ADDR 0xe000
+#define LCD_WIDTH 240	// aka. lcd.h:LCD_W
+#define LCD_HEIGHT 100	// aka. lcd.h:LCD_H
+#define LCD_ADDR 0xe000	// aka. lcd.h:LCD_ADDR
 
 #define LCD_PIXEL_USE_MASK
 
