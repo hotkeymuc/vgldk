@@ -27,8 +27,9 @@
 #define BUFFER_WIDTH 160
 #define BUFFER_HEIGHT 100
 #define BUFFER_ADDR 0xc000	// Will always be banked there
-#define BUFFER_BANK_VIS 3
-#define BUFFER_BANK_PRI 1
+#define BUFFER_BANK_PRI 1	// shared with VAGI_FRAME_BANK_LO=1
+#define BUFFER_BANK_TMP 2	// shared with VAGI_FRAME_BANK_HI=2
+#define BUFFER_BANK_VIS 3	// exclusively vor VIS data
 
 // Image/Frame processing options
 	// Chose one draw scaling option:
