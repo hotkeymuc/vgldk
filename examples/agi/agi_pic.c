@@ -40,8 +40,13 @@ int _flags;	// Contains flags for "special treatment" (e.g. "exit on command 0xf
 //int _currentStep;
 
 
-
+//@TODO: Inline it?
 void putVirtPixel(int x, int y) {
+	if (x < 0) return;
+	if (y < 0) return;
+	if (x >= AGI_FRAME_WIDTH) return;
+	if (y >= AGI_FRAME_HEIGHT) return;
+	
 	//@TODO: Do the _step checking on a higher level (e.g. line or flood fill)! This would save a lot of superfluous compare operations
 	if ((vagi_drawing_step == VAGI_STEP_VIS) && (_scrOn))
 		frame_set_pixel_4bit(x, y, _scrColor);

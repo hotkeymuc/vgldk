@@ -68,6 +68,7 @@ void code_segment_call(byte segment, word addr) {
 	
 	// Switch back to main segment
 	bank_0x0000_port = old_segment;	//0	// Mount previous segment back to 0x0000
+	//bank_0x0000_port = 0;	// Mount segment back to 0x0000
 	//bank_0x4000_port = 1;	// region 0x4000 is handled differently (in MAME:prestige.cpp). Depending on m_bank[5] it may switch to segment 0x40+ / cartridge
 }
 
@@ -85,6 +86,7 @@ void code_segment_call_b(byte segment, word addr, byte a) {
 	
 	// Switch back to main segment
 	bank_0x0000_port = old_segment;	//0	// Mount previous segment back to 0x0000
+	//bank_0x0000_port = 0;	// Mount segment back to 0x0000
 	//bank_0x4000_port = 1;	// region 0x4000 is handled differently (in MAME:prestige.cpp). Depending on m_bank[5] it may switch to segment 0x40+ / cartridge
 }
 

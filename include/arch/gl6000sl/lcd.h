@@ -110,6 +110,11 @@ const word lcd_addr = LCD_ADDR;
 
 
 // Text mode cursor
+
+
+#define LCD_TEXT_ROWS (LCD_H/font_char_height)
+#define LCD_TEXT_COLS (LCD_W/font_char_width)
+
 /*
 extern byte lcd_text_col;
 extern byte lcd_text_row;
@@ -309,19 +314,33 @@ void lcd_draw_glypth_at(byte x, byte y, byte code) {
 	unsigned char over;
 	byte shift_next;
 	
+	if (x >= LCD_W) return;
+	if (y+font_char_height >= LCD_H) return;
+	
 	//byte screen_cx = (x >> 3);	// Byte x offset on screen
 	byte screen_bx = (x & 0x07);	// Bit x offset on screen
+	byte clear_mask = ~(0xff >> screen_bx);	// Inverse bit x offset on screen
 	
 	p = (byte *)lcd_addr + (y * LCD_SCANLINE_SIZE) + (x >> 3);	// Framebuffer pointer
 	f = (byte *)&font_bitmap[code][0];	// Font pointer
 	
 	over = screen_bx + font_char_width - 8;
 	shift_next = font_char_width - over;
+	byte clear_mask_next = ~(0xff << shift_next);	// Inverse bit x offset on screen
 	for(iy = 0; iy < font_char_height; iy++) {
 		d = *f;
+		
+		// Add pixel black only (OR)
+		/*
 		*p |= d >> screen_bx;
 		if (over > 0) {
-			*(p+1) = d << shift_next;
+			*(p+1) |= d << shift_next;
+		}
+		*/
+		// Set
+		*p = (*p & clear_mask) | ( d >> screen_bx );
+		if (over > 0) {
+			*(p+1) = (*(p+1) & clear_mask_next) | (d << shift_next);
 		}
 		
 		f++;	// Next font line
@@ -398,19 +417,26 @@ void lcd_putchar(byte c) {
 		c = 0;	// Stop handling it
 	} else
 	if (c == '\b') {
-		if (lcd_text_col > 0)
+		if (lcd_text_col > 0) {
 			lcd_text_col --;
-		// Cross out old character
-		//@TODO: Draw a square
-		//lcd_draw_glypth_at(lcd_text_col*font_char_width, lcd_text_row*font_char_height, ' ');
-		lcd_putchar_at(lcd_text_col, lcd_text_row, ' ');
+		
+			// Cross out old character
+			//@TODO: Draw a square
+			//lcd_draw_glypth_at(lcd_text_col*font_char_width, lcd_text_row*font_char_height, ' ');
+			lcd_putchar_at(lcd_text_col, lcd_text_row, ' ');
+		}
 		c = 0;	// Stop handling it
 	}
 	
+	if (lcd_text_col >= LCD_TEXT_COLS) {
+		lcd_text_col = 0;
+		lcd_text_row ++;
+	}
 	
-	if (((lcd_text_row+1)*font_char_height) > lcd_h) {
+	if (lcd_text_row >= LCD_TEXT_ROWS) {
 		// We are at end of screen
-		lcd_scroll(((lcd_text_row+1) * font_char_height) - lcd_h);
+		word y = ((lcd_text_row+1) * font_char_height) - lcd_h;
+		lcd_scroll(y);
 	}
 	
 	if (c > 0) {
@@ -419,10 +445,6 @@ void lcd_putchar(byte c) {
 		lcd_text_col ++;
 	}
 	
-	if (((lcd_text_col+1)*font_char_width) > lcd_w) {
-		lcd_text_col = 0;
-		lcd_text_row ++;
-	}
 	
 }
 

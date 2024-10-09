@@ -190,11 +190,12 @@ void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
 	// Copy (and transform) pixels from full frame to reduced buffer
 	for(y = 0; y < BUFFER_HEIGHT; y++) {
 		// Transform y coordinate here!
-		y2 = buffer_to_frame_y(y) + y_src;
+		y2 = buffer_to_frame_y((word)y) + y_src;
 		
 		for(x = 0; x < BUFFER_WIDTH; x++) {
 			// Transform x coordinate here!
-			x2 = buffer_to_frame_x(x) + x_src;
+			//x2 = buffer_to_frame_x(x) + x_src;
+			x2 = buffer_to_frame_x((word)x) + x_src;
 			
 			// Get pixel from frame
 			/*

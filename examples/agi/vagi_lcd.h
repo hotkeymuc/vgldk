@@ -11,8 +11,6 @@
 #define LCD_PIXEL_INLINE inline // Inline the pixel set func (to potentially gain speed?)
 //#define LCD_PIXEL_INLINE  // Do not inline the pixel set func (to potentially gain speed?)
 
-#define LCD_TEXT_ROWS (LCD_HEIGHT/font_char_height)
-#define LCD_TEXT_COLS (LCD_WIDTH/font_char_width)
 /*
 void lcd_clear() {
 	memset((byte *)LCD_ADDR, 0x00, (LCD_HEIGHT * (LCD_WIDTH >> 3)));
