@@ -660,7 +660,8 @@ void cSetCelV() {
 void cLastCel() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
-	vars[ code_1 ] = ViewObjs[code_0].pLoop[0]-1;
+	//vars[ code_1 ] = ViewObjs[code_0].pLoop[0]-1;
+	vars[ code_1 ] = ViewObjs[code_0].totalCels - 1;
 }
 
 //current.cel(oA,vB);

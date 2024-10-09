@@ -84,9 +84,12 @@ enum {
 
 typedef struct {
 	U8	num;
+	
 	S16	x,y;
-	S16 prevX,prevY;
 	U8	width,height;
+	U8 settings;	//htk
+	
+	S16 prevX,prevY;
 	U8 prevWidth,prevHeight;
 	
 	U8	view;
@@ -101,7 +104,9 @@ typedef struct {
 	U8	stepTime,stepCount,stepSize;
 	U8	cycle,cycleTime,cycleCount;
 	
-	U8	*pView,*pLoop,*pCel;
+	//U8	*pView,*pLoop,*pCel;
+	bool viewLoaded;	// Replacement for "pView == NULL"
+	U16 oLoop, oCel;
 	
 	//struct _BLIT *blit;
 	

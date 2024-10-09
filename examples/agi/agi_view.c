@@ -344,7 +344,7 @@ BOOL CheckObjControls(VOBJ *v) {
 	
 	
 	int flags = FLAG_CONTROL;
-	int x = v->pCel[0];
+	int x = v->width;	//v->pCel[0];
 	int pri;
 	
 	
@@ -556,12 +556,16 @@ void SetObjView(VOBJ *v, int num) {
 		getchar();
 		return;
 	}
-	v->pView = (U8 *)num;	// Just so it isn't NULL
+	//v->pView = (U8 *)num;	// Just so it isn't NULL
+	v->viewLoaded = true;
 	v->view			= num;
 	
+	vagi_res_skip(view_res_h, 2);	// unknown header
+	
 	//v->totalLoops	= v->pView[2];
-	vagi_res_skip(view_res_h, 2);
 	v->totalLoops	= vagi_res_read(view_res_h);
+	//v->descPos	= vagi_res_read_word(view_res_h);	// Not used
+	
 	vagi_res_close(view_res_h);
 	
 	SetObjLoop(v, (v->loop >= v->totalLoops)?0:v->loop);
@@ -571,6 +575,8 @@ void SetObjView(VOBJ *v, int num) {
 void SetObjLoop(VOBJ *v, int loop) {
 	
 	//if(v->pView == NULL) ErrorMessage(ERR_VOBJ_VIEW, v->num);
+	if(!v->viewLoaded) { ErrorMessage(ERR_VOBJ_VIEW, v->num); return; }
+	
 	//if(loop > v->totalLoops) ErrorMessage2(ERR_VOBJ_LOOP, v->num, loop);
 	
 	if(loop == v->totalLoops)
@@ -578,13 +584,18 @@ void SetObjLoop(VOBJ *v, int loop) {
 	
 	v->loop			= loop;
 	
-	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->num);
+	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->view);
+	
+	// Skip 2*U8 ?, U8 num_loops,  WORD desc_pos
 	vagi_res_skip(view_res_h, 5 + (loop << 1));
+	
 	word o = vagi_res_read_word(view_res_h);
-	v->pLoop		= (U8 *)o;	//@TODO: ... = v->pView + bGetW(v->pView + 5 + (loop << 1));
+	//v->pLoop		= (U8 *)o;	//@TODO: ... = v->pView + bGetW(v->pView + 5 + (loop << 1));
+	v->oLoop		= o;
 	
 	vagi_res_seek_to(view_res_h, o);
 	v->totalCels	= vagi_res_read(view_res_h);	// = v->pLoop[0];
+	
 	vagi_res_close(view_res_h);
 	
 	if(v->cel >= v->totalCels)
@@ -597,29 +608,30 @@ void SetObjLoop(VOBJ *v, int loop) {
 void SetObjCel(VOBJ *v, int cel) {
 	
 	//if(v->pView == NULL) ErrorMessage(ERR_VOBJ_VIEW, v->num);
-	//if(cel > v->totalCels) ErrorMessage2(ERR_VOBJ_CEL, v->num, cel);
+	if(!v->viewLoaded) { ErrorMessage(ERR_VOBJ_VIEW, v->num); return; }
 	
+	if(cel > v->totalCels) { ErrorMessage2(ERR_VOBJ_CEL, v->num, cel); return; }
 	v->cel		= cel;
 	
-	//@FIXME: Activate loading cel and clamping in frame
-	v->width = sprite_width;
-	v->height = sprite_height;
-	
-	/*
 	
 	//v->pLoop + bGetW(v->pLoop + (cel<<1) + 1);
-	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->num);
-	vagi_res_seek_to(view_res_h, (word)v->pLoop);
+	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->view);
+	vagi_res_seek_to(view_res_h, v->oLoop);
 	
-	vagi_res_skip(view_res_h, (cel << 1)+1);
-	word o = vagi_res_read_word(view_res_h);
+	// 1 byte "no of cels"
+	vagi_res_skip(view_res_h, 1 + (cel << 1));
+	word o = vagi_res_read_word(view_res_h);	// Offset AFTER loop offset
 	
-	v->pCel		= (U8 *)o;
+	//v->pCel		= (U8 *)o;
+	v->oCel		= v->oLoop + o;
 	
-	//v->width	= v->pCel[0];
+	vagi_res_seek_to(view_res_h, v->oCel);
 	v->width	= vagi_res_read(view_res_h);	//sprite_width		//... = v->pCel[0];
-	//v->height	= v->pCel[1];
 	v->height	= vagi_res_read(view_res_h);	//sprite_height;	//... = v->pCel[1];
+	v->settings = vagi_res_read(view_res_h);	// HI nibble: mirroring; LO nibble: transparency index
+	//	cell_mirroring = cell_settings >> 4
+	//	cell_transparency = cell_settings & 0b00001111	// transparency palette index
+	//	data...
 	vagi_res_close(view_res_h);
 	
 	
@@ -634,7 +646,7 @@ void SetObjCel(VOBJ *v, int cel) {
 		if((horizon > v->y) && (!(v->flags & oINGOREHORIZON)))
 			v->y = horizon + 1;
 	}
-	*/
+	
 }
 
 void DrawObj(int num) {
@@ -927,11 +939,17 @@ void BlitVObj(VOBJ *v) {
 			ResetFlag(fEGOHIDDEN);
 	}
 	*/
+	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->view);
+	vagi_res_seek_to(view_res_h, v->oCel);
+	vagi_res_skip(view_res_h, 3);	// Skip header: U8 width, heihgt, settings
 	
+	U8 cell_mirroring = v->settings >> 4;
+	U8 cell_transparency = v->settings & 0x0f;
+	
+	// Draw cell!
+	
+	/*
 	// Test: draw a sprite!
-	
-	//printf("blit("); printf_d(x); putchar(','); printf_d(y); printf(")");
-	
 	int y = v->y - v->height;
 	if (y < 0) return;
 	
@@ -947,30 +965,100 @@ void BlitVObj(VOBJ *v) {
 		
 		0,0	//, true
 	);
+	*/
+	U8 b;
+	U8 col;
+	U8 gx;
+	U8 gy;
+	U8 count;
+	U8 i;
+	U8 ix;
+	U8 iy;
+	U8 cv;
 	
-	// Show VObj number
-	lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(y), ('0' + v->num));
+	gx = v->x;
+	gy = v->y - v->height;
+	ix = 0;
+	iy = 0;
+	
+	//@FIXME: Mirroring! see: cell_mirroring
+	
+	while(true) {
+		b = vagi_res_read(view_res_h);
+		
+		// If 0: go to next row
+		if (b == 0) {
+			iy ++;
+			if (iy >= v->height) break;
+			ix = 0;
+			gy ++;
+			gx = v->x;
+		}
+		col = b >> 4;
+		count = b & 0x0f;
+		
+		if (col == cell_transparency) {
+			// Skip transparent pixels
+			ix += count;
+			gx += count;
+		} else {
+			cv = AGI_PALETTE_TO_LUMA[col];
+			// RLE
+			for(i = 0; i < count; i ++) {
+				
+				//@FIXME: Scale and check priority!
+				U8 sx = game_to_screen_x((word)gx);
+				U8 sy = game_to_screen_y((word)gy);
+				if ((sy < LCD_HEIGHT) && (sx < LCD_WIDTH)) {
+					
+					U8 bx = screen_to_buffer_x(sx);
+					U8 by = screen_to_buffer_x(sy);
+					
+					U8 c_prio = buffer_get_pixel_4bit(bx, by);
+					if (c_prio >= v->priority) continue;	// Just skip (and hope background is correct)
+					
+					//@TODO: Dither modes!
+					lcd_set_pixel_4bit(sx, sy, cv);
+					
+				}
+				ix ++;
+				gx ++;
+			}
+		}
+		
+		
+	}
+	
+	vagi_res_close(view_res_h);
+	
+	
+	// Show VObj number as a label
+	//lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(y), ('0' + v->num));
 	
 }
 
 void UnBlitVObj(VOBJ *v) {
-	//htk: Erase object by drawing over it
+	//htk: Erase object by drawing background buffer over it
+	
+	// Draw over its PREVIOUS position and size
 	byte ssx = game_to_screen_x(v->prevX);
 	byte ssy = game_to_screen_y(v->prevY);
 	byte ssw = game_to_screen_x(v->prevWidth);
 	byte ssh = game_to_screen_y(v->prevHeight);
 	
 	// Widen (and crop)
-	byte b = 1;
+	byte b = 1;	// Over-draw by that many pixels
 	if (ssx >= b) ssx -= b; else ssx = 0;
 	ssw += 2*b;
 	if (ssx+ssw >= LCD_WIDTH) ssw = LCD_WIDTH-ssx;
 	
-	// Redraw object background
+	
+	// Top position
 	int y = ssy - ssh - b;
 	if (y < 0) return;
 	//if (ssy >= b) ssy -= b; else ssy = 0;
 	
+	// Redraw object background
 	draw_buffer(
 		BUFFER_BANK_VIS,
 		

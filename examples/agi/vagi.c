@@ -44,6 +44,7 @@
 	//#define false 0
 #else
 	// VGLDK_SERIES=0 defines VGLDK_VARIABLE_STDIO to use run-time provided putchar/getchar
+	//#define FONT_FULL_ASCII	// also include ASCII 128...255
 	#include <vgldk.h>
 	#include <stdiomin.h>	// for gets/puts/printf/printf_d. Will be auto-included on VGLDK_SERIES=0
 	
@@ -327,7 +328,7 @@ void vagi_handle_input() {
 				// Re-set ego
 				ViewObjs[0].x = 30;
 				ViewObjs[0].y = 80;
-				ViewObjs[0].priority = 12;
+				ViewObjs[0].priority = 14;
 			} else
 			
 			if (

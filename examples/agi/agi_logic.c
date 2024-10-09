@@ -466,8 +466,10 @@ U8 *NewRoom(U8 num) {
 		vObj = &ViewObjs[i];
 		vObj->flags			&= ~(oANIMATE|oDRAWN);
 		vObj->flags			|= oUPDATE;
-		vObj->pCel			= NULL;
-		vObj->pView			= NULL;
+		//vObj->pCel			= NULL;
+		vObj->oCel			= 0;
+		//vObj->pView			= NULL;
+		vObj->viewLoaded	= false;
 		//vObj->blit			= NULL;
 		vObj->stepTime		= 1;
 		vObj->stepCount		= 1;

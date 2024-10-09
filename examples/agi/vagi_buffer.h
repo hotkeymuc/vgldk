@@ -28,7 +28,7 @@
 #define BUFFER_HEIGHT 100
 #define BUFFER_ADDR 0xc000	// Will always be banked there
 #define BUFFER_BANK_PRI 1	// shared with VAGI_FRAME_BANK_LO=1
-#define BUFFER_BANK_TMP 2	// shared with VAGI_FRAME_BANK_HI=2
+#define BUFFER_BANK_TMP 2	// shared with VAGI_FRAME_BANK_HI=2 
 #define BUFFER_BANK_VIS 3	// exclusively vor VIS data
 
 // Image/Frame processing options
@@ -519,6 +519,9 @@ void draw_buffer_sprite_priority(
 				//c_vis = c_sprite;
 			}
 			*/
+			
+			
+			//@TODO: Wrap into "vagi_set_pixel(x, y, c);"
 			
 			// Draw pixel to VRAM
 			#ifdef BUFFER_DRAW_MONO
