@@ -40,32 +40,35 @@ bool vagi_pic_render_frame(word pic_num, byte drawing_step) {
 
 void vagi_pic_draw(byte pic_num) {
 	// Render both frames and create working buffers
-	//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
-	lcd_text_col = 0; lcd_text_row = 0;
-	//printf("Loading PIC "); printf_d(pic_num);
+	
+	//lcd_text_col = 0; lcd_text_row = LCD_TEXT_ROWS-1;	//(LCD_HEIGHT/font_char_height) - 1;
+	lcd_text_col = 0; lcd_text_row = 0; printf("Loading PIC "); printf_d(pic_num);	//getchar();
 	
 	// Render and process the VIS frame.
 	bool ok = vagi_pic_render_frame(pic_num, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)
+	//printf("ok");getchar();
 	if (ok) {
 		// Crop/scale frame to visual working buffer
 		process_frame_to_buffer(BUFFER_BANK_VIS, 0, 0);
 		
 		// Show visual buffer while priority is being rendered
 		//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Drawing PIC "); printf_d(pic_num);
-		//if (show_immediately) draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+		//if (show_immediately) draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
 		
 		// Render and process the PRI frame. The buffer is co-located with the frame buffer, overwriting it in the process. Must be done last.
-		//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("Loading PRIO "); printf_d(pic_num);
+		//lcd_text_col = 0; lcd_text_row = LCD_TEXT_ROWS-1;	//(LCD_HEIGHT/font_char_height) - 1;
+		lcd_text_col = 0; lcd_text_row = 0; printf("Loading PRIO "); printf_d(pic_num);
+		
 		ok = vagi_pic_render_frame(pic_num, VAGI_STEP_PRI);	// Render the full-size priority PIC frame (takes quite long...)
 		if (ok) {
 			// Crop/scale frame to priority working buffer
 			process_frame_to_buffer(BUFFER_BANK_PRI, 0, 0);
-			//draw_buffer(BUFFER_BANK_PRI, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+			//draw_buffer(BUFFER_BANK_PRI, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
 		}
 		//lcd_text_col = 0; lcd_text_row = (LCD_HEIGHT/font_char_height) - 1; printf("done.");
 		
 		// Partially redraw the lower part (where the progress bar was shown during rendering)
-		//if (show_immediately) draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, 0,0, true);
+		//if (show_immediately) draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, 0,0);	//, true);
 	}
 	
 	// Reset cursor to start at the top
@@ -73,7 +76,7 @@ void vagi_pic_draw(byte pic_num) {
 }
 
 void vagi_pic_show() {
-	draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+	draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
 }
 
 
@@ -112,16 +115,16 @@ void test_draw_agi_combined(byte pic_num, bool interactive) {
 			ok = vagi_pic_render_frame(pic_num, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)
 			if (ok) {
 				process_frame_to_buffer(bank_vis, x_src, y_src);	// Crop (upper or lower part) of frame to working buffer
-				draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);	// Show visual buffer while priority is being rendered
+				draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);	// Show visual buffer while priority is being rendered
 				
 				//lcd_text_col = 0; lcd_text_row = 0; printf("PRIO...");
 				ok = vagi_pic_render_frame(pic_num, VAGI_STEP_PRI);	// Render the full-size priority PIC frame (takes quite long...)
 				process_frame_to_buffer(bank_pri, x_src, y_src);	// Crop (upper or lower part) of frame to working buffer
-				//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+				//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
 				
 				//redraw = true;
 				// Partially redraw the lower part (where the progress bar was shown during rendering)
-				draw_buffer(bank_vis, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, x_ofs,y_ofs, true);
+				draw_buffer(bank_vis, 0,LCD_WIDTH, LCD_HEIGHT - (font_char_height*2),LCD_HEIGHT, x_ofs,y_ofs);	//, true);
 				redraw = false;	// The screen contents should be usable, so we do not need to re-draw it again
 				
 			} else {
@@ -130,13 +133,13 @@ void test_draw_agi_combined(byte pic_num, bool interactive) {
 			}
 			
 			// Draw full background
-			//draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
+			//draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs);	//, true);
 		}
 		
 		if (redraw) {
 			// Redraw the full visual buffer
 			//memset((byte *)LCD_ADDR, 0xff, LCD_HEIGHT * (LCD_WIDTH/8));	// Clear screen
-			draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
+			draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs);	//, true);
 			redraw = false;	// Prevent re-drawing again next time
 		}
 		
@@ -161,14 +164,14 @@ void test_draw_agi_combined(byte pic_num, bool interactive) {
 			x, y,
 			prio,	// prio
 			
-			x_ofs,y_ofs, true
+			x_ofs,y_ofs	//, true
 		);
 		
 		// Wait for user input
 		char c = getchar();
 		
 		// Clear background around ego sprite
-		draw_buffer(bank_vis, x,x+sprite_width*2, y,y+sprite_height, x_ofs,y_ofs, true);
+		draw_buffer(bank_vis, x,x+sprite_width*2, y,y+sprite_height, x_ofs,y_ofs);	//, true);
 		
 		// Handle keyboard input
 		switch(c) {
@@ -237,7 +240,7 @@ void test_draw_agi_combined(byte pic_num, bool interactive) {
 		case 'p':
 		case 'P':
 			// Show priority
-			draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
+			draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs);	//, true);
 			break;
 		
 		case 'r':
@@ -275,12 +278,12 @@ void test_draw_agi_combined(byte pic_num, bool interactive) {
 			// go through the thresholds (z-depth)
 			for(byte i = 0; i < 15; i++) {
 				//printf("VIS");
-				//draw_buffer(bank_vis, 0,0, true);
-				//draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
+				//draw_buffer(bank_vis, 0,0);	//, true);
+				//draw_buffer(bank_vis, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs);	//, true);
 				
 				//printf("PRIO");
-				//draw_buffer(bank_pri, x_ofs,y_ofs, true);
-				//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs, true);
+				//draw_buffer(bank_pri, x_ofs,y_ofs);	//, true);
+				//draw_buffer(bank_pri, 0,LCD_WIDTH, 0,LCD_HEIGHT, x_ofs,y_ofs);	//, true);
 				
 				// Draw threshold
 				byte thresh = 15 - i;
@@ -289,9 +292,9 @@ void test_draw_agi_combined(byte pic_num, bool interactive) {
 				printf(", y="); printf_d(y_src);	// Status
 				printf(", thresh="); printf_d(thresh);	// Status
 				//lcd_clear();
-				//draw_buffer_combined(bank_vis, bank_pri, thresh, x_ofs,y_ofs, true);
-				//draw_buffer_combined(bank_vis, bank_pri, thresh, area_x1, area_x2, area_y1, area_y2, x_ofs,y_ofs, true);
-				draw_buffer_combined(bank_vis, bank_pri, thresh, 0, LCD_WIDTH, 0, LCD_HEIGHT, x_ofs,y_ofs, true);
+				//draw_buffer_combined(bank_vis, bank_pri, thresh, x_ofs,y_ofs);	//, true);
+				//draw_buffer_combined(bank_vis, bank_pri, thresh, area_x1, area_x2, area_y1, area_y2, x_ofs,y_ofs);	//, true);
+				draw_buffer_combined(bank_vis, bank_pri, thresh, 0, LCD_WIDTH, 0, LCD_HEIGHT, x_ofs,y_ofs);	//, true);
 			}
 			
 			// Next time: Scroll to the other side (left / right)

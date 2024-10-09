@@ -44,8 +44,8 @@
 
 // Chose one pixel drawing option:
 //#define BUFFER_DRAW_MONO	// Use 1 bit on/off
-#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns
-//#define BUFFER_DRAW_DITHER	// Use simple error dithering. Looks great, but is problematic for partial redraws!
+//#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns
+#define BUFFER_DRAW_DITHER	// Use simple error dithering. Looks great, but is problematic for partial redraws!
 
 
 
@@ -126,11 +126,44 @@ static const byte AGI_PALETTE_TO_LUMA[16] = {
 };
 
 
-//void draw_buffer(byte bank, byte x_ofs, byte y_ofs, byte x_scale) {	//, byte y_scale) {
+byte inline screen_to_buffer_x(byte x) {
+	byte x2;
+	// Transform source x-coordinate to buffer coordinate
+	#ifdef BUFFER_DRAW_W160
+		x2 = x;	// 1:1
+	#endif
+	#ifdef BUFFER_DRAW_W192
+		x2 = (x * 5) / 6;	// stretch 160 to 192
+	#endif
+	#ifdef BUFFER_DRAW_W240
+		x2 = (x * 2) / 3;	// stretch 160 to 240
+	#endif
+	#ifdef BUFFER_DRAW_W320
+		if (x_scale) x2 = (x >> 1);	// stretch 160 to 320 if specified
+		else x2 = x;
+	#endif
+	return x2;
+}
+
+byte inline screen_to_buffer_y(byte y) {
+	byte y2;
+	// 1:1
+	//y2 = y;
+	
+	// 1:1 with crop/transform
+	y2 = y;	// + y_ofs;
+	
+	// scaling
+	//if (y_scale) y2 = (y >> 1) + y_ofs;
+	//else y2 = y + y_ofs;
+	return y2;
+}
+
+
 void draw_buffer(
 		byte bank,
 		byte area_x1, byte area_x2, byte area_y1, byte area_y2,
-		byte x_ofs, byte y_ofs, byte x_scale	//, byte y_scale
+		byte x_ofs, byte y_ofs	//, byte x_scale	//, byte y_scale
 	) {
 	// Transfer a final buffer to the screen, applying optional scale/translate
 	byte x;
@@ -151,17 +184,7 @@ void draw_buffer(
 	
 	// Transfer (and optionally scale) all pixels to screen
 	for(y = area_y1; y < area_y2; y++) {
-		// Transform source y-coordinate here!
-		// 1:1
-		//y2 = y;
-		
-		// 1:1 with crop/transform
-		y2 = y + y_ofs;
-		
-		// scaling
-		//if (y_scale) y2 = (y >> 1) + y_ofs;
-		//else y2 = y + y_ofs;
-		
+		y2 = screen_to_buffer_y(y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
 		#ifdef BUFFER_DRAW_DITHER
@@ -170,28 +193,7 @@ void draw_buffer(
 		#endif
 		
 		for(x = area_x1; x < area_x2; x++) {
-			
-			// Transform source x-coordinate here!
-			#ifdef BUFFER_DRAW_W160
-				x2 = x;	// 1:1
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W192
-				x2 = (x * 5) / 6;	// stretch 160 to 192
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W240
-				x2 = (x * 2) / 3;	// stretch 160 to 240
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W320
-				if (x_scale) x2 = (x >> 1) + x_ofs;	// stretch 160 to 320 if specified
-				else x2 = x + x_ofs;
-			#endif
-			
+			x2 = screen_to_buffer_x(x) + x_ofs;
 			if (x2 >= BUFFER_WIDTH) break;	// Beyond buffer
 			
 			// Get pixel from working buffer
@@ -199,7 +201,6 @@ void draw_buffer(
 			
 			// Draw pixel to VRAM
 			#ifdef BUFFER_DRAW_MONO
-				//lcd_set_pixel_1bit(x, y, c);	// B/W monochrome
 				lcd_set_pixel_1bit(x, y, (AGI_PALETTE_TO_LUMA[c] < 0x80) ? 1 : 0);	// B/W monochrome
 			#endif
 			#ifdef BUFFER_DRAW_PATTERN
@@ -249,17 +250,7 @@ void draw_buffer_combined(
 	
 	// Transfer (and optionally scale) all pixels to screen
 	for(y = area_y1; y < area_y2; y++) {
-		// Transform source y-coordinate here!
-		// 1:1
-		//y2 = y;
-		
-		// 1:1 with crop/transform
-		y2 = y + y_ofs;
-		
-		// scaling
-		//if (y_scale) y2 = (y >> 1) + y_ofs;
-		//else y2 = y + y_ofs;
-		
+		y2 = screen_to_buffer_y(y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
 		#ifdef BUFFER_DRAW_DITHER
@@ -268,28 +259,7 @@ void draw_buffer_combined(
 		#endif
 		
 		for(x = area_x1; x < area_x2; x++) {
-			
-			// Transform source x-coordinate here!
-			#ifdef BUFFER_DRAW_W160
-				x2 = x;	// 1:1
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W192
-				x2 = (x * 5) / 6;	// stretch 160 to 192
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W240
-				x2 = (x * 2) / 3;	// stretch 160 to 240
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W320
-				if (x_scale) x2 = (x >> 1) + x_ofs;	// stretch 160 to 320 if specified
-				else x2 = x + x_ofs;
-			#endif
-			
+			x2 = screen_to_buffer_x(x) + x_ofs;
 			if (x2 >= BUFFER_WIDTH) break;	// Beyond buffer
 			
 			// Get value from working buffers
@@ -327,7 +297,69 @@ void draw_buffer_combined(
 }
 */
 
-//void draw_buffer_combined(byte bank_vis, byte bank_pri, byte thresh, byte x_ofs, byte y_ofs, byte x_scale) {	//, byte y_scale) {
+byte inline screen_to_game_x(byte x) {
+	// Convert screen coordinates to game coordinates
+	byte x2;
+	#ifdef BUFFER_DRAW_W160
+		x2 = x;	// 1:1
+	#endif
+	#ifdef BUFFER_DRAW_W192
+		x2 = (x * 5) / 6;	// stretch 160 to 192
+	#endif
+	#ifdef BUFFER_DRAW_W240
+		x2 = (x * 2) / 3;	// stretch 160 to 240
+	#endif
+	#ifdef BUFFER_DRAW_W320
+		x2 = x / (x_scale ? 2 : 1);
+	#endif
+	return x2;
+}
+
+byte inline screen_to_game_y(byte y) {
+	// Convert screen coordinates to game coordinates
+	byte y2;
+	#ifdef BUFFER_PROCESS_HCROP
+		y2 = y;	// 1:1 with crop/transform
+	#endif
+	#ifdef BUFFER_PROCESS_HCRUSH
+		y2 = (y * 5) / 3;	// Screen is (crushed) 168 down to 100
+	#endif
+	return y2;
+}
+
+byte inline game_to_screen_x(byte x) {
+	// Convert game coordinates to screen coordinates
+	byte sx;
+	#ifdef BUFFER_DRAW_W160
+		sx = x;	// 1:1
+	#endif
+	#ifdef BUFFER_DRAW_W192
+		//x2 = (x * 5) / 6;	// stretch 160 to 192
+		sx = (x * 6) / 5;
+	#endif
+	#ifdef BUFFER_DRAW_W240
+		//x2 = (x * 2) / 3;	// stretch 160 to 240
+		sx = (x * 3) / 2;
+	#endif
+	#ifdef BUFFER_DRAW_W320
+		sx = x * (x_scale ? 2 : 1);
+	#endif
+	return sx;
+}
+
+byte inline game_to_screen_y(byte y) {
+	// Convert game coordinates to screen coordinates
+	byte sy;
+	#ifdef BUFFER_PROCESS_HCROP
+		//y2 = y + y_src;	// 1:1 with crop/transform
+		sy = y;	// 1:1 with crop/transform
+	#endif
+	#ifdef BUFFER_PROCESS_HCRUSH
+		sy = (y * 3) / 5;	// Scale (crush) 168 down to 100
+	#endif
+	return sy;
+}
+
 void draw_buffer_sprite_priority(
 		//byte bank_vis,
 		byte bank_pri,
@@ -339,7 +371,7 @@ void draw_buffer_sprite_priority(
 		byte sprite_x, byte sprite_y,
 		byte sprite_prio,
 		
-		byte x_ofs, byte y_ofs, byte x_scale //, byte y_scale
+		byte x_ofs, byte y_ofs	//, byte x_scale //, byte y_scale
 	) {
 	
 	// Combine two buffers (visual and priority) into one image and display it!
@@ -358,70 +390,23 @@ void draw_buffer_sprite_priority(
 	int v_err;
 	#endif
 	
-	byte ssx;
-	byte ssy;
-	byte ssw;
-	byte ssh;
 	word syo;
-	#ifdef BUFFER_DRAW_W160
-		ssx = sprite_x;	// 1:1
-		ssw = sprite_w;
-	#endif
-	#ifdef BUFFER_DRAW_W192
-		//x2 = (x * 5) / 6;	// stretch 160 to 192
-		ssx = (sprite_x * 6) / 5;
-		ssw = (sprite_w * 6) / 5;
-	#endif
-	#ifdef BUFFER_DRAW_W240
-		//x2 = (x * 2) / 3;	// stretch 160 to 240
-		ssx = (sprite_x * 3) / 2;
-		ssw = (sprite_w * 3) / 2;
-	#endif
-	#ifdef BUFFER_DRAW_W320
-		ssx = sprite_x * (x_scale ? 2 : 1);
-		ssw = sprite_w * (x_scale ? 2 : 1);
-	#endif
+	byte ssx = game_to_screen_x(sprite_x);
+	byte ssy = game_to_screen_y(sprite_y);
+	byte ssw = game_to_screen_x(sprite_w);
+	byte ssh = game_to_screen_y(sprite_h);
 	
-	
-	#ifdef BUFFER_PROCESS_HCROP
-		// 1:1 with crop/transform
-		//y2 = y + y_src;
-		ssy = sprite_y;
-		ssh = sprite_h;
-	#endif
-	#ifdef BUFFER_PROCESS_HCRUSH
-		// Scale (crush) 168 down to 100
-		//y2 = (y * 5) / 3;
-		ssy = (sprite_y * 3) / 5;
-		ssh = (sprite_h * 3) / 5;
-	#endif
-	
-	
-	
+	// We need priority now
+	buffer_switch(bank_pri);
 	
 	// Transfer (and optionally scale) all pixels to screen
 	for(byte iy = 0; iy < ssh; iy++) {
-		// Transform source y-coordinate here!
-		//y = sprite_y + iy;
 		y = ssy + iy;
-		// 1:1
-		//y2 = y;
 		
-		// 1:1 with crop/transform
-		y2 = y + y_ofs;
-		
-		// scaling
-		//if (y_scale) y2 = (y >> 1) + y_ofs;
-		//else y2 = y + y_ofs;
-		
+		y2 = screen_to_buffer_x(y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
-		#ifdef BUFFER_PROCESS_HCROP
-			syo = (iy * sprite_w);
-		#endif
-		#ifdef BUFFER_PROCESS_HCRUSH
-			syo = (((iy*5)/3) * sprite_w);
-		#endif
+		syo = screen_to_game_y(iy) * sprite_w;	// Sprite offset
 		
 		
 		#ifdef BUFFER_DRAW_DITHER
@@ -433,50 +418,18 @@ void draw_buffer_sprite_priority(
 		for(byte ix = 0; ix < ssw; ix++) {
 			x = ssx + ix;
 			
-			// Transform source x-coordinate here!
-			#ifdef BUFFER_DRAW_W160
-				x2 = x;	// 1:1
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W192
-				x2 = (x * 5) / 6;	// stretch 160 to 192
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W240
-				x2 = (x * 2) / 3;	// stretch 160 to 240
-				(void)x_ofs;
-				(void)x_scale;
-			#endif
-			#ifdef BUFFER_DRAW_W320
-				if (x_scale) x2 = (x >> 1) + x_ofs;	// stretch 160 to 320 if specified
-				else x2 = x + x_ofs;
-			#endif
-			
+			x2 = screen_to_buffer_x(x) + x_ofs;
 			if (x2 >= BUFFER_WIDTH) break;	// Beyond buffer
 			
-			// Get value from working buffers
-			buffer_switch(bank_pri);
+			// Get value from priority buffer
+			//buffer_switch(bank_pri);
 			c_prio = buffer_get_pixel_4bit(x2, y2);
 			
 			// Optional: Skip drawing foreground pixels (faster, but requires visual pixel to be already there)
 			if (c_prio >= sprite_prio) continue;	// Just skip (and hope background is correct)
 			
-			//syo = (iy * sprite_w);
-			#ifdef BUFFER_DRAW_W160
-				c = sprite_data[syo + ix];
-			#endif
-			#ifdef BUFFER_DRAW_W192
-				c = sprite_data[syo + (ix * 5) / 6];
-			#endif
-			#ifdef BUFFER_DRAW_W240
-				c = sprite_data[syo + (ix * 2) / 3];
-			#endif
-			#ifdef BUFFER_DRAW_W320
-				if (x_scale)	c = sprite_data[syo + (ix >> 1)];
-				else			c = sprite_data[syo + ix];
-			#endif
+			// Get sprite pixel
+			c = sprite_data[syo + screen_to_game_x(ix)];
 			
 			// Optional: Skip drawing transparent pixels
 			if (c == sprite_trans) continue;	// Just skip (and hope background is correct)

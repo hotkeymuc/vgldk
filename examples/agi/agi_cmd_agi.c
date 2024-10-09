@@ -340,7 +340,6 @@ void cDrawPic() {
 	
 	// Only render (and process), do not show.
 	vagi_pic_draw(pic_num);
-	//printf("Back from cDrawPic..."); getchar();
 	//vagi_pic_show();
 }
 
@@ -349,11 +348,6 @@ void cDrawPic() {
 //	whole graphical play area with a background.
 void cShowPic() {
 	ResetFlag(fPRINTMODE);
-	//@TODO: Implement
-	/*
-	cCloseWindow();
-	ShowPic();
-	*/
 	
 	//printf("cShowPic!"); getchar();
 	vagi_pic_show();
@@ -1050,17 +1044,20 @@ void cMoveObj() {
 	v->motion			= mtMOVE;
 	v->move.x			= code_1;
 	v->move.y			= code_2;
-	v->move.stepSize	= v->stepSize;
+	v->move.stepSize	= v->stepSize;	// Store previous stepSize, will be restored on StopObjMoving()
 	
 	if(code_3)
 		v->stepSize = code_3;
 	
-	ResetFlag(v->move.flag = code_4);
+	v->move.flag = code_4;
+	ResetFlag(v->move.flag);
 	
 	v->flags |= oUPDATE;
 	
-	if(v == &ViewObjs[0]) // for the ego
+	if(v == &ViewObjs[0]) { // for the ego
 		PLAYER_CONTROL = FALSE;
+		printf("CONTROL=OFF!");getchar();
+	}
 	
 	UpdateObjMove(v);
 	
@@ -1083,17 +1080,20 @@ void cMoveObjV() {
 	v->motion			= mtMOVE;
 	v->move.x			= vars[ code_1 ];
 	v->move.y			= vars[ code_2 ];
-	v->move.stepSize	= v->stepSize;
+	v->move.stepSize	= v->stepSize;	// Store previous stepSize, will be restored on StopObjMoving()
 	
 	if(vars[ code_3 ])
 		v->stepSize = vars[ code_3 ];
 	
-	ResetFlag(v->move.flag = code_4);
+	v->move.flag = code_4;
+	ResetFlag(v->move.flag);
 	
 	v->flags |= oUPDATE;
 	
-	if(v == &ViewObjs[0]) // for the ego
+	if(v == &ViewObjs[0]) { // for the ego
 		PLAYER_CONTROL = FALSE;
+		printf("CONTROL=OFF!");getchar();
+	}
 	
 	UpdateObjMove(v);
 }
@@ -1116,7 +1116,8 @@ void cFollowEgo() {
 	v->follow.count 			= 255;
 	v->flags 					|= oUPDATE;
 	
-	ResetFlag(v->follow.flag = code_2);
+	v->follow.flag = code_2;
+	ResetFlag(v->follow.flag);
 	
 }
 
@@ -1131,8 +1132,10 @@ void cWander() {
 	v->motion		 = mtWANDER;
 	v->flags		|= oUPDATE;
 	
-	if(v == &ViewObjs[0]) // for the ego
+	if(v == &ViewObjs[0]) { // for the ego
 		PLAYER_CONTROL = FALSE;
+		//printf("CONTROL=OFF wander!");getchar();
+	}
 }
 
 //normal.motion(oA);
@@ -1337,40 +1340,46 @@ void cPrintV() {
 //	Displays a string of text (message number Message) on the screen using the
 //	current text color attributes and positions it at Row and Col.
 void cDisplay() {
-	U8 code_0 = code_get();	// row
-	U8 code_1 = code_get();	// col
+	U8 code_0 = code_get();	// row = Y
+	U8 code_1 = code_get();	// col = X
 	U8 code_2 = code_get();	// msg
 	/*
 	SET_ROWCOL(code_0, code_1);
 	DrawAGIString(GetMessage(curLog,code_2));
 	*/
-	MessageBoxXY(GetMessage(curLog, code_2), code_1, code_0, 32);
+	DrawAGIString(GetMessage(curLog, code_2), code_1, code_0);
 }
 
 //display.v(vROW,vCOLUMN,vMESSAGE);
 //	Displays a string of text (message number vMessage) on the screen using the
 //	current text color attributes and positions it at vRow and vCol.
 void cDisplayV() {
-	U8 code_0 = code_get();	// row
-	U8 code_1 = code_get();	// col
+	U8 code_0 = code_get();	// row = Y
+	U8 code_1 = code_get();	// col = X
 	U8 code_2 = code_get();	// msg
 	/*
 	SET_ROWCOL(vars[ code_0 ], vars[ code_1 ]);
 	DrawAGIString(GetMessage(curLog,vars[ code_2 ]));
 	*/
-	MessageBoxXY(GetMessage(curLog, vars[ code_2 ]), code_1, code_0, 32);
+	DrawAGIString(GetMessage(curLog, vars[ code_2 ]), code_1, code_0);
 }
 
 //clear.lines(TOP,BOTTOM,COLOUR);
-//	Clears the specified rows of text to the specified color. It clears from
+//	Clears the specified rows of text (8 pixel height) to the specified color. It clears from
 //	RowTop to RowBottom with Color. Each row is eight pixels high.
 void cClearLines() {
-	U8 code_0 = code_get();
-	U8 code_1 = code_get();
-	U8 code_2 = code_get();
+	U8 code_0 = code_get();	// row top = y1
+	U8 code_1 = code_get();	// row bottom = y2
+	U8 code_2 = code_get();	// color
+	
 	//@TODO: Implement
 	/*
 	ClearTextRect(0, code_0, 39, code_1, (code_2)?15:0);
+	*/
+	/*
+	for(byte y = code_0; y <= code_1; y++) {
+		memset((void *)(LCD_ADDR + ((y*8) * (LCD_WIDTH/8))), 0x00, 8 * (LCD_WIDTH/8));	//@FIXME: Use specified color
+	}
 	*/
 }
 
@@ -1502,8 +1511,9 @@ void cGetString() {
 	ExecuteGetStringDialog(FALSE,code_0,GetMessage(curLog,code_1),code_4+1);
 	*/
 	
-	MessageBoxXY(GetMessage(curLog,code_1), code_3, code_2, 80);
 	//printf("GetString: ["); printf(GetMessage(curLog,code_1)); printf("]: ");
+	//MessageBoxXY(GetMessage(curLog,code_1), code_3, code_2, 80);
+	DrawAGIString(GetMessage(curLog,code_1), code_3, code_2);
 	putchar(cursorChar);	// Use the defined char (there's a AGI command to set that!)
 	gets(strings[code_0]);
 }
@@ -1734,6 +1744,7 @@ void cRandom() {
 //	player.control(); is all that is needed.
 void cProgramControl() {
 	PLAYER_CONTROL		= FALSE;
+	printf("CONTROL=OFF! program");getchar();
 }
 
 //player.control();
@@ -1742,6 +1753,7 @@ void cProgramControl() {
 void cPlayerControl() {
 	PLAYER_CONTROL		= TRUE;
 	ViewObjs[0].motion	= mtNONE;
+	printf("CONTROL=ON.");getchar();
 }
 
 //obj.status.v(oA);
@@ -2182,10 +2194,9 @@ void cDivV() {
 //	closed and erased from the screen.
 void cCloseWindow() {
 	WINDOW_OPEN = FALSE;
-	//@TODO: Implement
-	/*
-	RenderUpdate(0,0,PIC_MAXX,PIC_MAXY);
-	*/
+	
+	// Redraw screen
+	vagi_pic_show();
 }
 
 //	The set.simple() command sets the save.game mode to automatic by giving a

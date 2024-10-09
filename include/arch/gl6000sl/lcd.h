@@ -141,6 +141,7 @@ void lcd_clear() {
 	p = (byte *)lcd_addr;
 	
 	// Clear screen
+	//memset(p, 0x00, lcd_h*(lcd_w/8));
 	for (y = 0; y < lcd_h; y++) {
 		//b = (y % 2 == 0) ? 0xaa : 0x55;	// 50% grey pattern
 		for(x = 0; x < (lcd_w / 8); x++) {
@@ -402,10 +403,6 @@ void lcd_putchar(byte c) {
 		c = 0;	// Stop handling it
 	}
 	
-	if (((lcd_text_col+1)*font_char_width) > lcd_w) {
-		lcd_text_col = 0;
-		lcd_text_row ++;
-	}
 	
 	if (((lcd_text_row+1)*font_char_height) > lcd_h) {
 		// We are at end of screen
@@ -416,6 +413,11 @@ void lcd_putchar(byte c) {
 		//lcd_draw_glypth_at(lcd_text_col*font_char_width, lcd_text_row*font_char_height, c);
 		lcd_putchar_at(lcd_text_col, lcd_text_row, c);
 		lcd_text_col ++;
+	}
+	
+	if (((lcd_text_col+1)*font_char_width) > lcd_w) {
+		lcd_text_col = 0;
+		lcd_text_row ++;
 	}
 	
 }

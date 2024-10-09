@@ -124,6 +124,28 @@ VAGI Frame functions (handling one full resolution AGI frame)
 
 #include "vagi_buffer.h"
 
+byte inline buffer_to_frame_x(byte x) {
+	byte x2;
+	// 1:1
+	//x2 = x;
+	
+	// 1:1 with crop/transform
+	x2 = x;	// + x_src;
+	return x2;
+}
+byte inline buffer_to_frame_y(byte y) {
+	byte y2;
+	#ifdef BUFFER_PROCESS_HCROP
+		// 1:1 with crop/transform
+		y2 = y;	// + y_src;
+	#endif
+	#ifdef BUFFER_PROCESS_HCRUSH
+		// Scale (crush) 168 down to 100
+		y2 = (y * 5) / 3;
+	#endif
+	return y2;
+}
+
 void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
 	// Crop/scale/scroll full frame into working buffer (can re-use source bank as destination!)
 	byte x;
@@ -139,29 +161,14 @@ void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
 	
 	// Copy (and transform) pixels from full frame to reduced buffer
 	for(y = 0; y < BUFFER_HEIGHT; y++) {
-		
 		// Transform y coordinate here!
-		#ifdef BUFFER_PROCESS_HCROP
-			// 1:1 with crop/transform
-			y2 = y + y_src;
-		#endif
-		#ifdef BUFFER_PROCESS_HCRUSH
-			// Scale (crush) 168 down to 100
-			(void)y_src;
-			y2 = (y * 5) / 3;
-		#endif
+		y2 = buffer_to_frame_y(y) + y_src;
 		
 		for(x = 0; x < BUFFER_WIDTH; x++) {
 			// Transform x coordinate here!
-			
-			// 1:1
-			//x2 = x;
-			
-			// 1:1 with crop/transform
-			x2 = x + x_src;
+			x2 = buffer_to_frame_x(x) + x_src;
 			
 			// Get pixel from frame
-			
 			/*
 			#ifdef AGI_FRAME_CONTIGUOUS
 				// Get pixel from contiguous frame

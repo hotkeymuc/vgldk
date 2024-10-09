@@ -46,7 +46,7 @@ vagi_res_handle_t view_res_h;	// Resource handle to read from (vagi_res.h)
 
 const int objDirTableX[] 	= { 0, 0, 1, 1, 1, 0,-1,-1,-1};
 const int objDirTableY[] 	= { 0,-1,-1, 0, 1, 1, 1, 0,-1};
-const int vObjDirs[]		= {dirUPLEFT, dirUP, dirUPRIGHT,  dirLEFT, dirNONE, dirRIGHT,  dirDOWNLEFT, dirDOWN, dirDOWNRIGHT};
+const int vObjDirs[]		= {dirUPLEFT, dirUP, dirUPRIGHT,  dirLEFT, dirNONE, dirRIGHT,  dirDOWNLEFT, dirDOWN, dirDOWNRIGHT};	// for FindDirection()
 const int loopDirsFull[]	= {lpIGNORE,lpIGNORE,lpRIGHT,lpRIGHT,lpRIGHT,lpIGNORE,lpLEFT,lpLEFT,lpLEFT,lpRIGHT};
 const int loopDirsSingle[]	= {lpIGNORE,lpUP,lpRIGHT,lpRIGHT,lpRIGHT,lpDOWN,lpLEFT,lpLEFT,lpLEFT,lpRIGHT};
 /*
@@ -104,18 +104,20 @@ void InitViewSystem() {
 }
 
 void UpdateVObj() {
+	// This is called by the main game loop after the logic has run
+	
 	BOOL ANY_TO_DRAW=FALSE;
 	int newLoop;
 	VOBJ *v;
 	int i;
 	
-	//for(v=ViewObjs; v<&ViewObjs[MAX_VOBJ]; v++) {
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		
 		//printf("UpdateVObj");printf_d(i);printf("...");
 		//@FIXME: For now: Just always try drawing every ViewObj
 		if (v->flags & oDRAWN) {
+			UnBlitVObj(v);
 			BlitVObj(v);
 		}
 		
@@ -157,7 +159,8 @@ void UpdateVObj() {
 	
 	if(ANY_TO_DRAW) {
 		//EraseBlitList(&blUpdate);
-		UpdateObjsStep();
+		UpdateObjsStep();	// This moves all objects
+		
 		//DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
 		//UpdateBlitList(&blUpdate);
 		
@@ -166,15 +169,15 @@ void UpdateVObj() {
 }     
 
 void CalcVObjsDir() {
+	// Called by the main game loop BEFORE the logic is run
 	VOBJ *v;
 	int x,y;
 	int i;
 	
-	//for(v=ViewObjs; v<&ViewObjs[MAX_VOBJ]; v++)
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		
-		if((v->flags & (oDRAWN|oANIMATE|oUPDATE))==(oDRAWN|oANIMATE|oUPDATE)) {
+		if((v->flags & (oDRAWN|oANIMATE|oUPDATE)) == (oDRAWN|oANIMATE|oUPDATE)) {
 			if(v->stepCount == 1) {
 				switch(v->motion) {
 					case mtWANDER:
@@ -217,6 +220,8 @@ BOOL CheckBlockPoint(U8 x, U8 y) {
 }
 
 void UpdateObjsStep() {
+	// Called by the main game loop after logic is run, through UpdateVObj() only if any of the objects need to move
+	
 	VOBJ *v;
 	int border,oldX,oldY;
 	int i;
@@ -224,7 +229,6 @@ void UpdateObjsStep() {
 	vars[vEGOBORDER] = vars[vOBJBORDER] = bdNONE;
 	vars[vOBJECT] = 0;
 	
-	//for(v=ViewObjs; v<&ViewObjs[MAX_VOBJ]; v++)
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		
@@ -401,7 +405,8 @@ BOOL CheckObjInScreen(VOBJ *v) {
 
 void SolidifyObjPosition(VOBJ *v) {
 	
-	//@FIXME: This freezes!
+	//@FIXME: This function freezes!
+	//(void)v;
 	
 	/*
 	int checkDir = dirLEFT, checkCnt = 1, checkLen = 1;
@@ -450,15 +455,25 @@ void SolidifyObjPosition(VOBJ *v) {
 }
 
 void UpdateObjMove(VOBJ *v) {
+	// Rotate in the optimum direction to face v->move.x/y
 	v->direction = FindDirection(v->x, v->y, v->move.x, v->move.y, v->stepSize);
+	
 	if(v == &ViewObjs[0])
 		vars[vEGODIR] = v->direction;
-	if(!v->direction)
+	
+	// If no new direction found (i.e. reached destination)
+	if(!v->direction) {
+		//printf("Object reached move dest:\n");
+		//printf_d(v->x);putchar('=');printf_d(v->move.x);putchar('\n');
+		//printf_d(v->y);putchar('=');printf_d(v->move.y);putchar('\n');
+		//getchar();
 		StopObjMoving(v);
+	}
 }
 
 void StopObjMoving(VOBJ *v) {
-	SetFlag(v->move.flag);
+	SetFlag(v->move.flag);	// Signal to the logic that the object has reached its destination
+	
 	v->motion	= mtNONE;
 	v->stepSize	= v->move.stepSize;
 	
@@ -639,6 +654,8 @@ void DrawObj(int num) {
 		SolidifyObjPosition(v);
 		//v->prevWidth	= v->pCel[0];
 		//v->prevHeight	= v->pCel[1];
+		v->prevWidth	= v->width;	//v->pCel[0];
+		v->prevHeight	= v->height;	//v->pCel[1];
 		v->prevX		= v->x;
 		v->prevY		= v->y;
 		
@@ -678,22 +695,26 @@ void EraseObj(int num) {
 		if((NO_UPDATE = !(v->flags & oUPDATE))!=FALSE) EraseBlitList(&blStatic);
 		*/
 		
-		// Partial redraw: Re-draw that section from buffer, since we won't be having enough RAM for background blits I think...
+		//@TODO: Partial redraw: Re-draw that section from buffer, since we won't be having enough RAM for background blits I think...
 		//draw_buffer(BUFFER_BANK_VIS, v->x,v->x+v->width, v->y, v->y+v->height, 0,0,true);
+		UnBlitVObj(v);
 		
 		v->flags &= ~oDRAWN;
 		/*
 		if (NO_UPDATE) DrawBlitList(BuildBlitList(CheckStaticVObj, &blStatic));
-		
 		DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
-		UpdateObjCel(v);
 		*/
+		UpdateObjCel(v);
+		
 	}
 	
 }
 
 void UpdateObjCel(VOBJ *v) {
+	
 	//@TODO: Implement
+	//(void)v;
+	
 	/*
 	U8 *celData;
 	int prevHeight, prevWidth;
@@ -911,17 +932,39 @@ void BlitVObj(VOBJ *v) {
 	
 	//printf("blit("); printf_d(x); putchar(','); printf_d(y); printf(")");
 	
+	
 	draw_buffer_sprite_priority(
 		BUFFER_BANK_PRI,
 		
 		&sprite_data[0], sprite_width, sprite_height,
 		sprite_transparency,	// trans
 		
-		v->x, v->y,
+		v->x, v->y-v->height,	//sprite_height,
 		
 		v->priority,
 		
-		0,0, true
+		0,0	//, true
+	);
+	
+	lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(v->y - v->height), ('0' + v->num));
+	
+	
+}
+
+void UnBlitVObj(VOBJ *v) {
+	//htk: Erase object by drawing over it
+	byte ssx = game_to_screen_x(v->prevX);
+	byte ssy = game_to_screen_y(v->prevY);
+	byte ssw = game_to_screen_x(v->prevWidth);
+	byte ssh = game_to_screen_y(v->prevHeight);
+	
+	draw_buffer(
+		BUFFER_BANK_VIS,
+		
+		ssx - 1,       ssx + ssw + 1,
+		ssy - ssh - 1, ssy + 1,
+		
+		0,0	//, true
 	);
 	
 	

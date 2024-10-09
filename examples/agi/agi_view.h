@@ -87,7 +87,7 @@ typedef struct {
 	S16	x,y;
 	S16 prevX,prevY;
 	U8	width,height;
-	//U8 prevWidth,prevHeight;
+	U8 prevWidth,prevHeight;
 	
 	U8	view;
 	U8	loop,totalLoops;
@@ -185,6 +185,7 @@ void UpdateObjLoop(VOBJ *v);
 void SaveBlit(BLIT *b);
 void RestoreBlit(BLIT *b);
 */
+void UnBlitVObj(VOBJ *v);	// htk
 void BlitVObj(VOBJ *v);
 BOOL CheckUpdateVObj(VOBJ *v);
 BOOL CheckStaticVObj(VOBJ *v);

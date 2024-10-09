@@ -42,65 +42,6 @@ typedef void (t_code_segment_call)(void);
 typedef void (t_code_segment_call_b)(byte a);
 
 //static word bank_sp;
-
-// Note: This function must stay at a static address, no matter which segment is active!
-//void code_segment_call(word addr) {
-void inline code_segment_call(word addr) {
-	// Switch to other segment (let's hope the switch-a-roo works!)
-	//byte b0x0000 = bank_0x0000_port;
-	//byte b0x4000 = bank_0x4000_port;
-	
-	bank_0x0000_port = 2;
-	bank_0x4000_port = 3;
-	/*
-	__asm
-	push af
-	push bc
-	push de
-	push hl
-	__endasm;
-	*/
-	
-	/*
-	// Safe SP
-	__asm
-	; Store SP in HL
-	ld	hl, #0
-	add hl, sp
-	; Store SP in RAM
-	ld	(_bank_sp), hl
-	__endasm;
-	printf("Before: SP="); printf_x2(bank_sp >> 8); printf_x2(bank_sp & 0xff); putchar('\n');
-	*/
-	
-	// Call the given address as a function...
-	(*((t_code_segment_call *)addr))();
-	
-	/*
-	// Safe SP
-	__asm
-	; Store SP in HL
-	ld	hl, #0
-	add hl, sp
-	; Store SP in RAM
-	ld	(_bank_sp), hl
-	__endasm;
-	printf("After: SP="); printf_x2(bank_sp >> 8); printf_x2(bank_sp & 0xff); putchar('\n');
-	*/
-	
-	/*
-	__asm
-	pop hl
-	pop de
-	pop bc
-	pop af
-	__endasm;
-	*/
-	// Switch back to main segment
-	bank_0x0000_port = 0;	//b0x0000;	//0;
-	bank_0x4000_port = 1;	//b0x4000;	//1;
-}
-
 /*
 void inline code_segment_dump() {
 	#ifdef CODE_SEGMENT_0
@@ -112,68 +53,39 @@ void inline code_segment_dump() {
 }
 */
 
-//void code_segment_call_b(word addr, byte a) {
-void inline code_segment_call_b(word addr, byte a) {
+
+// Note: This function must stay at a static address, no matter which segment is active!
+void code_segment_call(byte segment, word addr) {
+	// Remember current segment
+	byte old_segment = bank_0x0000_port;
+	
 	// Switch to other segment (let's hope the switch-a-roo works!)
+	bank_0x0000_port = segment;	//2	// Mount given 0x4000-byte sized segment at 0x0000
+	//bank_0x4000_port = 3;	// region 0x4000 is handled differently (in MAME:prestige.cpp). Depending on m_bank[5] it may switch to segment 0x40+ / cartridge
 	
-	//code_segment_dump();
+	// Call the given address as a function...
+	(*((t_code_segment_call *)addr))();
 	
-	//printf("bank0000="); printf_d(bank_0x0000_port); putchar('\n');
-	//printf("bank4000="); printf_d(bank_0x4000_port); putchar('\n');
-	//byte b0x0000 = bank_0x0000_port;
-	//byte b0x4000 = bank_0x4000_port;
-	bank_0x0000_port = 2;
-	bank_0x4000_port = 3;
+	// Switch back to main segment
+	bank_0x0000_port = old_segment;	//0	// Mount previous segment back to 0x0000
+	//bank_0x4000_port = 1;	// region 0x4000 is handled differently (in MAME:prestige.cpp). Depending on m_bank[5] it may switch to segment 0x40+ / cartridge
+}
+
+
+void code_segment_call_b(byte segment, word addr, byte a) {
+	// Remember current segment
+	byte old_segment = bank_0x0000_port;
 	
-	//code_segment_dump();
-	
-	/*
-	__asm
-	push af
-	push bc
-	push de
-	push hl
-	__endasm;
-	*/
-	
-	/*
-	// Safe SP
-	__asm
-	; Store SP in HL
-	ld	hl, #0
-	add hl, sp
-	; Store SP in RAM
-	ld	(_bank_sp), hl
-	__endasm;
-	printf("Before: SP="); printf_x2(bank_sp >> 8); printf_x2(bank_sp & 0xff); putchar('\n');
-	*/
+	// Switch to other segment (let's hope the switch-a-roo works!)
+	bank_0x0000_port = segment;	//2	// Mount given 0x4000-byte sized segment at 0x0000
+	//bank_0x4000_port = 3;	// region 0x4000 is handled differently (in MAME:prestige.cpp). Depending on m_bank[5] it may switch to segment 0x40+ / cartridge
 	
 	// Call the given address as a function...
 	(*((t_code_segment_call_b *)addr))(a);
 	
-	/*
-	// Safe SP
-	__asm
-	; Store SP in HL
-	ld	hl, #0
-	add hl, sp
-	; Store SP in RAM
-	ld	(_bank_sp), hl
-	__endasm;
-	printf("After: SP="); printf_x2(bank_sp >> 8); printf_x2(bank_sp & 0xff); putchar('\n');
-	*/
-	
-	//code_segment_dump();
-	
 	// Switch back to main segment
-	//bank_0x4000_port = b0x4000;	// Usually 1;
-	//bank_0x0000_port = b0x0000;	// Usually 0;
-	bank_0x0000_port = 0;
-	bank_0x4000_port = 1;
-	
-	//code_segment_dump();
-	
-	//printf("bank end!");getchar();
+	bank_0x0000_port = old_segment;	//0	// Mount previous segment back to 0x0000
+	//bank_0x4000_port = 1;	// region 0x4000 is handled differently (in MAME:prestige.cpp). Depending on m_bank[5] it may switch to segment 0x40+ / cartridge
 }
 
 #endif	// __VAGI_BANK_H__

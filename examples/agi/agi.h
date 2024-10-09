@@ -90,11 +90,9 @@ extern BOOL SOUND_ON,PIC_VISIBLE,PRI_VISIBLE,STATUS_VISIBLE, VOBJ_BLOCKING,WALK_
 extern U8 oldScore;
 extern U8 horizon;
 extern U8 picNum;
-extern U8 minRow,inputPos,statusRow;
-extern U8 textColour,textAttr,textRow,textCol;
-extern int minRowY,ticks;
+//extern int minRowY;
+extern int ticks;
 extern RECT8 objBlock;
-extern char cursorChar;
 
 #define MAX_ID_LEN 7
 extern char szGameID[MAX_ID_LEN+1];
@@ -105,34 +103,12 @@ extern char szGameID[MAX_ID_LEN+1];
 #define MAX_IOBJ			256
 extern U8 invObjRooms[MAX_IOBJ];
 
-void InitObjSystem(void);
-void ExecuteInvDialog(void);
-U8 FindObj(char *name);
+// To be implemented
+//void InitObjSystem(void);
+//void ExecuteInvDialog(void);
+//U8 FindObj(char *name);
 
-
-// parse.h:
-#define MAX_INPUT	10	// Number of dictionary indices
-extern U16 input[MAX_INPUT],inpos;
-extern char *wordStrings[MAX_INPUT];
-extern int wordCount;
-extern char szInput[64];
-
-
-
-// more:
 void dump_vars();
-void WriteStatusLine();
-void vagi_printf(char *p);
-bool MessageBox(char *t);
-bool MessageBoxXY(char *t, byte x, byte y, byte w);
-void ErrorMessage(int msg, int param);
-void ErrorMessage2(int msg, int param1, int param2);
-void ErrorMessage3(int msg, int param1, int param2, int param3);
-
 U8 rand();
-
-// from GBAGI:parse.h:
-void InitParseSystem();
-char *ParseInput(char *sStart);
 
 #endif

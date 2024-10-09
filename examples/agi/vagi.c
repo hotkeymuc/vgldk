@@ -78,6 +78,7 @@ typedef word uint16;
 #include "vagi_buffer.h"	// This handles the (smaller) working buffer(s) needed at run-time (derived from frame)
 #include "vagi_res.h"	// This allows reading from AGI resources as if they were files
 
+
 // Test sprite
 #define sprite_width 8
 #define sprite_height 14
@@ -105,18 +106,15 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 #include "agi.h"
 
 
-// PIC code
+// PIC code (on separate code segment!)
 
-//#define AGI_PIC_SHOW_PROGRESS	// Show progress bar while rendering PICs, requires ~400 (0x195) bytes
-
+#define AGI_PIC_SHOW_PROGRESS	// Show progress bar while rendering PICs, requires ~400 (0x195) bytes
 #include "agi_pic.h"
 
 
 #ifndef CODE_SEGMENT_1
 	// Include known entry points in segment 1
 	#include "code_segment_1.h"
-	
-	//#define SKIP_BANKED_DRAW	// For debugging memory corruptions
 	
 	// Provide stubs ("trampolines") to functions in the other bank
 	
@@ -147,89 +145,24 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 	//int _currentStep;
 	
 	
-	/*
-	void vagi_pic_draw(byte pic_num) __naked {
-		(void) pic_num;
-		__asm
-			ld a, #2
-			ld c, #0x50
-			out	(c), a
-			ld a, #3
-			ld c, #0x51
-			out	(c), a
-			
-			call code_segment_1__vagi_pic_draw_addr
-			
-			ld a, #0
-			ld c, #0x50
-			out	(c), a
-			ld a, #1
-			ld c, #0x51
-			out	(c), a
-			ret
-		__endasm;
-	}
-	*/
-	
 	void vagi_pic_draw(byte pic_num) {
 		// Call entry point of "vagi_pic_draw()" in other segment
 		
-		#ifdef SKIP_BANKED_DRAW
-			printf("vagi_pic_draw OFF!");	//getchar();
-			(void)pic_num;
-			buffer_switch(BUFFER_BANK_VIS);
-			buffer_clear(0xf);
-			buffer_switch(BUFFER_BANK_PRI);
-			buffer_clear(0x4);
-		#else
-			//@FIXME: Calling works, but when returning things get weird...
-			lcd_text_col = 0; lcd_text_row = 0;
-			printf("Call seg. pic_draw...");
-			
-			//  Check if DATA for segment 0 is altered (AGIVER is first variable of segment 1 code)
-			AGIVER.minor = 44;
-			//printf("before:AGIVER=");
-			printf_d(AGIVER.minor);
-			
-			__asm
-				push af
-				push bc
-				push de
-				push hl
-			__endasm;
-			
-			code_segment_call_b(code_segment_1__vagi_pic_draw_addr, pic_num);
-			
-			__asm
-				pop hl
-				pop de
-				pop bc
-				pop af
-			__endasm;
-			
-			//printf("after:AGIVER=");
-			printf_d(AGIVER.minor);
-			
-			printf("back from pic_draw segment!"); getchar();
-		#endif
+		buffer_switch(BUFFER_BANK_PRI);
+		buffer_clear(0x4);
+		buffer_switch(BUFFER_BANK_VIS);
+		buffer_clear(0xf);
+		
+		//printf("call...");getchar();
+		code_segment_call_b(2, code_segment_1__vagi_pic_draw_addr, pic_num);
+		//printf("back.");getchar();
 	}
 	
 	void vagi_pic_show() {
-		draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0, false);
+		//lcd_clear();
+		draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
 		
-		/*
-		// Call entry point of "vagi_pic_show()" in other segment
-		
-		#ifdef SKIP_BANKED_DRAW
-			lcd_clear();
-			printf("vagi_pic_show OFF!");	//getchar();
-		#else
-			//@FIXME: Calling works, but when returning things get weird...
-			printf("Call seg. pic_show...");
-			code_segment_call(code_segment_1__vagi_pic_show_addr);
-			printf("back from pic_show segment!"); getchar();
-		#endif
-		*/
+		//code_segment_call(2, code_segment_1__vagi_pic_show_addr);
 	}
 	
 #endif
@@ -248,6 +181,10 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 	}
 #endif
 #ifdef CODE_SEGMENT_0
+// Exclusively in code segment 0
+
+// Text/Parser
+#include "agi_text.h"
 
 // VIEW code
 #include "agi_view.h"
@@ -264,6 +201,7 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 // Include Implementations
 //@FIXME: Only this main C file gets passed to the VGLDK compiler, so we need to include all C files manually here...
 #include "agi.c"
+#include "agi_text.c"
 #include "agi_view.c"
 #include "agi_vars.c"
 #include "agi_cmd_test.c"
@@ -274,6 +212,7 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 
 #define FRAMES_PER_SECOND 10	// Used for in-game time
 byte timer_frame;
+
 
 void vagi_init() {
 	vagi_res_init();	// calls romfs_init()
@@ -306,7 +245,7 @@ void vagi_init() {
 	
 	//ydiff 			= 0;
 	minRow 			= 1;
-	minRowY			= 0;	//(minRow*(SCREEN_WIDTH*CHAR_HEIGHT));
+	//minRowY			= 0;	//(minRow*(SCREEN_WIDTH*CHAR_HEIGHT));
 	inputPos		= 22;
 	statusRow		= 0;
 	
@@ -382,10 +321,10 @@ void vagi_handle_input() {
 				ViewObjs[0].y = 80;
 				ViewObjs[0].priority = 12;
 			} else
-			if ((INPUT_ENABLED) && (key == ' ')) {
-				lcd_text_col = 0;
-				lcd_text_row = inputPos;	//0;
-				printf(">");
+			//if ((INPUT_ENABLED) && (key == ' ')) {
+			if (key == ' ') {
+				//lcd_text_col = 0; lcd_text_row = inputPos; printf(">");
+				DrawAGIString(">", 0, inputPos);
 				gets(&szInput[0]);
 				
 				// fPLAYERCOMMAND and fSAIDOK are Reset in game loop before calling vagi_handle_input
@@ -398,6 +337,8 @@ void vagi_handle_input() {
 			//CTLMAP *c;
 			for(i=0; i<MAX_CONTROLLERS-1; i++) {
 				if(ctlMap[i].key == key) {
+					lcd_text_col = 0;
+					lcd_text_row = 0;
 					printf("CTL"); printf_d(ctlMap[i].num); printf("!\n");
 					controllers[ctlMap[i].num] = 1;
 					//break;
@@ -455,7 +396,7 @@ bool vagi_loop() {
 	if (PLAYER_CONTROL) ViewObjs[0].direction = vars[vEGODIR];
 	else vars[vEGODIR] = ViewObjs[0].direction;
 	
-	CalcVObjsDir();	// agi_view.c: This makes ViewObjs move/wander/follow
+	CalcVObjsDir();	// agi_view.c: This makes ViewObjs chose a new direction
 	
 	oldScore = vars[vSCORE];
 	SOUND_ON = TestFlag(fSOUND);
@@ -537,7 +478,7 @@ void main() __naked {
 #endif
 	
 	byte running = 1;
-	byte i;
+	//byte i;
 	
 	//printf("VAGI\n");
 	vagi_init();

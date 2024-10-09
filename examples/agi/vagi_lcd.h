@@ -1,30 +1,28 @@
 #ifndef __VAGI_LCD_H__
 #define __VAGI_LCD_H__
+// LCD functions
 
 #define LCD_WIDTH 240
 #define LCD_HEIGHT 100
 #define LCD_ADDR 0xe000
 
-// LCD functions
+#define LCD_PIXEL_USE_MASK
+
+#define LCD_TEXT_ROWS (LCD_HEIGHT/font_char_height)
+#define LCD_TEXT_COLS (LCD_WIDTH/font_char_width)
 /*
 void lcd_clear() {
 	memset((byte *)LCD_ADDR, 0x00, (LCD_HEIGHT * (LCD_WIDTH >> 3)));
 }
 */
 
+#ifdef LCD_PIXEL_USE_MASK
+// Look-up quickly
 const byte lcd_pixel_mask_set[8] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
 const byte lcd_pixel_mask_clear[8] = {0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0xfe};
 
 void inline lcd_set_pixel_1bit(byte x, byte y, byte c) {
 	// Draw to LCD VRAM (1bpp):
-	//	c == 0 = pixel CLEAR = WHITE
-	//	c > 0 = pixel SET = BLACK
-	/*
-	word a = LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3);
-	if (c)	*(byte *)a |= 1 << (7 - x & 0x07);
-	else	*(byte *)a &= 0xff - (1 << (7 - x & 0x07));
-	*/
-	
 	// Use mask look-up for more speed
 	/*
 	word a = LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3);
@@ -37,7 +35,16 @@ void inline lcd_set_pixel_1bit(byte x, byte y, byte c) {
 	if (c)	*(byte *)(LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3)) |= lcd_pixel_mask_set[x & 0x07];
 	else	*(byte *)(LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3)) &= lcd_pixel_mask_clear[x & 0x07];
 }
-
+#else
+void inline lcd_set_pixel_1bit(byte x, byte y, byte c) {
+	// Draw to LCD VRAM (1bpp):
+	//	c == 0 = pixel CLEAR = WHITE
+	//	c > 0 = pixel SET = BLACK
+	word a = LCD_ADDR + y * (LCD_WIDTH >> 3) + (x >> 3);
+	if (c)	*(byte *)a |= 1 << (7 - x & 0x07);
+	else	*(byte *)a &= ~(1 << (7 - x & 0x07));
+}
+#endif
 
 void lcd_set_pixel_4bit(byte x, byte y, byte c) {
 	// Draw pixel with tone mapping / dithering
