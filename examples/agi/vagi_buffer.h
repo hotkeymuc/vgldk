@@ -31,25 +31,172 @@
 #define BUFFER_BANK_PRI 1
 
 // Image/Frame processing options
+	// Chose one draw scaling option:
+	//#define BUFFER_DRAW_W160	// Draw width 1:1 (does not fill the full screen width)
+	//#define BUFFER_DRAW_W192	// Stretch width to 192 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
+	#define BUFFER_DRAW_W240	// Stretch width to 240 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
+	//#define BUFFER_DRAW_W320	// Draw width X2 with crop (fast, but requires scrolling)
 
-// Chose one draw scaling option:
-//#define BUFFER_DRAW_W160	// Draw width 1:1 (does not fill the full screen width)
-//#define BUFFER_DRAW_W192	// Stretch width to 192 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
-#define BUFFER_DRAW_W240	// Stretch width to 240 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
-//#define BUFFER_DRAW_W320	// Draw width X2 with crop (fast, but requires scrolling)
+	// Chose one frame processing option:
+	//#define BUFFER_PROCESS_HCROP	// Just extract 100 pixels in height (and employ scrolling with re-rendering)
+	#define BUFFER_PROCESS_HCRUSH	// Crush the 168 frame height down to 100
 
-// Chose one frame processing option:
-//#define BUFFER_PROCESS_HCROP	// Just extract 100 pixels in height (and employ scrolling with re-rendering)
-#define BUFFER_PROCESS_HCRUSH	// Crush the 168 frame height down to 100
+	// Chose one pixel drawing option:
+	//#define BUFFER_DRAW_MONO	// Use 1 bit on/off
+	//#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns
+	#define BUFFER_DRAW_DITHER	// Use simple error dithering. Looks great, but is problematic for partial redraws!
 
-// Chose one pixel drawing option:
-//#define BUFFER_DRAW_MONO	// Use 1 bit on/off
-//#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns
-#define BUFFER_DRAW_DITHER	// Use simple error dithering. Looks great, but is problematic for partial redraws!
+	// Chose one inlining option:
+	//#define BUFFER_SWITCH_INLINE inline	// Inline buffer switch calls
+	#define BUFFER_SWITCH_INLINE 	// Do not inline buffer switch calls
+	//#define BUFFER_PIXEL_INLINE inline	// Inline buffer set/get pixel
+	#define BUFFER_PIXEL_INLINE 	// Do not inline buffer set/get pixel
 
 
 
-void inline buffer_switch(byte bank) {
+// Helpers for converting coordinates
+/*
+byte inline screen_to_buffer_x(byte x) {
+	byte x2;
+	// Transform source x-coordinate to buffer coordinate
+	#ifdef BUFFER_DRAW_W160
+		x2 = x;	// 1:1
+	#endif
+	#ifdef BUFFER_DRAW_W192
+		x2 = (x * 5) / 6;	// stretch 160 to 192
+	#endif
+	#ifdef BUFFER_DRAW_W240
+		x2 = (x * 2) / 3;	// stretch 160 to 240
+	#endif
+	#ifdef BUFFER_DRAW_W320
+		if (x_scale) x2 = (x >> 1);	// stretch 160 to 320 if specified
+		else x2 = x;
+	#endif
+	return x2;
+}
+byte inline screen_to_buffer_y(byte y) {
+	byte y2;
+	// 1:1
+	//y2 = y;
+	
+	// 1:1 with crop/transform
+	y2 = y;	// + y_ofs;
+	
+	// scaling
+	//if (y_scale) y2 = (y >> 1) + y_ofs;
+	//else y2 = y + y_ofs;
+	return y2;
+}
+
+byte inline screen_to_game_x(byte x) {
+	// Convert screen coordinates to game coordinates
+	byte x2;
+	#ifdef BUFFER_DRAW_W160
+		x2 = x;	// 1:1
+	#endif
+	#ifdef BUFFER_DRAW_W192
+		x2 = (x * 5) / 6;	// stretch 160 to 192
+	#endif
+	#ifdef BUFFER_DRAW_W240
+		x2 = (x * 2) / 3;	// stretch 160 to 240
+	#endif
+	#ifdef BUFFER_DRAW_W320
+		x2 = x / (x_scale ? 2 : 1);
+	#endif
+	return x2;
+}
+byte inline screen_to_game_y(byte y) {
+	// Convert screen coordinates to game coordinates
+	byte y2;
+	#ifdef BUFFER_PROCESS_HCROP
+		y2 = y;	// 1:1 with crop/transform
+	#endif
+	#ifdef BUFFER_PROCESS_HCRUSH
+		y2 = (y * 5) / 3;	// Screen is (crushed) 168 down to 100
+	#endif
+	return y2;
+}
+
+byte inline game_to_screen_x(byte x) {
+	// Convert game coordinates to screen coordinates
+	byte sx;
+	#ifdef BUFFER_DRAW_W160
+		sx = x;	// 1:1
+	#endif
+	#ifdef BUFFER_DRAW_W192
+		//x2 = (x * 5) / 6;	// stretch 160 to 192
+		sx = (x * 6) / 5;
+	#endif
+	#ifdef BUFFER_DRAW_W240
+		//x2 = (x * 2) / 3;	// stretch 160 to 240
+		sx = (x * 3) / 2;
+	#endif
+	#ifdef BUFFER_DRAW_W320
+		sx = x * (x_scale ? 2 : 1);
+	#endif
+	return sx;
+}
+byte inline game_to_screen_y(byte y) {
+	// Convert game coordinates to screen coordinates
+	byte sy;
+	#ifdef BUFFER_PROCESS_HCROP
+		//y2 = y + y_src;	// 1:1 with crop/transform
+		sy = y;	// 1:1 with crop/transform
+	#endif
+	#ifdef BUFFER_PROCESS_HCRUSH
+		sy = (y * 3) / 5;	// Scale (crush) 168 down to 100
+	#endif
+	return sy;
+}
+
+
+*/
+
+
+
+// X
+#ifdef BUFFER_DRAW_W160
+	#define buffer_to_frame_x(x) (x)	// 1:1
+	#define screen_to_buffer_x(x) (x)	// ~1:1
+	#define screen_to_game_x(x) (x)	// ~1:1
+	#define game_to_screen_x(x) (x)	// 1:1
+#endif
+#ifdef BUFFER_DRAW_W192
+	#define buffer_to_frame_x(x) (x)	// 1:1
+	#define screen_to_buffer_x(x) ((x * 5) / 6)	// ~stretch 160 to 192
+	#define screen_to_game_x(x) ((x * 5) / 6)	// ~stretch 160 to 192
+	#define game_to_screen_x(x) ((x * 6) / 5)	// stretch 160 to 192
+#endif
+#ifdef BUFFER_DRAW_W240
+	#define buffer_to_frame_x(x) (x)	// 1:1
+	#define screen_to_buffer_x(x) ((x * 2) / 3)	// ~stretch 160 to 240
+	#define screen_to_game_x(x) ((x * 2) / 3)	// ~stretch 160 to 240
+	#define game_to_screen_x(x) ((x * 3) / 2)	// stretch 160 to 240
+#endif
+#ifdef BUFFER_DRAW_W320
+	#define buffer_to_frame_x(x) (x)	// 1:1
+	#define screen_to_buffer_x(x) ((x_scale) ? (x >> 1) : x)	// stretch 160 to 320 if specified
+	#define screen_to_game_x(x) (x / (x_scale ? 2 : 1))
+	#define game_to_screen_x(x) (x * (x_scale ? 2 : 1))	//
+#endif
+
+// Y
+#ifdef BUFFER_PROCESS_HCROP
+	#define buffer_to_frame_y(y) (y)	// 1:1 with crop/transform
+	#define screen_to_buffer_y(y) (y)	//if (y_scale) y2 = (y >> 1) + y_ofs;
+	#define screen_to_game_y(y) (y)	// 1:1 with crop/transform
+	#define game_to_screen_y(y) (y)	// 1:1 with crop/transform
+#endif
+#ifdef BUFFER_PROCESS_HCRUSH
+	#define buffer_to_frame_y(y) ((y * 5) / 3)	// ~Scale (crush) 168 down to 100
+	#define screen_to_buffer_y(y) (y)	//if (y_scale) y2 = (y >> 1) + y_ofs;
+	#define screen_to_game_y(y) ((y * 5) / 3)	// Screen is (crushed) 168 down to 100
+	#define game_to_screen_y(y) ((y * 3) / 5)	// Scale (crush) 168 down to 100
+#endif
+
+
+
+void BUFFER_SWITCH_INLINE buffer_switch(byte bank) {
 	// Mount a different RAM segment to BUFFER_ADDR (0xc000)
 	bank_0xc000_port = bank;
 }
@@ -57,33 +204,31 @@ void buffer_clear(byte c) {
 	//memset((byte *)BUFFER_ADDR, 0x00, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
 	memset((byte *)BUFFER_ADDR, c * 0x11, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
 }
-void buffer_add_pixel_4bit(byte x, byte y, byte c) {
-	// Add 4 bit color value of the working buffer at 0xc000
-	// Like set_pixel, but only does a single OR operation, hence: faster.
-	/*
-	word a;
-	a = BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1);
-	if ((x & 1) == 0)	*(byte *)a |= c;
-	else				*(byte *)a |= c << 4;
-	*/
-	/*
-	if ((x & 1) == 0)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
-	else				*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
-	*/
-	if (x & 1)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
-	else		*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
-}
+//	void buffer_add_pixel_4bit(byte x, byte y, byte c) {
+//		// Add 4 bit color value of the working buffer at 0xc000
+//		// Like set_pixel, but only does a single OR operation, hence: faster.
+//		/*
+//		word a;
+//		a = BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1);
+//		if ((x & 1) == 0)	*(byte *)a |= c;
+//		else				*(byte *)a |= c << 4;
+//		*/
+//		/*
+//		if ((x & 1) == 0)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
+//		else				*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
+//		*/
+//		if (x & 1)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
+//		else		*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
+//	}
 
-//void inline buffer_set_pixel_4bit(byte x, byte y, byte c) {
-void buffer_set_pixel_4bit(byte x, byte y, byte c) {
+void BUFFER_PIXEL_INLINE buffer_set_pixel_4bit(byte x, byte y, byte c) {
 	// Set 4 bit color value of the working buffer at 0xc000
 	byte *a = (byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1));
 	if (x & 1)	*a = (*a & 0x0f) | (c << 4);
 	else		*a = (*a & 0xf0) | c;
 }
 
-//byte inline buffer_get_pixel_4bit(byte x, byte y) {
-byte buffer_get_pixel_4bit(byte x, byte y) {
+byte BUFFER_PIXEL_INLINE buffer_get_pixel_4bit(byte x, byte y) {
 	// Get the 4 bit color value of the working buffer at 0xc000
 	/*
 	word a;
@@ -126,38 +271,6 @@ static const byte AGI_PALETTE_TO_LUMA[16] = {
 };
 
 
-byte inline screen_to_buffer_x(byte x) {
-	byte x2;
-	// Transform source x-coordinate to buffer coordinate
-	#ifdef BUFFER_DRAW_W160
-		x2 = x;	// 1:1
-	#endif
-	#ifdef BUFFER_DRAW_W192
-		x2 = (x * 5) / 6;	// stretch 160 to 192
-	#endif
-	#ifdef BUFFER_DRAW_W240
-		x2 = (x * 2) / 3;	// stretch 160 to 240
-	#endif
-	#ifdef BUFFER_DRAW_W320
-		if (x_scale) x2 = (x >> 1);	// stretch 160 to 320 if specified
-		else x2 = x;
-	#endif
-	return x2;
-}
-
-byte inline screen_to_buffer_y(byte y) {
-	byte y2;
-	// 1:1
-	//y2 = y;
-	
-	// 1:1 with crop/transform
-	y2 = y;	// + y_ofs;
-	
-	// scaling
-	//if (y_scale) y2 = (y >> 1) + y_ofs;
-	//else y2 = y + y_ofs;
-	return y2;
-}
 
 
 void draw_buffer(
@@ -297,68 +410,6 @@ void draw_buffer_combined(
 }
 */
 
-byte inline screen_to_game_x(byte x) {
-	// Convert screen coordinates to game coordinates
-	byte x2;
-	#ifdef BUFFER_DRAW_W160
-		x2 = x;	// 1:1
-	#endif
-	#ifdef BUFFER_DRAW_W192
-		x2 = (x * 5) / 6;	// stretch 160 to 192
-	#endif
-	#ifdef BUFFER_DRAW_W240
-		x2 = (x * 2) / 3;	// stretch 160 to 240
-	#endif
-	#ifdef BUFFER_DRAW_W320
-		x2 = x / (x_scale ? 2 : 1);
-	#endif
-	return x2;
-}
-
-byte inline screen_to_game_y(byte y) {
-	// Convert screen coordinates to game coordinates
-	byte y2;
-	#ifdef BUFFER_PROCESS_HCROP
-		y2 = y;	// 1:1 with crop/transform
-	#endif
-	#ifdef BUFFER_PROCESS_HCRUSH
-		y2 = (y * 5) / 3;	// Screen is (crushed) 168 down to 100
-	#endif
-	return y2;
-}
-
-byte inline game_to_screen_x(byte x) {
-	// Convert game coordinates to screen coordinates
-	byte sx;
-	#ifdef BUFFER_DRAW_W160
-		sx = x;	// 1:1
-	#endif
-	#ifdef BUFFER_DRAW_W192
-		//x2 = (x * 5) / 6;	// stretch 160 to 192
-		sx = (x * 6) / 5;
-	#endif
-	#ifdef BUFFER_DRAW_W240
-		//x2 = (x * 2) / 3;	// stretch 160 to 240
-		sx = (x * 3) / 2;
-	#endif
-	#ifdef BUFFER_DRAW_W320
-		sx = x * (x_scale ? 2 : 1);
-	#endif
-	return sx;
-}
-
-byte inline game_to_screen_y(byte y) {
-	// Convert game coordinates to screen coordinates
-	byte sy;
-	#ifdef BUFFER_PROCESS_HCROP
-		//y2 = y + y_src;	// 1:1 with crop/transform
-		sy = y;	// 1:1 with crop/transform
-	#endif
-	#ifdef BUFFER_PROCESS_HCRUSH
-		sy = (y * 3) / 5;	// Scale (crush) 168 down to 100
-	#endif
-	return sy;
-}
 
 void draw_buffer_sprite_priority(
 		//byte bank_vis,

@@ -122,8 +122,10 @@ VAGI Frame functions (handling one full resolution AGI frame)
 #endif
 
 
+// We need to access the buffer
 #include "vagi_buffer.h"
 
+/*
 byte inline buffer_to_frame_x(byte x) {
 	byte x2;
 	// 1:1
@@ -145,6 +147,32 @@ byte inline buffer_to_frame_y(byte y) {
 	#endif
 	return y2;
 }
+*/
+
+/*
+// X
+#ifdef BUFFER_DRAW_W160
+	#define buffer_to_frame_x(x) (x)	// 1:1
+#endif
+#ifdef BUFFER_DRAW_W192
+	#define buffer_to_frame_x(x) (x)	// 1:1
+#endif
+#ifdef BUFFER_DRAW_W240
+	#define buffer_to_frame_x(x) (x)	// 1:1
+#endif
+#ifdef BUFFER_DRAW_W320
+	#define buffer_to_frame_x(x) (x)	// 1:1
+#endif
+
+// Y
+#ifdef BUFFER_PROCESS_HCROP
+	#define buffer_to_frame_y (y)	// 1:1 with crop/transform
+#endif
+#ifdef BUFFER_PROCESS_HCRUSH
+	#define buffer_to_frame_y ((y * 5) / 3)	// ~Scale (crush) 168 down to 100
+#endif
+*/
+
 
 void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
 	// Crop/scale/scroll full frame into working buffer (can re-use source bank as destination!)
