@@ -949,7 +949,7 @@ void BlitVObj(VOBJ *v) {
 	);
 	
 	// Show VObj number
-	//lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(y), ('0' + v->num));
+	lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(y), ('0' + v->num));
 	
 }
 
