@@ -147,7 +147,6 @@ void InitLogicSystem() {
 }
 
 
-//U8 *CallLogic(U8 num) {
 word CallLogic(U8 num) {
 	LOGIC *prevLog;
 	LOGIC log;

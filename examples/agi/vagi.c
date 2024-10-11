@@ -255,7 +255,7 @@ void vagi_init() {
 	//ydiff 			= 0;
 	minRow 			= 1;
 	//minRowY			= 0;	//(minRow*(SCREEN_WIDTH*CHAR_HEIGHT));
-	inputPos		= 22;
+	inputPos		= 13;	// 22
 	statusRow		= 0;
 	
 	textColour		= 0x0F;
@@ -342,7 +342,7 @@ void vagi_handle_input() {
 				draw_buffer(BUFFER_BANK_PRI, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
 			} else
 			if (key == 'v') {
-				// Show priority
+				// Show vis
 				draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
 			} else
 			if (
@@ -352,7 +352,8 @@ void vagi_handle_input() {
 				//)
 			){
 				//lcd_text_col = 0; lcd_text_row = inputPos; printf(">");
-				DrawAGIString(">", 0, inputPos);
+				//DrawAGIString(">", 0, inputPos);
+				DrawAGIString(">", 0, inputPos - 1);
 				gets(&szInput[0]);
 				
 				// fPLAYERCOMMAND and fSAIDOK are Reset in game loop before calling vagi_handle_input

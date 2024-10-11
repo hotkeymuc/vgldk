@@ -140,7 +140,7 @@ void romfs_fskip_far(romfs_handle_t h, word skip_hi, word skip_lo) {
 	#endif
 	*/
 	
-	unsigned long skip = (skip_hi * R_BANK_SIZE) + skip_lo;
+	unsigned long skip = (skip_hi * 0x10000) + skip_lo;
 	romfs_states[h].mem_bank += (skip / R_BANK_SIZE);
 	romfs_states[h].offset += skip;	// This will overflow sooner or later. Just for stats.
 	
