@@ -9,9 +9,7 @@
 */
 
 #include "agi.h"
-#define agi_logic_get_byte() vagi_res_read(curLogic->res_h)
-#define agi_logic_get_word() vagi_res_read_word(curLogic->res_h)
-#define agi_logic_skip(n) vagi_res_skip(curLogic->res_hn)
+
 
 
 // logic.h:
@@ -34,12 +32,20 @@ extern BOOL IF_RESULT;
 extern U16 logScan[256];
 
 extern BOOL new_room_called;	// VAGI
+extern BOOL trace_ops;	// VAGI
 
 // Helpers:
-U8 code_get();
+U8 code_get(void);
+U8 code_peek(void);
 U16 code_get_word();
-void code_skip(U8 n);
-void code_term();
+void code_skip(U16 n);
+void code_term(void);
+//#define code_get() vagi_res_read(curLog->res_h)
+//#define code_peek() vagi_res_peek(curLog->res_h)
+//#define code_get_word() vagi_res_read_word(curLog->res_h)
+//#define code_skip(n) vagi_res_skip(curLog->res_h, n)
+//#define code_term() { vagi_res_close(curLog->res_h); vagi_res_close(curLog->msg_res_h); }
+
 
 char *GetMessage(LOGIC *log, int num);
 void InitLogicSystem(void);

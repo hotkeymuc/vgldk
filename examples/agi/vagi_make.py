@@ -32,14 +32,16 @@ else:
 
 
 GAMES_PATH = '/z/apps/_games/_SCUMM'
-#GAME_ID = 'KQ1'
-#GAME_ID = 'KQ2'
-#GAME_ID = 'KQ3'
-#GAME_ID = 'LSL1'
-#GAME_ID = 'CAULDRON'
-#GAME_ID = 'SQ1'
-GAME_ID = 'SQ2'	# my fav! (AGIv2)
-#GAME_ID = 'PQ1'
+
+# Chose a game:
+#GAME_ID = 'SQ1'; GAME_PACKED_DIRS = 0
+GAME_ID = 'SQ2'; GAME_PACKED_DIRS = 0	# my fav! (AGIv2)
+#GAME_ID = 'KQ1'; GAME_PACKED_DIRS = 0
+#GAME_ID = 'KQ2'; GAME_PACKED_DIRS = 1
+#GAME_ID = 'KQ3'; GAME_PACKED_DIRS = 1
+#GAME_ID = 'LSL1'; GAME_PACKED_DIRS = 1
+#GAME_ID = 'CAULDRON'; GAME_PACKED_DIRS = 1
+#GAME_ID = 'PQ1'; GAME_PACKED_DIRS = 0
 # Not working:
 ##GAME_ID = 'Enclosure'
 ##GAME_ID = 'uriquest'
@@ -49,6 +51,16 @@ GAME_ID = 'SQ2'	# my fav! (AGIv2)
 
 GAME_PATH = f'{GAMES_PATH}/{GAME_ID}'	# Where to find the game
 GAME_CART_FILENAME = f'out/DATA_{GAME_ID}.bin'	# Where to put the bundled game ROM
+
+# Those are passed on as #defines
+GAME_DEFINES = {
+	'GAME_ID': GAME_ID,
+	#'PACKED_DIRS': GAME_PACKED_DIRS,	# Does the game employ "PACKED_DIRS"?
+}
+if GAME_PACKED_DIRS: GAME_DEFINES['PACKED_DIRS'] = 1
+
+
+
 
 import time
 import os	# For running files at the command line
@@ -329,18 +341,21 @@ if __name__ == '__main__':
 	# Compile the game data ROM
 	game_make(game_path=GAME_PATH, cart_filename=GAME_CART_FILENAME)
 	
+	# Gather some meta information
+	defines = {
+		**GAME_DEFINES
+	}
 	# Compile the VAGI runtime
-	
 	if CODE_SEGMENTED:
 		# Compile extended code segment
 		put('Compiling extended segment binary...')
-		vagi_make('vagi_segment_1', {'CODE_SEGMENT': 1, 'CODE_SEGMENT_1': 1})
+		vagi_make('vagi_segment_1', {**defines, 'CODE_SEGMENT': 1, 'CODE_SEGMENT_1': 1})
 		# Extract entry addresses
 		noi2h.noi2h('out/vagi_segment_1.noi', 'code_segment_1.h', 'code_segment_1_')
 		
 		# Compile main code segment
 		put('Compiling main segment binary...')
-		vagi_make('vagi_segment_0', {'CODE_SEGMENT': 0, 'CODE_SEGMENT_0': 1})
+		vagi_make('vagi_segment_0', {**defines, 'CODE_SEGMENT': 0, 'CODE_SEGMENT_0': 1})
 		
 		# Get system ROM data
 		put('Combining binaries...')
@@ -359,7 +374,7 @@ if __name__ == '__main__':
 	else:
 		# Compile a non-segmented, single binary
 		put('Compiling single-segment binary...')
-		vagi_make('vagi_all', {'CODE_SEGMENT':1, 'CODE_SEGMENT_0': 1, 'CODE_SEGMENT_1': 1})	# Compile all
+		vagi_make('vagi_all', {**defines, 'CODE_SEGMENT':1, 'CODE_SEGMENT_0': 1, 'CODE_SEGMENT_1': 1})	# Compile all
 		
 		# Get system ROM data
 		with open('out/vagi_all.bin', 'rb') as h:

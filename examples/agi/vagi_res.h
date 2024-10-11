@@ -37,26 +37,46 @@ void inline romfs_switch_bank(byte bank) {
 
 #define VAGI_RES_MAX_HANDLES 6
 
-#define VAGI_RES_ERROR_SIGNATURE_ERROR -11
-#define VAGI_RES_ERROR_VOLUME_ERROR -12
-#define VAGI_RES_ERROR_OUT_OF_HANDLES -13
+#define VAGI_RES_ERROR_OUT_OF_HANDLES -11
+#define VAGI_RES_ERROR_SIGNATURE_ERROR -12
+#define VAGI_RES_ERROR_VOLUME_ERROR -13
+#define VAGI_RES_ERROR_VOLUME_MISS -14
+#define VAGI_RES_ERROR_UNKNOWN_KIND -15
 
+
+#define VAGI_RES_IGNORE_SIGNATURE_ERROR	// Not recommended, just for debugging quirks among different games
+//#define VAGI_RES_IGNORE_VOLUME_MISS	// Not recommended, just for debugging quirks among different games
 
 enum AGI_RES_KIND {
 	AGI_RES_KIND_LOG,
 	AGI_RES_KIND_PIC,
 	AGI_RES_KIND_SND,
-	AGI_RES_KIND_VIEW
+	AGI_RES_KIND_VIEW,
+	
+	AGI_RES_KIND_COUNT
 };
 
-static const byte AGI_DIR_FILES[4] = {
+//const char * AGI_RES_KIND_ID[AGI_RES_KIND_COUNT] = {
+//	"LOG",
+//	"PIC",
+//	"SND",
+//	"VIEW",
+//};
+static const char AGI_RES_KIND_ID[AGI_RES_KIND_COUNT] = {
+	'L',
+	'P',
+	'S',
+	'V'
+};
+
+static const byte AGI_DIR_FILES[AGI_RES_KIND_COUNT] = {
 	R_LOGDIR,
 	R_PICDIR,
 	R_SNDDIR,
 	R_VIEWDIR,
 };
 
-static const byte AGI_VOL_FILES[4] = {
+static const byte AGI_VOL_FILES[] = {
 	R_VOL_0,
 	#ifdef R_VOL_1
 	R_VOL_1,
@@ -69,6 +89,9 @@ static const byte AGI_VOL_FILES[4] = {
 	#endif
 	#ifdef R_VOL_4
 	R_VOL_4,
+	#endif
+	#ifdef R_VOL_5
+	R_VOL_5,
 	#endif
 };
 
@@ -96,6 +119,12 @@ typedef int vagi_res_handle_t;	// Those are processed by user programs
 extern vagi_res_state_t vagi_res_states[VAGI_RES_MAX_HANDLES];
 vagi_res_state_t vagi_res_states[VAGI_RES_MAX_HANDLES];
 
+// Helper
+void vagi_res_printf_res(byte kind, word num) {
+	putchar(AGI_RES_KIND_ID[kind]); printf_d(num);
+	putchar(':');
+}
+
 void vagi_res_init() {
 	romfs_init();
 	
@@ -107,6 +136,9 @@ void vagi_res_init() {
 
 vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	byte b1, b2, b3;
+	byte vi;
+	word declen;
+	word enclen;
 	
 	// Find a free handle/state
 	vagi_res_handle_t h;
@@ -116,6 +148,9 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	if (h >= VAGI_RES_MAX_HANDLES) {
 		// No free handle available!
 		return VAGI_RES_ERROR_OUT_OF_HANDLES;
+	}
+	if (kind >= AGI_RES_KIND_COUNT) {
+		return VAGI_RES_ERROR_UNKNOWN_KIND;
 	}
 	
 	vagi_res_state_t *state = &vagi_res_states[h];
@@ -139,7 +174,8 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	romfs_handle_t rh;
 	rh = romfs_fopen(AGI_DIR_FILES[kind]);
 	if (rh < 0) {
-		printf("DIR err=-"); printf_d(-rh); putchar('\n');
+		vagi_res_printf_res(kind, num);
+		printf("DIR err=-"); printf_d(-rh); getchar();
 		//return 0;
 		return rh;
 	}
@@ -151,27 +187,29 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	// Seek to given entry number (3 bytes each)
 	romfs_fskip(rh, num*3);
 	
-	// Get the 3 data bytes
-	b1 = romfs_fread(rh);
-	b2 = romfs_fread(rh);
-	b3 = romfs_fread(rh);
-	romfs_fclose(rh);	// We don't need to access the DIR after that and can re-use that romfs state
+	// Get the 3 offset bytes from DIR
+	b1 = romfs_fread(rh);	// vol / HSB+
+	b2 = romfs_fread(rh);	// ofs HSB
+	b3 = romfs_fread(rh);	// ofs LSB
 	
 	// Extract volume and offset
-	if (b1 & 0x80) {
-		// MSB set = compressed PIC resource (see GBAGI:gbarom/decompress.c:PIC_expand)
-	}
-	state->res_vol = (b1 & 0xf0) >> 4;
+	vi = (b1 & 0xf0) >> 4;
+	state->res_vol = vi;
 	state->res_ofs_hi = (b1 & 0x0f);	// << 16
-	state->res_ofs = (b2 << 8) | b3;
+	state->res_ofs = ((word)b2 << 8) | (word)b3;
 	//printf("vol="); printf_d(res_vol); printf(", ofs="); printf_x2(res_ofs_hi); printf_x2(res_ofs >> 8); printf_x2(res_ofs & 0xff); printf("\n");
+	romfs_fclose(rh);	// We don't need to access the DIR after that and can re-use that romfs state
+	
 	
 	// Open volume file (assume the VOL.* files are located sequencially)
 	//printf("Opening VOL...");
 	rh = romfs_fopen(AGI_VOL_FILES[state->res_vol]);
 	if (rh < 0) {
-		printf("VOL."); printf_d(state->res_vol); printf(" err=-"); printf_d(-rh); putchar('\n');
-		//return 0;
+		vagi_res_printf_res(kind, num);
+		printf("VOL."); printf_d(state->res_vol);
+		printf(": err=-"); printf_d(-rh);
+		getchar();
+		
 		return rh;
 	}
 	
@@ -179,36 +217,81 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	romfs_fskip_far(rh, state->res_ofs_hi, state->res_ofs);
 	
 	// Check signature (0x1234)
-	b1 = romfs_fread(rh);
-	b2 = romfs_fread(rh);
+	b1 = romfs_fread(rh);	// LO: 0x34
+	b2 = romfs_fread(rh);	// HI: 0x12
 	if ((b1 != 0x12) || (b2 != 0x34)) {
 		// Signature mismatch!
-		printf("SIG err!\n");
-		//printf("SIG err: "); printf_x2(b1); printf_x2(b2); putchar('\n');	//printf(" != 1234\n");
+		vagi_res_printf_res(kind, num);
+		printf("SIG err:");
+		printf_x2(b1); printf_x2(b2);	//printf(" != 1234\n");
+		getchar();
+		#ifdef VAGI_RES_IGNORE_SIGNATURE_ERROR
+		// Ignore!
+		#else
 		romfs_fclose(rh);
-		//return 0;
 		return VAGI_RES_ERROR_SIGNATURE_ERROR;
+		#endif
 	}
 	
 	// Check resource volume value
-	b1 = romfs_fread(rh);
-	if (b1 != state->res_vol) {
+	b1 = romfs_fread(rh);	// Volume number
+	vi = b1;
+	if ((vi & 0x7f) != state->res_vol) {
 		// Volume mismatch (volume file number VS stored volume number of resource)
-		printf("VOL err!\n");
-		//printf("VOL err: "); printf_d(b1); putchar('\n');	//printf(" != "); printf_d(state->res_vol); printf("\n");
+		vagi_res_printf_res(kind, num);
+		printf("VOL mis:");
+		printf_d(vi & 0x7f); printf(" != "); printf_d(state->res_vol);
+		getchar();
+		#ifdef VAGI_RES_IGNORE_VOLUME_MISS
+		// Ignore!
+		#else
 		romfs_fclose(rh);
-		//return 0;
-		return VAGI_RES_ERROR_VOLUME_ERROR;
+		return VAGI_RES_ERROR_VOLUME_MISS;
+		#endif
 	}
 	
-	// Read size (LO-HI)
-	b1 = romfs_fread(rh);
-	b2 = romfs_fread(rh);
+	// Read (decompressed) size (LO-HI)
+	b1 = romfs_fread(rh);	// LO: decompressed size
+	b2 = romfs_fread(rh);	// HI: decompressed size
+	declen = (word)b1 | ((word)b2 << 8);
+	state->res_size = declen;	//b1 | (b2 << 8);
+	
+	// Handle "PACKED_DIRS"!
+	//if (PACKED_DIRS)
+	#ifdef PACKED_DIRS
+		//enclen 	= (gi->version->flags&PACKED_DIRS)?fgetw(f):declen;
+		b1 = romfs_fread(rh);	// LO: decompressed size
+		b2 = romfs_fread(rh);	// HI: decompressed size
+		enclen = (word)b1 | ((word)b2 << 8);
+		// Rewind!
+		romfs_frewind(rh);
+		romfs_fskip_far(rh, state->res_ofs_hi, state->res_ofs);
+		romfs_fskip(rh, 5);	// Skip 5 byte header (SIG,SIG,VI,SIZE,SIZE)
+	#else
+		enclen = declen;
+	#endif
+	
+	if (enclen == declen) {
+		// not compressed
+	} else {
+		vagi_res_printf_res(kind, num);
+		printf("Compressed:");
+		printf_x2(enclen >> 8); printf_x2(enclen & 0xff);
+		printf(" -> ");
+		printf_x2(declen >> 8); printf_x2(declen & 0xff);
+		printf("...");
+		if (vi & 0x80) {
+			//vagi_res_printf_res(kind, num);
+			printf("Comp.PIC not supp.!");getchar();
+		} else {
+			//vagi_res_printf_res(kind, num);
+			printf("LZW not supp.!");getchar();
+		}
+	}
 	
 	// Activate state
 	state->active = true;
 	state->romfs_handle = rh;
-	state->res_size = b1 | (b2 << 8);
 	state->offset = 0;
 	
 	return h;

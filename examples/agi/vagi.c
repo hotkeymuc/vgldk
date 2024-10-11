@@ -105,6 +105,9 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 
 
 // The AGI specific fun starts here:
+//#define PACKED_DIRS 1	// Game contains "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
+//#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
+#define VAGI_SHOW_EGO_INFO	// Show info about ego ViewObjs[0]
 #include "agi.h"
 
 
@@ -193,8 +196,9 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 
 // LOG code
 //#define AGI_LOGIC_DEBUG	// Debug control flow
-//#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
+#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
 //#define AGI_COMMANDS_INCLUDE_NAMES	// Include command names for debugging, requires ~0x800+ bytes of space!
+
 //#define AGI_LOGIC_DEBUG_IFS	// Even verboser logic debug: Show "IF v[x] > y" etc.
 #include "agi_vars.h"
 #include "agi_commands.h"
@@ -330,7 +334,14 @@ void vagi_handle_input() {
 				ViewObjs[0].y = 80;
 				ViewObjs[0].priority = 14;
 			} else
-			
+			if (key == 'p') {
+				// Show priority
+				draw_buffer(BUFFER_BANK_PRI, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
+			} else
+			if (key == 'v') {
+				// Show priority
+				draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
+			} else
 			if (
 				//(INPUT_ENABLED) && (	// Input is usually only available if INPUT_ENABLED is set
 				(key == ' ')
@@ -520,15 +531,20 @@ void main() __naked {
 		memcpy((byte *)a, (byte *)&ViewObjs[0], MAX_VOBJ*sizeof(VOBJ));
 		*/
 		
-		/*
+		#ifdef VAGI_SHOW_EGO_INFO
 		lcd_text_col = 0;
 		//lcd_text_row = 0;
-		lcd_text_row = (LCD_HEIGHT/font_char_height) - 1;
-		printf("x="); printf_d(ViewObjs[0].x);
-		printf(" y="); printf_d(ViewObjs[0].y);
-		printf(" pri="); printf_d(ViewObjs[0].priority);
-		//printf(" dir="); printf_d(ViewObjs[0].direction);
-		*/
+		lcd_text_row = LCD_TEXT_ROWS-1; (LCD_HEIGHT/font_char_height) - 1;
+		printf("F="); printf_x2(ViewObjs[0].flags);
+		printf(" X="); printf_d(ViewObjs[0].x);
+		printf(" Y="); printf_d(ViewObjs[0].y);
+		printf(" PRI="); printf_x2(ViewObjs[0].priority);
+		printf(" D="); printf_x2(ViewObjs[0].direction);
+		printf(" M="); printf_x2(ViewObjs[0].motion);
+		
+		//printf(" V="); printf_d(vars[30]);	// v30 = SQ2, pic2: which wall we are on
+		lcd_draw_glypth_at(game_to_screen_x(ViewObjs[0].x), game_to_screen_y(ViewObjs[0].y), ('0' + ViewObjs[0].num));
+		#endif
 		
 		/*
 		// Dump VOBJ state

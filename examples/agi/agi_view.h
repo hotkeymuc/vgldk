@@ -159,7 +159,7 @@ extern U8 priTable[172];
 //#define TEST_Y(x1,x2,y)	((x1 >= code[1]) && (y >= code[2]) && (x2 <= code[3]) && (y <= code[4]))
 
 
-extern VOBJ picView,objView, ViewObjs[MAX_VOBJ];
+extern VOBJ picView, objView, ViewObjs[MAX_VOBJ];
 //extern BLIT blUpdate, blStatic;
 //extern BLIT blits[MAX_VOBJ];
 extern BOOL PRI_FIXED;
@@ -197,6 +197,7 @@ BOOL CheckStaticVObj(VOBJ *v);
 
 void EraseBlitLists(void);
 void DrawBlitLists(void);
+void DrawBlitList(void);	// htk
 /*
 void UpdateBlitLists(void);
 void EraseBlitList(BLIT *b);

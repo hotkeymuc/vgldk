@@ -33,6 +33,8 @@
 #include "agi_pic.h"
 #include "agi_vars.h"
 
+//#define VIEW_SHOW_NUM	// Draw VObj numbers as labels
+
 VOBJ picView, ViewObjs[MAX_VOBJ], *viewPtrs[MAX_VOBJ];
 //PVIEW pViews[MAX_PVIEWS], *pPView;
 //BLIT blUpdate, blStatic;
@@ -116,9 +118,9 @@ void UpdateVObj() {
 		
 		//printf("UpdateVObj");printf_d(i);printf("...");
 		//@FIXME: For now: Just always try drawing every ViewObj
-		if (v->flags & oDRAWN) {
+		if (v->flags & (oDRAWN) > 0) {
 			UnBlitVObj(v);
-			BlitVObj(v);
+			//BlitVObj(v);
 		}
 		
 		
@@ -162,6 +164,7 @@ void UpdateVObj() {
 		UpdateObjsStep();	// This moves all objects
 		
 		//DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
+		DrawBlitList();	//@FIXME: This draws all!
 		//UpdateBlitList(&blUpdate);
 		
 		ViewObjs[0].flags &= ~(oONLAND|oWATER);
@@ -408,7 +411,7 @@ void SolidifyObjPosition(VOBJ *v) {
 	//@FIXME: This function freezes!
 	//(void)v;
 	
-	/*
+	
 	int checkDir = dirLEFT, checkCnt = 1, checkLen = 1;
 	
 	if((v->y <= horizon) && (!(v->flags&oINGOREHORIZON)))
@@ -417,6 +420,7 @@ void SolidifyObjPosition(VOBJ *v) {
 	if( CheckObjInScreen(v)	&& (!CheckObjCollision(v)) && CheckObjControls(v) )
 		return;
 	
+	/*
 	while( (!CheckObjInScreen(v)) || CheckObjCollision(v) || (!CheckObjControls(v)) ) {
 		switch(checkDir) {
 			case dirLEFT:
@@ -542,18 +546,12 @@ void SetObjView(VOBJ *v, int num) {
 	//@TODO: Implement
 	/*
 	if(!viewDir[num]) ErrorMessage(ERR_NO_VIEW,num);
-	
-	v->pView		= (U8*)viewDir[num]+5;
-	v->view			= num;
-	v->totalLoops	= v->pView[2];
 	*/
-	
 	
 	//v->pView		= (U8*)viewDir[num]+5;
 	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, num);
 	if (view_res_h < 0) {
-		printf("VIEW err=-"); printf_d(-view_res_h); printf("!\n");
-		getchar();
+		//printf("VIEW err=-"); printf_d(-view_res_h); getchar();
 		return;
 	}
 	//v->pView = (U8 *)num;	// Just so it isn't NULL
@@ -608,9 +606,9 @@ void SetObjLoop(VOBJ *v, int loop) {
 void SetObjCel(VOBJ *v, int cel) {
 	
 	//if(v->pView == NULL) ErrorMessage(ERR_VOBJ_VIEW, v->num);
-	if(!v->viewLoaded) { ErrorMessage(ERR_VOBJ_VIEW, v->num); return; }
+	if (!v->viewLoaded) { ErrorMessage(ERR_VOBJ_VIEW, v->num); return; }
 	
-	if(cel > v->totalCels) { ErrorMessage2(ERR_VOBJ_CEL, v->num, cel); return; }
+	if (cel > v->totalCels) { ErrorMessage2(ERR_VOBJ_CEL, v->num, cel); return; }
 	v->cel		= cel;
 	
 	
@@ -618,7 +616,7 @@ void SetObjCel(VOBJ *v, int cel) {
 	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->view);
 	vagi_res_seek_to(view_res_h, v->oLoop);
 	
-	// 1 byte "no of cels"
+	// 1 byte "no of cels", then offsets U16
 	vagi_res_skip(view_res_h, 1 + (cel << 1));
 	word o = vagi_res_read_word(view_res_h);	// Offset AFTER loop offset
 	
@@ -677,12 +675,11 @@ void DrawObj(int num) {
 		
 		v->flags		|= oDRAWN;
 		
-		BlitVObj(v);	//@FIXME: Blit right away?
 		/*
 		DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
-		
-		UpdateObjCel(v);
 		*/
+		DrawBlitList();	// This draws them all!
+		UpdateObjCel(v);
 		
 		v->flags		&= ~oSKIPUPDATE;
 	}
@@ -939,6 +936,8 @@ void BlitVObj(VOBJ *v) {
 			ResetFlag(fEGOHIDDEN);
 	}
 	*/
+	bool VIEW_INVISIBLE	= true;	// Keep track if the view has ANY pixel shown (for fEGOHIDDEN)
+	
 	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->view);
 	vagi_res_seek_to(view_res_h, v->oCel);
 	vagi_res_skip(view_res_h, 3);	// Skip header: U8 width, heihgt, settings
@@ -1017,8 +1016,12 @@ void BlitVObj(VOBJ *v) {
 					U8 c_prio = buffer_get_pixel_4bit(bx, by);
 					if (c_prio >= v->priority) continue;	// Just skip (and hope background is correct)
 					
+					VIEW_INVISIBLE = false;	// A pixel was drawn!
+					
 					//@TODO: Dither modes!
 					lcd_set_pixel_4bit(sx, sy, cv);
+					lcd_set_pixel_4bit(sx+1, sy, cv);	//@FIXME: Just to fill skips
+					
 					
 				}
 				ix ++;
@@ -1031,10 +1034,17 @@ void BlitVObj(VOBJ *v) {
 	
 	vagi_res_close(view_res_h);
 	
+	if(v->num == 0) {  // 'tis the ego
+		if (VIEW_INVISIBLE)
+			SetFlag(fEGOHIDDEN);
+		else
+			ResetFlag(fEGOHIDDEN);
+	}
 	
+	#ifdef VIEW_SHOW_NUM
 	// Show VObj number as a label
-	//lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(y), ('0' + v->num));
-	
+	lcd_draw_glypth_at(game_to_screen_x(v->x), game_to_screen_y(v->y), ('0' + v->num));
+	#endif
 }
 
 void UnBlitVObj(VOBJ *v) {
@@ -1063,7 +1073,12 @@ void UnBlitVObj(VOBJ *v) {
 		BUFFER_BANK_VIS,
 		
 		ssx,       ssx + ssw,
-		y, ssy+b,	//ssy - ssh, ssy,
+		y,
+		ssy+b
+		#ifdef VIEW_SHOW_NUM
+		+font_char_height
+		#endif
+		,	//ssy - ssh, ssy,
 		
 		0,0	//, true
 	);
@@ -1100,9 +1115,24 @@ void DrawBlitLists() {
 	byte i;
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
-		BlitVObj(v);
+		if (v->flags & oDRAWN) {
+			BlitVObj(v);
+		}
 	}
 }
+
+void DrawBlitList() {
+	VOBJ *v;
+	byte i;
+	//@FIXME: Do not draw all.
+	for(i = 0; i < MAX_VOBJ; i++) {
+		v = &ViewObjs[i];
+		if (v->flags & oDRAWN) {
+			BlitVObj(v);
+		}
+	}
+}
+
 
 /*
 void UpdateBlitLists() {
@@ -1282,6 +1312,8 @@ void AddToPic(U8 num, U8 loop, U8 cel, U8 x, U8 y, U8 pri) {
 void AddObjPicPri(VOBJ *v) {
 	
 	//@TODO: Implement!
+	BlitVObj(v);
+	
 	/*
 	U8 *pBuf;
 	int x,y,height,celMaxX,pHigh=0;
@@ -1355,6 +1387,7 @@ int CalcPriY(int pri) {
 void ShowObj(int num) {
 	
 	//@TODO: Implement!
+	printf("TODO: ShowObj");
 	/*
 	char *s;
 	BLIT *b;

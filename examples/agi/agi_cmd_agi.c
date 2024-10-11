@@ -479,7 +479,9 @@ void cUnanimateAll() {
 	int i;
 	EraseBlitLists();
 	
-	//for(v=ViewObjs; v<&ViewObjs[MAX_VOBJ]; v++)
+	//printf("cUnanimateAll");//getchar();
+	//trace_ops = true;	//@FIXME: Debugging...
+	
 	for(i=0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		v->flags &= ~(oANIMATE|oDRAWN);
@@ -1911,8 +1913,10 @@ void cSetScanStart() {
 	#ifdef AGI_LOGIC_DEBUG
 	printf("cSetScanStart");getchar();
 	#endif
+	
 	U16 code_now = vagi_res_tell(curLog->res_h);
 	logScan[curLog->num] = (U16)(code_now - curLog->ofs_code);
+	//logScan[curLog->num] = code_now;
 }
 
 //reset.scan.start();

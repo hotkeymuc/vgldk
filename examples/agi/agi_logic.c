@@ -32,7 +32,8 @@ LOGIC *curLog;
 LOGIC *log0;	// Only used for FormatString "%g..." to print message from logic0
 
 BOOL IF_RESULT;
-BOOL new_room_called;
+BOOL new_room_called;	// vagi
+BOOL trace_ops;	// vagi
 
 const char AGI_MESSAGES_KEY[] = "Avis Durgan";
 
@@ -51,6 +52,7 @@ U16 logScan[256];	// Stores offset inside given logic
 
 
 // Helpers:
+
 U8 inline code_get() {
 	return vagi_res_read(curLog->res_h);
 }
@@ -60,7 +62,7 @@ U8 inline code_peek() {
 U16 inline code_get_word() {
 	return vagi_res_read_word(curLog->res_h);
 }
-void inline code_skip(U8 n) {
+void inline code_skip(U16 n) {
 	vagi_res_skip(curLog->res_h, n);
 }
 void code_term() {
@@ -68,6 +70,7 @@ void code_term() {
 	vagi_res_close(curLog->res_h);
 	vagi_res_close(curLog->msg_res_h);
 }
+
 
 
 char *GetMessage(LOGIC *log, int num) {
@@ -131,6 +134,7 @@ void InitLogicSystem() {
 	curLog 			= NULL;
 	log0			= NULL;
 	
+	trace_ops = false;
 	memset(logScan, 0, sizeof(logScan));
 }
 
@@ -173,7 +177,7 @@ word CallLogic(U8 num) {
 	word code_size = vagi_res_read_word(log.res_h);
 	log.ofs_code = 2;	//vagi_res_tell(log.res_h);
 	
-	// Open handle for reading messages
+	// Open another handle for reading messages
 	log.msg_res_h = vagi_res_open(AGI_RES_KIND_LOG, num);	// Exclusively for reading messages (skip around)
 	log.ofs_messages = log.ofs_code + code_size;	// Put ofs_messages right at the message section header
 	vagi_res_seek_to(log.msg_res_h, log.ofs_messages);
@@ -219,7 +223,8 @@ int cmdnum;
 //U8 *ExecuteLogic(LOGIC *log) {
 word ExecuteLogic(LOGIC *log) {
 	//register unsigned int op;
-	unsigned int op;
+	//unsigned int op;
+	U8 op;
 #ifdef _PRINT_LOG
 	int i,l;
 	cmdnum = 0;
@@ -236,6 +241,16 @@ word ExecuteLogic(LOGIC *log) {
 	while(!vagi_res_eof(log->res_h)) {
 		op = vagi_res_read(log->res_h);
 		#ifdef AGI_LOGIC_DEBUG_OPS
+		if (trace_ops) {
+			// Show logic num
+			printf_x2(log->num); putchar(':');
+			
+			// Show Instruction pointer
+			word cp = vagi_res_tell(log->res_h);
+			printf_x2(cp >> 8); printf_x2(cp & 0x0f);
+			putchar(':');
+			
+			// Show OP
 			printf("op=");
 			#ifdef AGI_COMMANDS_INCLUDE_NAMES
 				printf(agiCommands[op].name);
@@ -245,6 +260,7 @@ word ExecuteLogic(LOGIC *log) {
 			//for(i=0;i<agiCommands[op].nParams;i++) { code_peek()....
 			//printf("...");
 			//getchar();
+		}
 		#endif
 		
 #ifdef _WINDOWS
@@ -290,7 +306,9 @@ word ExecuteLogic(LOGIC *log) {
 			//if (IF_RESULT) printf("TRUE\n"); else printf("FALSE\n");
 		#endif
 		#ifdef AGI_LOGIC_DEBUG_OPS
+		if (trace_ops) {
 			printf(".\n");
+		}
 		#endif
 		if (op == 0) return 1;	// op #0 = "return"
 		if (new_room_called) return 0;
@@ -323,7 +341,8 @@ void ExecuteIF() {
 	//register unsigned int orCnt=0;
 	//register unsigned int op;
 	unsigned int orCnt=0;
-	unsigned int op;
+	//unsigned int op;
+	U8 op;
 #ifdef _PRINT_LOG
 	int i,l;
 #endif
@@ -331,7 +350,6 @@ void ExecuteIF() {
 		printf("IF...");
 	#endif
 	for(;;) {
-		//if((op = *code++) >= 0xFC) {
 		if((op = code_get()) >= 0xFC) {
 			if(op == 0xFC) {
 				if(orCnt) {
@@ -342,7 +360,7 @@ void ExecuteIF() {
 				orCnt++;
 			} else if(op == 0xFF) {
 				//code+=2;
-				vagi_res_skip(curLog->res_h, 2);
+				code_skip(2);
 				return;
 			}
 			if(op == 0xFD) {
@@ -373,7 +391,6 @@ void ExecuteIF() {
 			#ifdef AGI_LOGIC_DEBUG_IFS
 				printf("(res="); printf_d(IF_RESULT); printf(")");
 			#endif
-			
 			
 			if (IS_NOT) {
 				#ifdef AGI_LOGIC_DEBUG_IFS
@@ -413,16 +430,17 @@ void ExecuteIF() {
 
 void SkipORTrue() {
 	//register unsigned int op;
-	unsigned int op;
+	//unsigned int op;
+	U8 op;
 	#ifdef AGI_LOGIC_DEBUG_IFS
 		printf("(skipORtrue)");
 	#endif
-	//while((op = *code++) != 0xFC)
+	
 	while((op = code_get()) != 0xFC) {
 		if(op <= 0xFC) {
 			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
-			if (op == 0xe)	vagi_res_skip(curLog->res_h, (code_peek() << 1) + 1);
-			else			vagi_res_skip(curLog->res_h, testCommands[op].nParams);
+			if (op == 0xe)	code_skip((code_peek() << 1) + 1);
+			else			code_skip(testCommands[op].nParams);
 		}
 	}
 }
@@ -430,23 +448,22 @@ void SkipORTrue() {
 
 void SkipANDFalse() {
 	//register unsigned int op;
-	unsigned int op;
+	//unsigned int op;
+	U8 op;
 	#ifdef AGI_LOGIC_DEBUG_IFS
 		printf("(skipANDfalse)");
 	#endif
-	//while((op = *code++) != 0xFF)
 	while((op = code_get()) != 0xFF) {
 		if(op < 0xFC) {
 			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
-			if (op == 0xe)	vagi_res_skip(curLog->res_h, (code_peek() << 1) + 1);
-			else			vagi_res_skip(curLog->res_h, testCommands[op].nParams);
+			if (op == 0xe)	code_skip((code_peek() << 1) + 1);
+			else			code_skip(testCommands[op].nParams);
 		}
 	}
-	//code += (S16)(bGetW(code)+2);	// address
-	
-	//code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h)) + 2;
-	//vagi_res_seek_to(curLog->res_h, code_ofs);
-	vagi_res_skip(curLog->res_h, code_get_word());
+	//code += (S16)(bGetW(code)+2);	// Note: bGetW() does not increment code, so "+2" skips ofer the word just read.
+	code_skip(code_get_word());
+	//word o = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
+	//vagi_res_seek_to(curLog->res_h, o);
 }
 
 
