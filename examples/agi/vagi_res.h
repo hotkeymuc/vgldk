@@ -44,8 +44,9 @@ void inline romfs_switch_bank(byte bank) {
 #define VAGI_RES_ERROR_UNKNOWN_KIND -15
 
 
-#define VAGI_RES_IGNORE_SIGNATURE_ERROR	// Not recommended, just for debugging quirks among different games
+//#define VAGI_RES_IGNORE_SIGNATURE_ERROR	// Not recommended, just for debugging quirks among different games
 //#define VAGI_RES_IGNORE_VOLUME_MISS	// Not recommended, just for debugging quirks among different games
+//#define VAGI_RES_IGNORE_COMPRESSED
 
 enum AGI_RES_KIND {
 	AGI_RES_KIND_LOG,
@@ -274,18 +275,33 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	if (enclen == declen) {
 		// not compressed
 	} else {
+		#ifdef VAGI_RES_IGNORE_COMPRESSED
+		// Ignore
+		#else
+		// Show info
 		vagi_res_printf_res(kind, num);
 		printf("Compressed:");
 		printf_x2(enclen >> 8); printf_x2(enclen & 0xff);
 		printf(" -> ");
 		printf_x2(declen >> 8); printf_x2(declen & 0xff);
 		printf("...");
+		#endif
 		if (vi & 0x80) {
-			//vagi_res_printf_res(kind, num);
-			printf("Comp.PIC not supp.!");getchar();
+			#ifdef VAGI_RES_IGNORE_COMPRESSED
+			// Ignore
+			#else
+			vagi_res_printf_res(kind, num);
+			printf("Comp.PIC not supp.!");
+			getchar();
+			#endif
 		} else {
-			//vagi_res_printf_res(kind, num);
-			printf("LZW not supp.!");getchar();
+			#ifdef VAGI_RES_IGNORE_COMPRESSED
+			// Ignore
+			#else
+			vagi_res_printf_res(kind, num);
+			printf("LZW not supp.!");
+			getchar();
+			#endif
 		}
 	}
 	

@@ -115,14 +115,18 @@ void UpdateVObj() {
 	
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
-		
+		/*
 		//printf("UpdateVObj");printf_d(i);printf("...");
 		//@FIXME: For now: Just always try drawing every ViewObj
-		if (v->flags & (oDRAWN) > 0) {
-			UnBlitVObj(v);
-			//BlitVObj(v);
+		//if (v->flags & (oDRAWN) > 0) {
+		if (v->flags & (oDRAWN|oUPDATE) == (oDRAWN|oUPDATE)) {
+			if ((v->flags & (oSKIPUPDATE))) {
+			} else {
+				//UnBlitVObj(v);
+				//BlitVObj(v);
+			}
 		}
-		
+		*/
 		
 		if((v->flags & (oDRAWN|oANIMATE|oUPDATE)) == (oDRAWN|oANIMATE|oUPDATE)) {
 			ANY_TO_DRAW = TRUE;
@@ -164,7 +168,7 @@ void UpdateVObj() {
 		UpdateObjsStep();	// This moves all objects
 		
 		//DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
-		DrawBlitList();	//@FIXME: This draws all!
+		DrawBlitLists();	//@FIXME: This draws all!
 		//UpdateBlitList(&blUpdate);
 		
 		ViewObjs[0].flags &= ~(oONLAND|oWATER);
@@ -543,11 +547,9 @@ void UpdateObjFollow(VOBJ *v) {
 }
 
 void SetObjView(VOBJ *v, int num) {
-	//@TODO: Implement
 	/*
 	if(!viewDir[num]) ErrorMessage(ERR_NO_VIEW,num);
 	*/
-	
 	//v->pView		= (U8*)viewDir[num]+5;
 	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, num);
 	if (view_res_h < 0) {
@@ -560,14 +562,12 @@ void SetObjView(VOBJ *v, int num) {
 	
 	vagi_res_skip(view_res_h, 2);	// unknown header
 	
-	//v->totalLoops	= v->pView[2];
 	v->totalLoops	= vagi_res_read(view_res_h);
 	//v->descPos	= vagi_res_read_word(view_res_h);	// Not used
 	
 	vagi_res_close(view_res_h);
 	
 	SetObjLoop(v, (v->loop >= v->totalLoops)?0:v->loop);
-	
 }
 
 void SetObjLoop(VOBJ *v, int loop) {
@@ -678,7 +678,7 @@ void DrawObj(int num) {
 		/*
 		DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
 		*/
-		DrawBlitList();	// This draws them all!
+		
 		UpdateObjCel(v);
 		
 		v->flags		&= ~oSKIPUPDATE;
@@ -940,7 +940,7 @@ void BlitVObj(VOBJ *v) {
 	
 	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, v->view);
 	vagi_res_seek_to(view_res_h, v->oCel);
-	vagi_res_skip(view_res_h, 3);	// Skip header: U8 width, heihgt, settings
+	vagi_res_skip(view_res_h, 3);	// Skip header: U8 width, height, settings
 	
 	//U8 cell_mirroring = v->settings >> 4;
 	U8 cell_mirroring =  (v->settings & 0x80) && (((v->settings >> 4) & 7) != v->loop);
@@ -968,20 +968,36 @@ void BlitVObj(VOBJ *v) {
 	*/
 	U8 b;
 	U8 col;
+	U8 c_prio;
 	U8 gx;
 	U8 gy;
 	U8 count;
 	U8 i;
 	U8 ix;
 	U8 iy;
-	U8 cv;
+	U8 sx;
+	U8 sy;
+	U8 bx;
+	U8 by;
 	
-	gx = v->x;
+	#ifdef BUFFER_DRAW_DITHER
+		int v_err = 0;
+		int cv;
+	#else
+		U8 cv;
+	#endif
+	
+	gx = v->x + (cell_mirroring ? (v->width - 1) : 0);
 	gy = v->y - v->height;
+	
+	sy = game_to_screen_y((word)gy);
+	if (sy >= LCD_HEIGHT) return;
+	by = screen_to_buffer_x(sy);
+	
 	ix = 0;
 	iy = 0;
 	
-	//@FIXME: Mirroring! see: cell_mirroring
+	buffer_switch(BUFFER_BANK_PRI);
 	
 	while(true) {
 		b = vagi_res_read(view_res_h);
@@ -990,12 +1006,22 @@ void BlitVObj(VOBJ *v) {
 		if (b == 0) {
 			iy ++;
 			if (iy >= v->height) break;
+			
 			ix = 0;
 			gy ++;
-			if (cell_mirroring)
-				gx = v->x + v->width - 1;
-			else
-				gx = v->x;
+			gx = v->x + (cell_mirroring ? (v->width - 1) : 0);
+			
+			sy = game_to_screen_y((word)gy);
+			if (sy >= LCD_HEIGHT) break;
+			by = screen_to_buffer_y((word)sy);
+			
+			#ifdef BUFFER_DRAW_DITHER
+				//v_err = 0;
+				//v_err = ((sprite_x * y) * 0x77) & 0x1f;	// Add some noise
+				//v_err = ((ix * iy) * 0x77) & 0x1f;	// Add some noise
+				v_err = rand() & 0x7f;	// Add some noise
+			#endif
+			continue;
 		}
 		col = b >> 4;
 		count = b & 0x0f;
@@ -1003,39 +1029,60 @@ void BlitVObj(VOBJ *v) {
 		if (col == cell_transparency) {
 			// Skip transparent pixels
 			ix += count;
-			if (cell_mirroring)
-				gx -= count;
-			else
-				gx += count;
+			if (cell_mirroring) gx -= count; else gx += count;
 		} else {
 			cv = AGI_PALETTE_TO_LUMA[col];
 			// RLE
 			for(i = 0; i < count; i ++) {
 				
-				//@FIXME: Scale and check priority!
-				U8 sx = game_to_screen_x((word)gx);
-				U8 sy = game_to_screen_y((word)gy);
-				if ((sy < LCD_HEIGHT) && (sx < LCD_WIDTH)) {
+				// Scale and check priority!
+				sx = game_to_screen_x((word)gx);
+				if (sx < LCD_WIDTH) {
+					bx = screen_to_buffer_x((word)sx);
 					
-					U8 bx = screen_to_buffer_x(sx);
-					U8 by = screen_to_buffer_x(sy);
-					
-					U8 c_prio = buffer_get_pixel_4bit(bx, by);
-					if (c_prio >= v->priority) continue;	// Just skip (and hope background is correct)
-					
-					VIEW_INVISIBLE = false;	// A pixel was drawn!
-					
-					//@TODO: Dither modes!
-					lcd_set_pixel_4bit(sx, sy, cv);
-					//lcd_set_pixel_4bit(sx+1, sy, cv);	//@FIXME: Just to fill skips
-					
-					
-				}
+					c_prio = buffer_get_pixel_4bit(bx, by);
+					if (c_prio < v->priority) {
+						
+						VIEW_INVISIBLE = false;	// A pixel was drawn!
+						
+						//lcd_set_pixel_4bit(sx, sy, cv);
+						#if VAGI_SCREEN_W > 160
+							// Fill gaps
+							for(byte xx = sx; xx < sx+2; xx++) {
+						#else
+							byte xx = sx;
+						#endif
+							
+							// Draw pixel to VRAM
+							#ifdef BUFFER_DRAW_MONO
+								//lcd_set_pixel_1bit(xx, sy, cv);	// B/W monochrome
+								lcd_set_pixel_1bit(xx, sy, (cv < 0x80) ? 1 : 0);	// B/W monochrome
+							#endif
+							#ifdef BUFFER_DRAW_PATTERN
+								lcd_set_pixel_4bit(xx, sy, cv);	// Use patterns
+							#endif
+							#ifdef BUFFER_DRAW_DITHER
+								// Dithering with luma
+								cv += v_err;
+								if (cv < 0x80) {
+									//lcd_set_pixel_1bit(sx+xx, sy, 1);	// B/W monochrome (1=black)
+									lcd_set_pixel_1bit_on(xx, sy);	// B/W monochrome (1=black)
+									v_err = (cv - 0x00);
+								} else {
+									//lcd_set_pixel_1bit(sx+xx, sy, 0);	// B/W monochrome (0=white)
+									lcd_set_pixel_1bit_off(xx, sy);	// B/W monochrome (0=white)
+									v_err = (cv - 0xff);
+								}
+							#endif
+						
+						#if VAGI_SCREEN_W > 160
+							}
+						#endif
+					} // end of "priority"
+				} // end of screen clip
+				
 				ix ++;
-				if (cell_mirroring)
-					gx --;
-				else
-					gx ++;
+				if (cell_mirroring) gx --; else gx ++;
 			}
 		}
 		
@@ -1125,22 +1172,26 @@ void DrawBlitLists() {
 	byte i;
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
-		if (v->flags & oDRAWN) {
+		if (v->flags & (oDRAWN|oUPDATE) == (oDRAWN|oUPDATE)) {
+		//if (v->flags & (oDRAWN) == (oDRAWN)) {
+			//if (!(v->flags & oSKIPUPDATE))
+			UnBlitVObj(v);
+		//	BlitVObj(v);
+		}
+	}
+	for(i = 0; i < MAX_VOBJ; i++) {
+		v = &ViewObjs[i];
+		//if (v->flags & (oDRAWN|oUPDATE) == (oDRAWN|oUPDATE)) {
+		if (v->flags & (oDRAWN) == (oDRAWN)) {
+			//if (!(v->flags & oSKIPUPDATE))
+			//UnBlitVObj(v);
 			BlitVObj(v);
 		}
 	}
 }
 
 void DrawBlitList() {
-	VOBJ *v;
-	byte i;
-	//@FIXME: Do not draw all.
-	for(i = 0; i < MAX_VOBJ; i++) {
-		v = &ViewObjs[i];
-		if (v->flags & oDRAWN) {
-			BlitVObj(v);
-		}
-	}
+	// ...
 }
 
 

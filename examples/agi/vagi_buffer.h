@@ -33,19 +33,19 @@
 
 // Image/Frame processing options
 	// Chose one draw scaling option:
-	//#define BUFFER_DRAW_W160	// Draw width 1:1 (does not fill the full screen width)
+	#define BUFFER_DRAW_W160	// FASTEST: Draw width 1:1 (does not fill the full screen width)
 	//#define BUFFER_DRAW_W192	// Stretch width to 192 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
-	#define BUFFER_DRAW_W240	// Stretch width to 240 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
+	//#define BUFFER_DRAW_W240	// RECOMMENDED: Stretch width to 240 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
 	//#define BUFFER_DRAW_W320	// Draw width X2 with crop (fast, but requires scrolling)
 
 	// Chose one frame processing option:
 	//#define BUFFER_PROCESS_HCROP	// Just extract 100 pixels in height (and employ scrolling with re-rendering)
-	#define BUFFER_PROCESS_HCRUSH	// Crush the 168 frame height down to 100
+	#define BUFFER_PROCESS_HCRUSH	// RECOMMENDED: Crush the 168 frame height down to 100
 
 	// Chose one pixel drawing option:
 	//#define BUFFER_DRAW_MONO	// Use 1 bit on/off
 	//#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns
-	#define BUFFER_DRAW_DITHER	// Use simple error dithering. Looks great, but is problematic for partial redraws!
+	#define BUFFER_DRAW_DITHER	// RECOMMENDED: Use simple error dithering. Looks great, but is problematic for partial redraws!
 
 	// Chose one inlining option:
 	//#define BUFFER_SWITCH_INLINE inline	// Inline buffer switch calls
@@ -157,24 +157,28 @@ byte inline game_to_screen_y(byte y) {
 
 // X
 #ifdef BUFFER_DRAW_W160
+	#define VAGI_SCREEN_W 160
 	#define buffer_to_frame_x(x) (x)	// 1:1
 	#define screen_to_buffer_x(x) (x)	// ~1:1
 	#define screen_to_game_x(x) (x)	// ~1:1
 	#define game_to_screen_x(x) (x)	// 1:1
 #endif
 #ifdef BUFFER_DRAW_W192
+	#define VAGI_SCREEN_W 192
 	#define buffer_to_frame_x(x) (x)	// 1:1
 	#define screen_to_buffer_x(x) ((x * 5) / 6)	// ~stretch 160 to 192
 	#define screen_to_game_x(x) ((x * 5) / 6)	// ~stretch 160 to 192
 	#define game_to_screen_x(x) ((x * 6) / 5)	// stretch 160 to 192
 #endif
 #ifdef BUFFER_DRAW_W240
+	#define VAGI_SCREEN_W 240
 	#define buffer_to_frame_x(x) (x)	// 1:1
 	#define screen_to_buffer_x(x) ((x * 2) / 3)	// ~stretch 160 to 240
 	#define screen_to_game_x(x) ((x * 2) / 3)	// ~stretch 160 to 240
 	#define game_to_screen_x(x) ((x * 3) / 2)	// stretch 160 to 240
 #endif
 #ifdef BUFFER_DRAW_W320
+	#define VAGI_SCREEN_W 320
 	#define buffer_to_frame_x(x) (x)	// 1:1
 	#define screen_to_buffer_x(x) ((x_scale) ? (x >> 1) : x)	// stretch 160 to 320 if specified
 	#define screen_to_game_x(x) (x / (x_scale ? 2 : 1))
@@ -183,12 +187,14 @@ byte inline game_to_screen_y(byte y) {
 
 // Y
 #ifdef BUFFER_PROCESS_HCROP
+	#define VAGI_SCREEN_H 168	//100
 	#define buffer_to_frame_y(y) (y)	// 1:1 with crop/transform
 	#define screen_to_buffer_y(y) (y)	//if (y_scale) y2 = (y >> 1) + y_ofs;
 	#define screen_to_game_y(y) (y)	// 1:1 with crop/transform
 	#define game_to_screen_y(y) (y)	// 1:1 with crop/transform
 #endif
 #ifdef BUFFER_PROCESS_HCRUSH
+	#define VAGI_SCREEN_H 100
 	#define buffer_to_frame_y(y) ((y * 5) / 3)	// ~Scale (crush) 168 down to 100
 	#define screen_to_buffer_y(y) (y)	//if (y_scale) y2 = (y >> 1) + y_ofs;
 	#define screen_to_game_y(y) ((y * 5) / 3)	// Screen is (crushed) 168 down to 100
@@ -486,6 +492,7 @@ void draw_buffer_sprite_priority(
 		//v_err = 0;
 		//v_err = ((sprite_x * y) * 0x77) & 0x1f;	// Add some noise
 		v_err = ((ssx * y) * 0x77) & 0x1f;	// Add some noise
+		//v_err = rand() & 0x1f;	// Add some noise
 		#endif
 		
 		for(byte ix = 0; ix < ssw; ix++) {
