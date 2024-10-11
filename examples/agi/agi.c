@@ -32,8 +32,9 @@ void dump_vars() {
 	putchar('\n');
 }
 
+/*
 #define STATE_BYTES 7
-#define MULT 0x13B /* for STATE_BYTES==6 only */
+#define MULT 0x13B // for STATE_BYTES==6 only
 #define MULT_LO (MULT & 255)
 #define MULT_HI (MULT & 256)
 
@@ -56,4 +57,4 @@ U8 rand() {
 		i = 0;
 	return x;
 }
-
+*/

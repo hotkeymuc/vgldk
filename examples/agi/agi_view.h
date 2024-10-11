@@ -87,7 +87,8 @@ typedef struct {
 	
 	S16	x,y;
 	U8	width,height;
-	U8 settings;	//htk
+	U8 settings;	// htk
+	U16	descPos;	// htk
 	
 	S16 prevX,prevY;
 	U8 prevWidth,prevHeight;

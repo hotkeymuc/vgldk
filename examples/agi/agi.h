@@ -109,6 +109,6 @@ extern U8 invObjRooms[MAX_IOBJ];
 //U8 FindObj(char *name);
 
 void dump_vars();
-U8 rand();
+//U8 rand();
 
 #endif

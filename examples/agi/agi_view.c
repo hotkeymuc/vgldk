@@ -563,7 +563,7 @@ void SetObjView(VOBJ *v, int num) {
 	vagi_res_skip(view_res_h, 2);	// unknown header
 	
 	v->totalLoops	= vagi_res_read(view_res_h);
-	//v->descPos	= vagi_res_read_word(view_res_h);	// Not used
+	v->descPos	= vagi_res_read_word(view_res_h);	// If view == object
 	
 	vagi_res_close(view_res_h);
 	
@@ -981,7 +981,7 @@ void BlitVObj(VOBJ *v) {
 	U8 by;
 	
 	#ifdef BUFFER_DRAW_DITHER
-		int v_err = 0;
+		int v_err = (int)(rand() & 0x7f) - 64;	// Add some noise
 		int cv;
 	#else
 		U8 cv;
@@ -1012,14 +1012,15 @@ void BlitVObj(VOBJ *v) {
 			gx = v->x + (cell_mirroring ? (v->width - 1) : 0);
 			
 			sy = game_to_screen_y((word)gy);
-			if (sy >= LCD_HEIGHT) break;
+			//if (sy >= LCD_HEIGHT) break;
 			by = screen_to_buffer_y((word)sy);
+			if (by >= BUFFER_HEIGHT) break;
 			
 			#ifdef BUFFER_DRAW_DITHER
 				//v_err = 0;
 				//v_err = ((sprite_x * y) * 0x77) & 0x1f;	// Add some noise
 				//v_err = ((ix * iy) * 0x77) & 0x1f;	// Add some noise
-				v_err = rand() & 0x7f;	// Add some noise
+				v_err = (int)(rand() & 0x7f) - 64;	// Add some noise
 			#endif
 			continue;
 		}
@@ -1037,9 +1038,8 @@ void BlitVObj(VOBJ *v) {
 				
 				// Scale and check priority!
 				sx = game_to_screen_x((word)gx);
-				if (sx < LCD_WIDTH) {
-					bx = screen_to_buffer_x((word)sx);
-					
+				bx = screen_to_buffer_x((word)sx);
+				if (bx < BUFFER_WIDTH) {
 					c_prio = buffer_get_pixel_4bit(bx, by);
 					if (c_prio < v->priority) {
 						
@@ -1447,11 +1447,8 @@ int CalcPriY(int pri) {
 // displays the view and it's description
 void ShowObj(int num) {
 	
-	//@TODO: Implement!
-	printf("TODO: ShowObj");
-	/*
-	char *s;
-	BLIT *b;
+	//char *s;
+	//BLIT *b;
 	static VOBJ objView; // static because of GCC bug
 	
 	// set up a temporary view object
@@ -1459,11 +1456,11 @@ void ShowObj(int num) {
 	// set up the loop/cels
 	objView.loop		= 0;
 	objView.cel			= 0;
-	SetObjView(&objView,num);
+	SetObjView(&objView, num);
 	
 	// size/position/attributes
-	objView.prevWidth	= objView.pCel[0];
-	objView.prevHeight	= objView.pCel[1];
+	objView.prevWidth	= objView.width;
+	objView.prevHeight	= objView.height;
 	objView.x 			=
 	objView.prevX 		= (PIC_MAXX-objView.width)>>1;
 	objView.y 			=
@@ -1473,17 +1470,23 @@ void ShowObj(int num) {
 	objView.num			= 255;
 	
 	// draw it
-	SaveBlit(b = NewBlit(&objView));
+	//SaveBlit(b = NewBlit(&objView));
 	BlitVObj(&objView);
 	UpdateObjCel(&objView);
 	
+	//@TODO: Display description
+	/*
 	// display the description
 	s = (char*)viewDir[num]+5;
+	vagi_res_seek_to( objView.descPos )..
 	MessageBox(s + bGetW(s+3));
+	*/
+	MessageBox("TBI");
+	getchar();
 	
 	// clean up
-	RestoreBlit(b);
+	//RestoreBlit(b);
 	UpdateObjCel(&objView);
-	*/
+	
 }
 

@@ -639,7 +639,11 @@ void draw_Fill() {
 		if (cont) {	// If an error occurs: Do not call drawFill again, something went wrong.
 			cont = _draw_Fill(x1, y1);
 			if (!cont) {
+				#ifdef VAGI_PIC_IGNORE_FILL_STACK
+				// Ignore!
+				#else
 				printf("FILL_STACK!");
+				#endif
 			}
 		}
 	}

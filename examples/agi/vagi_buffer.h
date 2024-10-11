@@ -44,12 +44,12 @@
 
 	// Chose one pixel drawing option:
 	//#define BUFFER_DRAW_MONO	// Use 1 bit on/off
-	//#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns
-	#define BUFFER_DRAW_DITHER	// RECOMMENDED: Use simple error dithering. Looks great, but is problematic for partial redraws!
+	#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns
+	//#define BUFFER_DRAW_DITHER	// RECOMMENDED: Use simple error dithering. Looks great, but is problematic for partial redraws!
 
 	// Chose one inlining option:
-	//#define BUFFER_SWITCH_INLINE inline	// Inline buffer switch calls
-	#define BUFFER_SWITCH_INLINE 	// Do not inline buffer switch calls
+	#define BUFFER_SWITCH_INLINE inline	// Inline buffer switch calls
+	//#define BUFFER_SWITCH_INLINE 	// Do not inline buffer switch calls
 	//#define BUFFER_PIXEL_INLINE inline	// Inline buffer set/get pixel
 	#define BUFFER_PIXEL_INLINE 	// Do not inline buffer set/get pixel
 
@@ -316,8 +316,9 @@ void draw_buffer(
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
 		#ifdef BUFFER_DRAW_DITHER
-		v_err = 0;
+		//v_err = 0;
 		//v_err = (y * 0x77) & 0x1f;	// Add some noise
+		v_err = (int)(rand() & 0x7f) - 64;	// Add some noise
 		#endif
 		
 		for(x = area_x1; x < area_x2; x++) {

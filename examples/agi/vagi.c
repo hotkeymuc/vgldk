@@ -32,8 +32,8 @@
 
 //#define PACKED_DIRS 1	// Game contains "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 //#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
-#define VAGI_RES_IGNORE_COMPRESSED	// do not show "unsupported" messages on compressed resources
-
+#define VAGI_RES_IGNORE_COMPRESSED	// Do not show "unsupported" messages on compressed resources
+#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry
 
 #define VGLDK_NO_SOUND	// We do not support it, so don't waste space
 
@@ -71,6 +71,34 @@ typedef byte uint8;
 typedef int int16;
 typedef word uint16;
 
+
+// from agi.c:
+#define STATE_BYTES 7
+#define MULT 0x13B // for STATE_BYTES==6 only
+#define MULT_LO (MULT & 255)
+#define MULT_HI (MULT & 256)
+
+byte rand() {
+	static byte state[STATE_BYTES] = { 0x87, 0xdd, 0xdc, 0x10, 0x35, 0xbc, 0x5c };
+	static word c = 0x42;
+	static int i = 0;
+	word t;
+	byte x;
+	
+	x = state[i];
+	t = (word)x * MULT_LO + c;
+	c = t >> 8;
+#if MULT_HI
+	c += x;
+#endif
+	x = t & 255;
+	state[i] = x;
+	if (++i >= sizeof(state))
+		i = 0;
+	return x;
+}
+
+// End of essential glue
 
 #ifdef VAGI_MOUSE
 	#include <mouse.h>
@@ -257,7 +285,7 @@ void vagi_init() {
 	//ydiff 			= 0;
 	minRow 			= 1;
 	//minRowY			= 0;	//(minRow*(SCREEN_WIDTH*CHAR_HEIGHT));
-	inputPos		= 13;	// 22
+	inputPos		= 12;	// 22
 	statusRow		= 0;
 	
 	textColour		= 0x0F;
@@ -355,7 +383,7 @@ void vagi_handle_input() {
 			){
 				//lcd_text_col = 0; lcd_text_row = inputPos; printf(">");
 				//DrawAGIString(">", 0, inputPos);
-				DrawAGIString(">", 0, inputPos - 1);
+				DrawAGIString(">", 0, inputPos - 4);
 				gets(&szInput[0]);
 				
 				// fPLAYERCOMMAND and fSAIDOK are Reset in game loop before calling vagi_handle_input

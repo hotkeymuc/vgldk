@@ -65,6 +65,7 @@ void LCD_PIXEL_INLINE lcd_set_pixel_1bit_off(byte x, byte y) {
 }
 #endif
 
+
 void lcd_set_pixel_4bit(byte x, byte y, byte c) {
 	// Draw pixel with tone mapping / dithering
 	
@@ -73,26 +74,51 @@ void lcd_set_pixel_4bit(byte x, byte y, byte c) {
 	//	else if (c < 12) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );
 	//	else c = 1;
 	
+	/*
+		// 5 shades:
+		     if (c <  3) c = 0;	// 0=white (unset)
+		else if (c <  7) c = ((x + y) & 3) ? 0 : 1;	// Mostly white
+		else if (c < 11) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );	// 50% gray
+		else if (c < 14) c = ((x + y) & 3) ? 1 : 0;	// Mostly black
+		else             c = 1;	// 1=black (set)
+		lcd_set_pixel_1bit(x, y, c);
+	*/
 	
-	//	// 5 shades:
-	//	     if (c <  3) c = 0;	// 0=white (unset)
-	//	else if (c <  7) c = ((x + y) & 3) ? 0 : 1;	// Mostly white
-	//	else if (c < 11) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );	// 50% gray
-	//	else if (c < 14) c = ((x + y) & 3) ? 1 : 0;	// Mostly black
-	//	else             c = 1;	// 1=black (set)
-	//	lcd_set_pixel_1bit(x, y, c);
+	/*
+	// 7-8 shades
+	switch(c >> 5) {
+		case 0: c = 1; break;	// 1=black (set)
+		case 1: c = ((x + y) & 7) ? 1 : 0; break;	// Mostly 1 (black)
+		case 2: c = ((x + y) & 3) ? 1 : 0;	// Mostly 1 (black)
+		case 3: c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) ); break;
+		case 4: c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) ); break;
+		case 5: c = ((x + y) & 3) ? 0 : 1; break;	// Mostly 0 (white)
+		case 6: c = ((x + y) & 7) ? 0 : 1; break;	// Mostly 0 (white)
+		case 7: c = 0; break;
+	}
+	*/
+	// 16 shades
+	byte xy = x + y;
+	switch(c >> 4) {
+		case  0: c = 1; break;	// 1=black (set)
+		case  1: c = (xy & 15) ? 1 : 0; break;			// Mostly 1 (black)	0111111111111111	15/16
+		case  2: c = (xy &  7) ? 1 : 0; break;			// Mostly 1 (black)	01111111	7/8
+		case  3: c = (xy &  7) ? 1 : 0; break;			// Mostly 1 (black)	01111111	7/8
+		case  4: c = (xy &  3) ? 1 : 0;	break;			// Mostly 1 (black)	01110111	6/8
+		case  5: c = (xy &  3) ? 1 : 0;	break;			// Mostly 1 (black)	01110111	6/8
+		case  6: c = (xy &  3) ? 1 : 0;	break;			// More 1 (black)	11011101	6/8
+		case  7: c = (xy &  1); break;					// 50%			01010101	4/8
+		case  8: c = (xy &  1); break;					// 50%			01010101	4/8
+		case  9: c = (xy &  3) ? 0 : 1; break;			// Mostly 0 (white)	10001000	2/8
+		case 10: c = (xy &  3) ? 0 : 1; break;			// Mostly 0 (white)	10001000	2/8
+		case 11: c = (xy &  3) ? 0 : 1; break;			// Mostly 0 (white)	10001000	2/8
+		case 12: c = (xy &  7) ? 0 : 1; break;			// Mostly 0 (white)	10000000	1/8
+		case 13: c = (xy &  7) ? 0 : 1; break;			// Mostly 0 (white)	10000000	1/8
+		case 14: c = (xy & 15) ? 0 : 1; break;			// Mostly 0 (white)	1000000000000000	1/15
+		case 15: c = 0; break;
+	}
 	
-	//	switch(c >> 5) {
-	//		case 0: c = 1; break;
-	//		case 1: c = ((x + y) & 7) ? 1 : 0; break;	// Mostly 1 (black)
-	//		case 2: c = ((x + y) & 3) ? 1 : 0;	// Mostly 1 (black)
-	//		case 3: c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) ); break;
-	//		case 4: c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) ); break;
-	//		case 5: c = ((x + y) & 3) ? 0 : 1; break;	// Mostly 0 (white)
-	//		case 6: c = ((x + y) & 7) ? 0 : 1; break;	// Mostly 0 (white)
-	//		case 7: c = 0; break;
-	//	}
-	
+	/*
 	// 7 shades
 	     if (c <  36) c = 1;	// 1=black (set)
 	else if (c <  72) c = ((x + y) & 7) ? 1 : 0;	// Mostly 1 (black)
@@ -101,7 +127,7 @@ void lcd_set_pixel_4bit(byte x, byte y, byte c) {
 	else if (c < 182) c = ((x + y) & 3) ? 0 : 1;	// Mostly 0 (white)
 	else if (c < 218) c = ((x + y) & 7) ? 0 : 1;	// Mostly 0 (white)
 	else              c = 0;	// 0=white (unset)
-	
+	*/
 	lcd_set_pixel_1bit(x, y, c);
 }
 
