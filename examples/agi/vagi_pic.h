@@ -40,9 +40,9 @@ bool vagi_pic_render_frame(word pic_num, byte drawing_step) {
 
 void vagi_pic_draw(byte pic_num) {
 	// Render both frames and create working buffers
+	const byte status_row = LCD_TEXT_ROWS-1;	//0;
 	
-	//lcd_text_col = 0; lcd_text_row = LCD_TEXT_ROWS-1;	//(LCD_HEIGHT/font_char_height) - 1;
-	lcd_text_col = 0; lcd_text_row = 0; printf("Loading PIC "); printf_d(pic_num);	//getchar();
+	lcd_text_col = 0; lcd_text_row = status_row; printf("Loading PIC "); printf_d(pic_num);
 	
 	// Render and process the VIS frame.
 	bool ok = vagi_pic_render_frame(pic_num, VAGI_STEP_VIS);	// Render the full-size visual PIC frame (takes quite long...)
@@ -56,8 +56,7 @@ void vagi_pic_draw(byte pic_num) {
 		//if (show_immediately) draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
 		
 		// Render and process the PRI frame. The buffer is co-located with the frame buffer, overwriting it in the process. Must be done last.
-		//lcd_text_col = 0; lcd_text_row = LCD_TEXT_ROWS-1;	//(LCD_HEIGHT/font_char_height) - 1;
-		lcd_text_col = 0; lcd_text_row = 0; printf("Loading PRIO "); printf_d(pic_num);
+		lcd_text_col = 0; lcd_text_row = status_row; printf("Loading PRI "); printf_d(pic_num);
 		
 		ok = vagi_pic_render_frame(pic_num, VAGI_STEP_PRI);	// Render the full-size priority PIC frame (takes quite long...)
 		if (ok) {

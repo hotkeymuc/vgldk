@@ -44,7 +44,7 @@
 
 	// Chose one pixel drawing option:
 	//#define BUFFER_DRAW_MONO	// Use 1 bit on/off
-	#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns
+	#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns / ordered Bayer dither
 	//#define BUFFER_DRAW_DITHER	// RECOMMENDED: Use simple error dithering. Looks great, but is problematic for partial redraws!
 
 	// Chose one inlining option:
@@ -211,23 +211,24 @@ void buffer_clear(byte c) {
 	//memset((byte *)BUFFER_ADDR, 0x00, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
 	memset((byte *)BUFFER_ADDR, c * 0x11, ((BUFFER_WIDTH * BUFFER_HEIGHT) >> 1));
 }
-//	void buffer_add_pixel_4bit(byte x, byte y, byte c) {
-//		// Add 4 bit color value of the working buffer at 0xc000
-//		// Like set_pixel, but only does a single OR operation, hence: faster.
-//		/*
-//		word a;
-//		a = BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1);
-//		if ((x & 1) == 0)	*(byte *)a |= c;
-//		else				*(byte *)a |= c << 4;
-//		*/
-//		/*
-//		if ((x & 1) == 0)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
-//		else				*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
-//		*/
-//		if (x & 1)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
-//		else		*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
-//	}
-
+/*
+void buffer_add_pixel_4bit(byte x, byte y, byte c) {
+	// Add 4 bit color value of the working buffer at 0xc000
+	// Like set_pixel, but only does a single OR operation, hence: faster.
+	
+	//	word a;
+	//	a = BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1);
+	//	if ((x & 1) == 0)	*(byte *)a |= c;
+	//	else				*(byte *)a |= c << 4;
+	
+	
+	//	if ((x & 1) == 0)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
+	//	else				*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
+	
+	if (x & 1)	*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c << 4;
+	else		*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1)) |= c;
+}
+*/
 void BUFFER_PIXEL_INLINE buffer_set_pixel_4bit(byte x, byte y, byte c) {
 	// Set 4 bit color value of the working buffer at 0xc000
 	byte *a = (byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1));
@@ -242,10 +243,6 @@ byte BUFFER_PIXEL_INLINE buffer_get_pixel_4bit(byte x, byte y) {
 	a = BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1);
 	if ((x & 1) == 0)	return (*(byte *)a) & 0x0f;
 	else				return (*(byte *)a) >> 4;
-	*/
-	/*
-	if ((x & 1) == 0)	return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) & 0x0f;
-	else				return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) >> 4;
 	*/
 	if (x & 1)	return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) >> 4;
 	else		return (*(byte *)(BUFFER_ADDR + y * (BUFFER_WIDTH >> 1) + (x >> 1))) & 0x0f;
@@ -292,12 +289,6 @@ void draw_buffer(
 	byte y2;
 	byte c;
 	
-	#ifdef BUFFER_DRAW_DITHER
-	// Dithering
-	int v;
-	int v_err;
-	#endif
-	
 	// Clip area
 	if (area_x1 >= LCD_WIDTH) return;
 	if (area_x2 > LCD_WIDTH) area_x2 = LCD_WIDTH;	//-1;
@@ -315,11 +306,7 @@ void draw_buffer(
 		y2 = screen_to_buffer_y(y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
-		#ifdef BUFFER_DRAW_DITHER
-		//v_err = 0;
-		//v_err = (y * 0x77) & 0x1f;	// Add some noise
-		v_err = (int)(rand() & 0x7f) - 64;	// Add some noise
-		#endif
+		//v_err = (int)(rand() & 0x7f) - 64;	// Add some noise
 		
 		for(x = area_x1; x < area_x2; x++) {
 			//if (x >= LCD_WIDTH) break;	// Beyond screen (already checked before loop)
@@ -331,26 +318,7 @@ void draw_buffer(
 			c = buffer_get_pixel_4bit(x2, y2);
 			
 			// Draw pixel to VRAM
-			#ifdef BUFFER_DRAW_MONO
-				lcd_set_pixel_1bit(x, y, (AGI_PALETTE_TO_LUMA[c] < 0x80) ? 1 : 0);	// B/W monochrome
-			#endif
-			#ifdef BUFFER_DRAW_PATTERN
-				lcd_set_pixel_4bit(x, y, AGI_PALETTE_TO_LUMA[c]);	// Use patterns
-			#endif
-			#ifdef BUFFER_DRAW_DITHER
-				// Dithering with luma
-				v = AGI_PALETTE_TO_LUMA[c];
-				v += v_err;
-				if (v < 0x80) {
-					//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
-					lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
-					v_err = (v - 0x00);
-				} else {
-					//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
-					lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
-					v_err = (v - 0xff);
-				}
-			#endif
+			vagi_set_pixel_8bit(x, y, AGI_PALETTE_TO_LUMA[c]);
 			
 		}
 	}
@@ -375,21 +343,13 @@ void draw_buffer_combined(
 	byte c;
 	//byte c_vis;
 	
-	#ifdef BUFFER_DRAW_DITHER
-	// Dithering
-	int v;
-	int v_err;
-	#endif
 	
 	// Transfer (and optionally scale) all pixels to screen
 	for(y = area_y1; y < area_y2; y++) {
 		y2 = screen_to_buffer_y(y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
-		#ifdef BUFFER_DRAW_DITHER
-		v_err = 0;
 		//v_err = (y * 0x77) & 0x1f;	// Add some noise
-		#endif
 		
 		for(x = area_x1; x < area_x2; x++) {
 			x2 = screen_to_buffer_x(x) + x_ofs;
@@ -406,27 +366,7 @@ void draw_buffer_combined(
 			c = buffer_get_pixel_4bit(x2, y2);
 			
 			// Draw to VRAM
-			#ifdef BUFFER_DRAW_MONO
-				//lcd_set_pixel_1bit(x, y, c);	// B/W monochrome
-				lcd_set_pixel_1bit(x, y, (AGI_PALETTE_TO_LUMA[c] < 0x80) ? 1 : 0);	// B/W monochrome
-			#endif
-			#ifdef BUFFER_DRAW_PATTERN
-				lcd_set_pixel_4bit(x, y, AGI_PALETTE_TO_LUMA[c]);	// Use patterns
-			#endif
-			#ifdef BUFFER_DRAW_DITHER
-				// Dithering with luma
-				v = AGI_PALETTE_TO_LUMA[c];
-				v += v_err;
-				if (v < 0x80) {
-					//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
-					lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
-					v_err = (v - 0x00);
-				} else {
-					//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
-					lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
-					v_err = (v - 0xff);
-				}
-			#endif
+			vagi_set_pixel_8bit(x, y, AGI_PALETTE_TO_LUMA[c]);
 		}
 	}
 }
@@ -457,11 +397,6 @@ void draw_buffer_sprite_priority(
 	//byte c_vis;
 	byte c_prio;
 	
-	#ifdef BUFFER_DRAW_DITHER
-	// Dithering
-	int v;
-	int v_err;
-	#endif
 	
 	word syo;
 	byte ssx = game_to_screen_x(sprite_x);
@@ -489,12 +424,8 @@ void draw_buffer_sprite_priority(
 		syo = (word)sprite_w * screen_to_game_y((word)iy);	// Sprite offset
 		
 		
-		#ifdef BUFFER_DRAW_DITHER
-		//v_err = 0;
-		//v_err = ((sprite_x * y) * 0x77) & 0x1f;	// Add some noise
-		v_err = ((ssx * y) * 0x77) & 0x1f;	// Add some noise
+		//v_err = ((ssx * y) * 0x77) & 0x1f;	// Add some noise
 		//v_err = rand() & 0x1f;	// Add some noise
-		#endif
 		
 		for(byte ix = 0; ix < ssw; ix++) {
 			x = ssx + ix;
@@ -528,31 +459,7 @@ void draw_buffer_sprite_priority(
 			}
 			*/
 			
-			
-			//@TODO: Wrap into "vagi_set_pixel(x, y, c);"
-			
-			// Draw pixel to VRAM
-			#ifdef BUFFER_DRAW_MONO
-				//lcd_set_pixel_1bit(x, y, c);	// B/W monochrome
-				lcd_set_pixel_1bit(x, y, (AGI_PALETTE_TO_LUMA[c] < 0x80) ? 1 : 0);	// B/W monochrome
-			#endif
-			#ifdef BUFFER_DRAW_PATTERN
-				lcd_set_pixel_4bit(x, y, AGI_PALETTE_TO_LUMA[c]);	// Use patterns
-			#endif
-			#ifdef BUFFER_DRAW_DITHER
-				// Dithering with luma
-				v = AGI_PALETTE_TO_LUMA[c];
-				v += v_err;
-				if (v < 0x80) {
-					//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
-					lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
-					v_err = (v - 0x00);
-				} else {
-					//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
-					lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
-					v_err = (v - 0xff);
-				}
-			#endif
+			vagi_set_pixel_8bit(x, y, AGI_PALETTE_TO_LUMA[c]);
 		}
 	}
 }

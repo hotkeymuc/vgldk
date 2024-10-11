@@ -980,12 +980,7 @@ void BlitVObj(VOBJ *v) {
 	U8 bx;
 	U8 by;
 	
-	#ifdef BUFFER_DRAW_DITHER
-		int v_err = (int)(rand() & 0x7f) - 64;	// Add some noise
-		int cv;
-	#else
-		U8 cv;
-	#endif
+	U8 cv;
 	
 	gx = v->x + (cell_mirroring ? (v->width - 1) : 0);
 	gy = v->y - v->height;
@@ -1016,11 +1011,11 @@ void BlitVObj(VOBJ *v) {
 			by = screen_to_buffer_y((word)sy);
 			if (by >= BUFFER_HEIGHT) break;
 			
-			#ifdef BUFFER_DRAW_DITHER
+			#ifdef VAGI_DRAW_DITHER
+				// Reset dither error
 				//v_err = 0;
-				//v_err = ((sprite_x * y) * 0x77) & 0x1f;	// Add some noise
-				//v_err = ((ix * iy) * 0x77) & 0x1f;	// Add some noise
-				v_err = (int)(rand() & 0x7f) - 64;	// Add some noise
+				//v_err = ((ix * iy) * 0x77) & 0x1f;
+				v_err = (int)(rand() & 0x7f) - 64;
 			#endif
 			continue;
 		}
@@ -1049,34 +1044,10 @@ void BlitVObj(VOBJ *v) {
 						#if VAGI_SCREEN_W > 160
 							// Fill gaps
 							for(byte xx = sx; xx < sx+2; xx++) {
-						#else
-							byte xx = sx;
-						#endif
-							
-							// Draw pixel to VRAM
-							#ifdef BUFFER_DRAW_MONO
-								//lcd_set_pixel_1bit(xx, sy, cv);	// B/W monochrome
-								lcd_set_pixel_1bit(xx, sy, (cv < 0x80) ? 1 : 0);	// B/W monochrome
-							#endif
-							#ifdef BUFFER_DRAW_PATTERN
-								lcd_set_pixel_4bit(xx, sy, cv);	// Use patterns
-							#endif
-							#ifdef BUFFER_DRAW_DITHER
-								// Dithering with luma
-								cv += v_err;
-								if (cv < 0x80) {
-									//lcd_set_pixel_1bit(sx+xx, sy, 1);	// B/W monochrome (1=black)
-									lcd_set_pixel_1bit_on(xx, sy);	// B/W monochrome (1=black)
-									v_err = (cv - 0x00);
-								} else {
-									//lcd_set_pixel_1bit(sx+xx, sy, 0);	// B/W monochrome (0=white)
-									lcd_set_pixel_1bit_off(xx, sy);	// B/W monochrome (0=white)
-									v_err = (cv - 0xff);
-								}
-							#endif
-						
-						#if VAGI_SCREEN_W > 160
+								vagi_set_pixel_8bit(xx, sy, cv);
 							}
+						#else
+							vagi_set_pixel_8bit(sx, sy, cv);
 						#endif
 					} // end of "priority"
 				} // end of screen clip
@@ -1085,7 +1056,6 @@ void BlitVObj(VOBJ *v) {
 				if (cell_mirroring) gx --; else gx ++;
 			}
 		}
-		
 		
 	}
 	
