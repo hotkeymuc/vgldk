@@ -65,6 +65,14 @@ U16 inline code_get_word() {
 void inline code_skip(U16 n) {
 	vagi_res_skip(curLog->res_h, n);
 }
+void inline code_seek_to(U16 o) {
+	vagi_res_seek_to(curLog->res_h, o);
+}
+void inline code_seek_relative(S16 s) {
+	word code_ofs = vagi_res_tell(curLog->res_h) + s;
+	vagi_res_seek_to(curLog->res_h, code_ofs);
+}
+
 void code_term() {
 	// We need to signal that this logic is done (original: "code == NULL")
 	vagi_res_close(curLog->res_h);
@@ -331,8 +339,9 @@ void ExecuteGoto() {
 	//code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
 	//vagi_res_seek_to(curLog->res_h, code_ofs);
 	
-	word o = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
-	vagi_res_seek_to(curLog->res_h, o);
+	//word o = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
+	//code_seek_to(o);
+	code_seek_relative((S16)(code_get_word()));
 }
 
 
@@ -461,9 +470,11 @@ void SkipANDFalse() {
 		}
 	}
 	//code += (S16)(bGetW(code)+2);	// Note: bGetW() does not increment code, so "+2" skips ofer the word just read.
-	code_skip(code_get_word());
+	//code_skip(code_get_word());
+	
 	//word o = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
-	//vagi_res_seek_to(curLog->res_h, o);
+	//code_seek_to(o);
+	code_seek_relative(code_get_word());
 }
 
 
