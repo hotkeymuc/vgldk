@@ -942,7 +942,8 @@ void BlitVObj(VOBJ *v) {
 	vagi_res_seek_to(view_res_h, v->oCel);
 	vagi_res_skip(view_res_h, 3);	// Skip header: U8 width, heihgt, settings
 	
-	U8 cell_mirroring = v->settings >> 4;
+	//U8 cell_mirroring = v->settings >> 4;
+	U8 cell_mirroring =  (v->settings & 0x80) && (((v->settings >> 4) & 7) != v->loop);
 	U8 cell_transparency = v->settings & 0x0f;
 	
 	// Draw cell!
@@ -991,7 +992,10 @@ void BlitVObj(VOBJ *v) {
 			if (iy >= v->height) break;
 			ix = 0;
 			gy ++;
-			gx = v->x;
+			if (cell_mirroring)
+				gx = v->x + v->width - 1;
+			else
+				gx = v->x;
 		}
 		col = b >> 4;
 		count = b & 0x0f;
@@ -999,7 +1003,10 @@ void BlitVObj(VOBJ *v) {
 		if (col == cell_transparency) {
 			// Skip transparent pixels
 			ix += count;
-			gx += count;
+			if (cell_mirroring)
+				gx -= count;
+			else
+				gx += count;
 		} else {
 			cv = AGI_PALETTE_TO_LUMA[col];
 			// RLE
@@ -1020,12 +1027,15 @@ void BlitVObj(VOBJ *v) {
 					
 					//@TODO: Dither modes!
 					lcd_set_pixel_4bit(sx, sy, cv);
-					lcd_set_pixel_4bit(sx+1, sy, cv);	//@FIXME: Just to fill skips
+					//lcd_set_pixel_4bit(sx+1, sy, cv);	//@FIXME: Just to fill skips
 					
 					
 				}
 				ix ++;
-				gx ++;
+				if (cell_mirroring)
+					gx --;
+				else
+					gx ++;
 			}
 		}
 		

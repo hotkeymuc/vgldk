@@ -19,16 +19,19 @@
 	2024-09-11 Bernhard "HotKey" Slawik
 */
 
-// Those are set by vagi_make.py to create separate code segments
-//#define CODE_SEGMENT	// Indicate that the code is to be compiled in multiple segments
-#ifndef CODE_SEGMENT
-	// If nothing specified: Compile the whole code
-	#define CODE_SEGMENT_0	// Include segment 0 code in compilation (main code)
-	#define CODE_SEGMENT_1	// Include segment 1 code in compilation (extended code)
-#endif
 
 //#define VAGI_MOUSE	// Support mouse
 //#define VAGI_MINIMAL	// Squeeze all as much space as possible. No stdio!
+//#define VAGI_SHOW_EGO_INFO	// Show info about ego ViewObjs[0]
+//#define PACKED_DIRS 1	// Game contains "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
+//#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
+
+//#define AGI_LOGIC_DEBUG	// Debug control flow
+//#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
+//#define AGI_COMMANDS_INCLUDE_NAMES	// Include command names for debugging, requires ~0x800+ bytes of space!
+
+//#define AGI_LOGIC_DEBUG_IFS	// Even verboser logic debug: Show "IF v[x] > y" etc.
+
 
 #define VGLDK_NO_SOUND	// We do not support it, so don't waste space
 
@@ -73,6 +76,14 @@ typedef word uint16;
 
 
 // Platform specific helpers:
+// Those are set by vagi_make.py to create separate code segments
+//#define CODE_SEGMENT	// Indicate that the code is to be compiled in multiple segments
+#ifndef CODE_SEGMENT
+	// If nothing specified: Compile the whole code
+	#define CODE_SEGMENT_0	// Include segment 0 code in compilation (main code)
+	#define CODE_SEGMENT_1	// Include segment 1 code in compilation (extended code)
+#endif
+
 #include "vagi_bank.h"	// Bank switching and code segmentation. NOTE: This must stay at same address in all code segments!
 
 #include "vagi_lcd.h"	// This abstracts access to the LCD screen
@@ -105,9 +116,6 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 
 
 // The AGI specific fun starts here:
-//#define PACKED_DIRS 1	// Game contains "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
-//#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
-#define VAGI_SHOW_EGO_INFO	// Show info about ego ViewObjs[0]
 #include "agi.h"
 
 
@@ -195,11 +203,6 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 #include "agi_view.h"
 
 // LOG code
-//#define AGI_LOGIC_DEBUG	// Debug control flow
-#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
-//#define AGI_COMMANDS_INCLUDE_NAMES	// Include command names for debugging, requires ~0x800+ bytes of space!
-
-//#define AGI_LOGIC_DEBUG_IFS	// Even verboser logic debug: Show "IF v[x] > y" etc.
 #include "agi_vars.h"
 #include "agi_commands.h"
 #include "agi_logic.h"
@@ -216,7 +219,7 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 #include "agi_logic.c"
 
 
-#define FRAMES_PER_SECOND 10	// Used for in-game time
+#define FRAMES_PER_SECOND 8	// Used for in-game time
 byte timer_frame;
 
 
