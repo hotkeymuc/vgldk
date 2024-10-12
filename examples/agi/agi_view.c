@@ -336,10 +336,10 @@ BOOL CheckObjCollision(VOBJ *v1) {
 
 BOOL CheckObjControls(VOBJ *v) {
 	
-	//U8 *p = MAKE_PICBUF_PTR(v->x,v->y);
 	buffer_switch(BUFFER_BANK_PRI);	// Map destination working buffer to 0xc000
-	
-	int px = v->x;
+	int sx = game_to_screen_x(v->x);
+	int px = screen_to_buffer_x(sx);
+	/*
 	#ifdef BUFFER_PROCESS_HCROP
 		// 1:1 with crop/transform
 		int py = v->y;
@@ -348,6 +348,9 @@ BOOL CheckObjControls(VOBJ *v) {
 		// Scale (crush) 168 down to 100
 		int py = (v->y * 3) / 5;
 	#endif
+	*/
+	int sy = game_to_screen_y(v->y);
+	int py = screen_to_buffer_y(sy);
 	
 	
 	int flags = FLAG_CONTROL;
@@ -355,26 +358,28 @@ BOOL CheckObjControls(VOBJ *v) {
 	int pri;
 	
 	
-	if(!(v->flags & oFIXEDPRIORITY))
+	if (!(v->flags & oFIXEDPRIORITY))
 		v->priority = priTable[v->y];
 	
-	if(v->priority != 15) {
+	if (v->priority != 15) {
 		flags |= FLAG_WATER;
 		do {
-			//if(!(BOOL)(pri = (*p++ & 0xF0))) {
-			if(!(BOOL)(pri = buffer_get_pixel_4bit(px++, py))) {
+			pri = buffer_get_pixel_4bit(px++, py);
+			if (pri == 0) {
 				flags &= ~FLAG_CONTROL;
 				break;
 			}
-			if(pri != PRI_WATER) {
+			if (pri != PRI_WATER) {
 				flags &= ~FLAG_WATER;
-				if(pri == PRI_CONTROL) {
+				if (pri == PRI_CONTROL) {
 					if(!( v->flags&oIGNORECTL)) {
 						flags &= ~FLAG_CONTROL;
 						break;
 					}
-				} else if(pri == PRI_SIGNAL)
+				} else
+				if (pri == PRI_SIGNAL) {
 					flags |= FLAG_SIGNAL;
+				}
 			}
 		} while(--x);
 		
@@ -392,6 +397,7 @@ BOOL CheckObjControls(VOBJ *v) {
 			SetFlag(fEGOONSIGNAL);
 		else
 			ResetFlag(fEGOONSIGNAL);
+		
 		if(flags&FLAG_WATER)
 			SetFlag(fEGOONWATER);
 		else
@@ -412,9 +418,6 @@ BOOL CheckObjInScreen(VOBJ *v) {
 
 void SolidifyObjPosition(VOBJ *v) {
 	
-	//@FIXME: This function freezes!
-	//(void)v;
-	
 	
 	int checkDir = dirLEFT, checkCnt = 1, checkLen = 1;
 	
@@ -424,7 +427,8 @@ void SolidifyObjPosition(VOBJ *v) {
 	if( CheckObjInScreen(v)	&& (!CheckObjCollision(v)) && CheckObjControls(v) )
 		return;
 	
-	/*
+	//@FIXME: This hangs?
+	
 	while( (!CheckObjInScreen(v)) || CheckObjCollision(v) || (!CheckObjControls(v)) ) {
 		switch(checkDir) {
 			case dirLEFT:
@@ -459,7 +463,7 @@ void SolidifyObjPosition(VOBJ *v) {
 				break;
 		}
 	}
-	*/
+	
 }
 
 void UpdateObjMove(VOBJ *v) {

@@ -465,6 +465,7 @@ typedef struct {
 #else
 	// Working but slow (because it checks things that don't change throughout the fill!)
 	bool inline draw_FillCheck(int16 x, int16 y) {
+		// Return TRUE if the current pixel should be flood-filled
 		//	Original:
 		//		byte screenColor;
 		//		byte screenPriority;
@@ -510,6 +511,11 @@ typedef struct {
 			return (c == 15);
 		
 		if ((_priOn) && (!_scrOn) && (_priColor != 4))
+			return (c == 4);
+		
+		// htk addition:
+		if (vagi_drawing_step == VAGI_STEP_PRI)
+			//return (c != _priColor);
 			return (c == 4);
 		
 		return (_scrOn && c == 15 && _scrColor != 15);

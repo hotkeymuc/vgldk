@@ -49,7 +49,9 @@ VAGI Frame functions (handling one full resolution AGI frame)
 	}
 	#define frame_set_pixel_4bit(x, y, c) frame_contiguous_set_pixel_4bit(x, y, c)
 	#define frame_get_pixel_4bit(x, y) frame_contiguous_get_pixel_4bit(x, y)
+	
 #else
+	
 	// Work across two different banks
 	// Note: We need to check for bank switches at EACH SINGLE pixel operation... This is very slow.
 	#define VAGI_FRAME_BANK_LO 1	// Bank number to use for the lower part
@@ -186,6 +188,8 @@ void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
 	//bank_0xc000_port = dest_bank;	// Map destination working buffer to 0xc000
 	//buffer_switch(dest_bank);
 	//buffer_clear();
+	byte oy2;
+	oy2 = 0;
 	
 	// Copy (and transform) pixels from full frame to reduced buffer
 	for(y = 0; y < BUFFER_HEIGHT; y++) {
@@ -194,27 +198,34 @@ void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
 		
 		for(x = 0; x < BUFFER_WIDTH; x++) {
 			// Transform x coordinate here!
-			//x2 = buffer_to_frame_x(x) + x_src;
 			x2 = buffer_to_frame_x((word)x) + x_src;
 			
 			// Get pixel from frame
-			/*
-			#ifdef AGI_FRAME_CONTIGUOUS
-				// Get pixel from contiguous frame
-				//bank_0xc000_port = AGI_FRAME_CONTIGUOUS_BANK;	// Map contiguous lower bank to 0xc000
-				buffer_switch(AGI_FRAME_CONTIGUOUS_BANK);
-				c = frame_contiguous_get_pixel_4bit(x2, y2);
-			#else
-				// Get pixel from banked frame
-				c = frame_banked_get_pixel_4bit(x2, y2);
-			#endif
-			*/
 			c = frame_get_pixel_4bit(x2, y2);
 			
 			// Write to final working buffer
 			buffer_switch(dest_bank);	// Map destination working buffer to 0xc000
 			buffer_set_pixel_4bit(x, y, c);
 		}
+		
+		
+		// Make sure control/signal pixels don't get crushed/scaled away
+		if ((dest_bank == BUFFER_BANK_PRI) && (y2 - oy2 > 1)) {
+			for(x = 0; x < BUFFER_WIDTH; x++) {
+				// Transform x coordinate here!
+				x2 = buffer_to_frame_x((word)x) + x_src;
+				
+				// Get pixel from frame
+				c = frame_get_pixel_4bit(x2, y2-1);
+				if ((c == 0) || (c == PRI_CONTROL) || (c == PRI_SIGNAL)) {
+					// Write to final working buffer
+					buffer_switch(dest_bank);	// Map destination working buffer to 0xc000
+					buffer_set_pixel_4bit(x, y, c);
+				}
+			}
+		}
+		
+		oy2 = y2;
 	}
 }
 
