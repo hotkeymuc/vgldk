@@ -494,33 +494,25 @@ typedef struct {
 		if (x < 0 || x >= _width || y < 0 || y >= _height)
 			return false;
 		
-		//x += _xOffset;
-		//y += _yOffset;
-		
 		c = frame_get_pixel_4bit(x, y);
 		
-		// ScummVM:
-		//if (_flags & kPicFTrollMode)
-		//	return ((c != 11) && (c != _scrColor));
-		/*
-		// case 1
-		if (!_priOn && _scrOn && _scrColor != 15)
-			return (c == 15);
-		
-		// case 2
-		if (_priOn && !_scrOn && _priColor != 4)
-			return c == 4;
-		
-		// case 3
-		return (_scrOn && c == 15 && _scrColor != 15);
-		*/
 		
 		// Naive case: Looks like ScummVM (fills too less)
 		//if (_scrOn) return (c == 15);
 		//return (c == 4);
 		
-		if (_priOn) return (c == 4);
-		return (c == 15);
+		// VAGI:
+		//if (_priOn) return (c == 4);
+		//return (c == 15);
+		
+		// ScummVM:
+		if ((!_priOn) && (_scrOn) && (_scrColor != 15))
+			return (c == 15);
+		
+		if ((_priOn) && (!_scrOn) && (_priColor != 4))
+			return (c == 4);
+		
+		return (_scrOn && c == 15 && _scrColor != 15);
 	}
 #endif
 
@@ -562,17 +554,13 @@ bool inline _draw_Fill(int16 x, int16 y) {
 	
 	
 	// Push initial pixel on the stack
-	//stack.push(Common::Point(x, y));
 	stack[0].x = x;
 	stack[0].y = y;
 	stack_pos++;
 	
 	// Exit if stack is empty
-	//while (!stack.empty()) {
 	while (stack_pos > 0) {
 		
-		//Common::Point p = stack.pop();
-		//p = &stack[stack_pos--];
 		stack_pos--;
 		px = stack[stack_pos].x;
 		py = stack[stack_pos].y;
@@ -593,7 +581,6 @@ bool inline _draw_Fill(int16 x, int16 y) {
 			
 			if (draw_FillCheck(c, py - 1)) {
 				if (newspanUp) {
-					//stack.push(Common::Point(c, p.y - 1));
 					stack[stack_pos].x = c;
 					stack[stack_pos].y = py-1;
 					stack_pos++;
@@ -610,7 +597,6 @@ bool inline _draw_Fill(int16 x, int16 y) {
 			
 			if (draw_FillCheck(c, py + 1)) {
 				if (newspanDown) {
-					//stack.push(Common::Point(c, p.y + 1));
 					stack[stack_pos].x = c;
 					stack[stack_pos].y = py+1;
 					stack_pos++;
