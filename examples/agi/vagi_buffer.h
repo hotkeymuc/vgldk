@@ -37,16 +37,11 @@
 	//#define BUFFER_DRAW_W192	// Stretch width to 192 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
 	//#define BUFFER_DRAW_W240	// RECOMMENDED: Stretch width to 240 (slow, but nice; combine with BUFFER_PROCESS_HCRUSH to get full-screen image)
 	//#define BUFFER_DRAW_W320	// Draw width X2 with crop (fast, but requires scrolling)
-
+	
 	// Chose one frame processing option:
 	//#define BUFFER_PROCESS_HCROP	// Just extract 100 pixels in height (and employ scrolling with re-rendering)
 	#define BUFFER_PROCESS_HCRUSH	// RECOMMENDED: Crush the 168 frame height down to 100
-
-	// Chose one pixel drawing option:
-	//#define BUFFER_DRAW_MONO	// Use 1 bit on/off
-	#define BUFFER_DRAW_PATTERN	// Use 4 bit patterns / ordered Bayer dither
-	//#define BUFFER_DRAW_DITHER	// RECOMMENDED: Use simple error dithering. Looks great, but is problematic for partial redraws!
-
+	
 	// Chose one inlining option:
 	#define BUFFER_SWITCH_INLINE inline	// Inline buffer switch calls
 	//#define BUFFER_SWITCH_INLINE 	// Do not inline buffer switch calls

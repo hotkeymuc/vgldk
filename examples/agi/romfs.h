@@ -71,6 +71,7 @@ byte *romfs_fpoint(romfs_handle_t h);
 //int romfs_fpeek(romfs_handle_t h);
 byte romfs_fpeek(romfs_handle_t h);
 
-int romfs_fread(romfs_handle_t h);
+//int romfs_fread(romfs_handle_t h);
+byte romfs_fread(romfs_handle_t h);
 
 #endif

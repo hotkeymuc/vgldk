@@ -113,6 +113,8 @@ void UpdateVObj() {
 	VOBJ *v;
 	int i;
 	
+	vagi_trace_stage("UpdateVObj...");
+	
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		/*
@@ -165,15 +167,18 @@ void UpdateVObj() {
 	
 	if(ANY_TO_DRAW) {
 		//EraseBlitList(&blUpdate);
+		vagi_trace_stage("UpdateObjsStep");
 		UpdateObjsStep();	// This moves all objects
 		
+		//vagi_trace_stage("DrawBlitLists");
 		//DrawBlitList(BuildBlitList(CheckUpdateVObj, &blUpdate));
 		DrawBlitLists();	//@FIXME: This draws all!
 		//UpdateBlitList(&blUpdate);
 		
 		ViewObjs[0].flags &= ~(oONLAND|oWATER);
 	}
-}     
+	
+}
 
 void CalcVObjsDir() {
 	// Called by the main game loop BEFORE the logic is run
@@ -181,39 +186,44 @@ void CalcVObjsDir() {
 	int x,y;
 	int i;
 	
-	for(i = 0; i < MAX_VOBJ; i++) {
+	for (i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		
-		if((v->flags & (oDRAWN|oANIMATE|oUPDATE)) == (oDRAWN|oANIMATE|oUPDATE)) {
-			if(v->stepCount == 1) {
-				switch(v->motion) {
+		if ((v->flags & (oDRAWN|oANIMATE|oUPDATE)) == (oDRAWN|oANIMATE|oUPDATE)) {
+			if (v->stepCount == 1) {
+				switch (v->motion) {
 					case mtWANDER:
+						vagi_trace_stage("UpdateObjWander");
 						UpdateObjWander(v);
 						break;
 					case mtFOLLOW:
+						vagi_trace_stage("UpdateObjFollow");
 						UpdateObjFollow(v);
 						break;
 					case mtMOVE:
+						vagi_trace_stage("UpdateObjMove");
 						UpdateObjMove(v);
 						break;
 				}
+				vagi_trace_stage("updated motion");
 				
-				if(VOBJ_BLOCKING) {
+				if (VOBJ_BLOCKING) {
 					if( (!(v->flags&oIGNORECTL)) && (v->direction) ) {
 						x = v->x;
 						y = v->y;
 						
-						if(CheckBlockPoint(x, y) == CheckBlockPoint(x + (v->stepSize * objDirTableX[v->direction]), y + (v->stepSize * objDirTableY[v->direction])))
+						if(CheckBlockPoint(x, y) == CheckBlockPoint(x + (v->stepSize * objDirTableX[v->direction]), y + (v->stepSize * objDirTableY[v->direction]))) {
 							v->flags &= ~oBLOCK;
-						else {
+						} else {
 							v->flags |= oBLOCK;
 							v->direction = dirNONE;
 							if(v == &ViewObjs[0])
 								vars[vEGODIR] = dirNONE;
 						}
 					}
-				} else
+				} else {
 					v->flags &= ~oBLOCK;
+				}
 			}
 		}
 	}
@@ -513,7 +523,7 @@ void UpdateObjWander(VOBJ *v) {
 		v->direction = rand()%9;
 		if(v == &ViewObjs[0])
 			vars[vEGODIR]	= v->direction;
-		while(v->wanderCount < 6)
+		while (v->wanderCount < 6)
 			v->wanderCount	= rand() % 0x33;
 	}
 }

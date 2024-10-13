@@ -32,22 +32,21 @@ else:
 
 
 GAMES_PATH = '/z/apps/_games/_SCUMM'
+GAME_PACKED_DIRS = 0
 
 # Chose a game:
-#GAME_ID = 'SQ1'; GAME_PACKED_DIRS = 0
-#GAME_ID = 'SQ2'; GAME_PACKED_DIRS = 0	# my fav! (AGIv2)
-GAME_ID = 'KQ1'; GAME_PACKED_DIRS = 0
+#GAME_ID = 'SQ1'
+#GAME_ID = 'SQ2'	# my fav! (AGIv2)
+#GAME_ID = 'KQ1'
 #GAME_ID = 'KQ2'; GAME_PACKED_DIRS = 1	# working with script error 004
-#GAME_ID = 'KQ3'; GAME_PACKED_DIRS = 1	# Skript error and memory corruption in 1st interactive screen
+#GAME_ID = 'KQ3'; GAME_PACKED_DIRS = 1	# Script error and memory corruption in 1st interactive screen
 #GAME_ID = 'LSL1'; GAME_PACKED_DIRS = 1
-#GAME_ID = 'CAULDRON'; GAME_PACKED_DIRS = 1
-#GAME_ID = 'PQ1'; GAME_PACKED_DIRS = 0
-# Not working:
-##GAME_ID = 'Enclosure'
-##GAME_ID = 'uriquest'
-##GAME_ID = 'SpaceQuest0__rep_104'
-##GAME_ID = 'SpaceQuest_NewAdventuresOfRogerWilco'
-##GAME_ID = 'SpaceQuestX_TheLostChapter'
+GAME_ID = 'CAULDRON'; GAME_PACKED_DIRS = 1
+### Not working:
+#GAME_ID = 'Enclosure'	# SIG err
+#GAME_ID = 'SpaceQuest0__rep_104'	# SIG error at start screen
+#GAME_ID = 'SpaceQuest_NewAdventuresOfRogerWilco'
+#GAME_ID = 'SpaceQuestX_TheLostChapter'; GAME_PACKED_DIRS = 1	# SIG err
 
 GAME_PATH = f'{GAMES_PATH}/{GAME_ID}'	# Where to find the game
 GAME_CART_FILENAME = f'out/DATA_{GAME_ID}.bin'	# Where to put the bundled game ROM

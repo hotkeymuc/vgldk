@@ -239,6 +239,10 @@ word ExecuteLogic(LOGIC *log) {
 	#ifdef AGI_LOGIC_DEBUG
 		//printf("ExecLogic("); printf_d(log->num); printf(") <\n");
 	#endif
+	#ifdef AGI_LOGIC_DEBUG_OPS
+		//U8 cursor_col;
+	#endif
+	
 	//code = log->code+logScan[log->num];
 	//code_ofs = log->ofs_code + logScan[log->num];
 	vagi_res_seek_to(log->res_h, log->ofs_code + logScan[log->num]);
@@ -268,7 +272,9 @@ word ExecuteLogic(LOGIC *log) {
 			#else
 				printf_d(op);
 			#endif
+			
 			//for(i=0;i<agiCommands[op].nParams;i++) { code_peek()....
+			//cursor_col = lcd_text_col;
 			//printf("...");
 			//getchar();
 		}
@@ -291,8 +297,7 @@ word ExecuteLogic(LOGIC *log) {
 			}
 		}
 	}
-	if(sndBuf)
-		StopSound();
+	if(sndBuf) StopSound();
 #endif
 #ifdef _PRINT_LOG
 		cmdnum++;
@@ -318,7 +323,10 @@ word ExecuteLogic(LOGIC *log) {
 		#endif
 		#ifdef AGI_LOGIC_DEBUG_OPS
 		if (trace_ops) {
-			printf(".\n");
+			//lcd_text_row = 0;
+			//lcd_text_col = cursor_col;
+			//printf("done");
+			putchar('.');
 		}
 		#endif
 		if (op == 0) return 1;	// op #0 = "return"
@@ -444,11 +452,13 @@ void SkipORTrue() {
 	//register unsigned int op;
 	//unsigned int op;
 	U8 op;
+	//int op;
 	#ifdef AGI_LOGIC_DEBUG_IFS
 		printf("(skipORtrue)");
 	#endif
 	
 	while((op = code_get()) != 0xFC) {
+		//if (op < 0) return;	// EOF = -1
 		if(op <= 0xFC) {
 			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
 			if (op == 0xe)	code_skip((code_peek() << 1) + 1);
@@ -462,10 +472,12 @@ void SkipANDFalse() {
 	//register unsigned int op;
 	//unsigned int op;
 	U8 op;
+	//int op;
 	#ifdef AGI_LOGIC_DEBUG_IFS
 		printf("(skipANDfalse)");
 	#endif
 	while((op = code_get()) != 0xFF) {
+		//if (op < 0) return;	// EOF = -1
 		if(op < 0xFC) {
 			//code += (op == 0xE)?(*code << 1) + 1:testCommands[op].nParams;
 			if (op == 0xe)	code_skip((code_peek() << 1) + 1);

@@ -35,6 +35,8 @@
 #define VAGI_RES_IGNORE_COMPRESSED	// Do not show "unsupported" messages on compressed resources
 //#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry (what it should NEVER)
 
+//#define VAGI_TRACE_STAGES	// Allow on-screen tracing of engine stages
+
 #define VGLDK_NO_SOUND	// We do not support it, so don't waste space
 
 #ifdef VAGI_MINIMAL
@@ -78,6 +80,7 @@ typedef word uint16;
 #define MULT_LO (MULT & 255)
 #define MULT_HI (MULT & 256)
 
+/*
 byte rand() {
 	static byte state[STATE_BYTES] = { 0x87, 0xdd, 0xdc, 0x10, 0x35, 0xbc, 0x5c };
 	static word c = 0x42;
@@ -95,6 +98,41 @@ byte rand() {
 	state[i] = x;
 	if (++i >= sizeof(state))
 		i = 0;
+	return x;
+}
+*/
+
+extern byte rand_state[STATE_BYTES];	// = { 0x87, 0xdd, 0xdc, 0x10, 0x35, 0xbc, 0x5c };
+extern word rand_c;	// = 0x42;
+extern int rand_i;	// = 0;
+byte rand_state[STATE_BYTES];	// = { 0x87, 0xdd, 0xdc, 0x10, 0x35, 0xbc, 0x5c };
+word rand_c;	// = 0x42;
+int rand_i;	// = 0;
+void rand_init() {
+	rand_c = 0;
+	rand_state[rand_c++] = 0x87;
+	rand_state[rand_c++] = 0xdd;
+	rand_state[rand_c++] = 0xdc;
+	rand_state[rand_c++] = 0x10;
+	rand_state[rand_c++] = 0x35;
+	rand_state[rand_c++] = 0xbc;
+	rand_state[rand_c++] = 0x5c;
+	rand_c = 0x42;
+	rand_i = 0;
+}
+byte rand() {
+	word t;
+	byte x;
+	
+	x = rand_state[rand_i];
+	t = (word)x * MULT_LO + rand_c;
+	rand_c = t >> 8;
+#if MULT_HI
+	rand_c += x;
+#endif
+	x = t & 255;
+	rand_state[rand_i] = x;
+	if (++rand_i >= sizeof(rand_state)) rand_i = 0;
 	return x;
 }
 
@@ -146,6 +184,19 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 
 
 // The AGI specific fun starts here:
+#define FRAMES_PER_SECOND 8	// Used for in-game time
+extern byte timer_frame;
+byte timer_frame;
+
+#ifdef VAGI_TRACE_STAGES
+	extern bool trace_stages;
+	bool trace_stages;
+	
+	#define vagi_trace_stage(t) if (trace_stages) { lcd_text_row = 0; lcd_text_col = 0; printf(t); }
+#else
+	#define vagi_trace_stage(t)	;
+#endif
+
 #include "agi.h"
 
 
@@ -249,12 +300,12 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 #include "agi_logic.c"
 
 
-#define FRAMES_PER_SECOND 8	// Used for in-game time
-byte timer_frame;
+
 
 
 void vagi_init() {
 	vagi_res_init();	// calls romfs_init()
+	rand_init();
 	
 	AGIVER.major = 2;
 	AGIVER.minor = 0;
@@ -263,6 +314,9 @@ void vagi_init() {
 	szGameID[1] = '\0';
 	cursorChar = '>';
 	
+	#ifdef VAGI_TRACE_STAGES
+	trace_stages = false;
+	#endif
 	timer_frame = 0;
 	
 	QUIT_FLAG = FALSE;
@@ -363,8 +417,12 @@ void vagi_handle_input() {
 			// Handle Input/GUI
 			if (key == 't') {
 				// Enable trace_ops (requires AGI_LOGIC_DEBUG_OPS)
-				trace_ops = 1 - trace_ops;
-				printf("TRACE:"); if (trace_ops) printf("ON!"); else printf("off");
+				//trace_ops = 1 - trace_ops;
+				//printf("trace_ops:"); if (trace_ops) printf("ON!"); else printf("off");
+				#ifdef VAGI_TRACE_STAGES
+					trace_stages = 1 - trace_stages;
+					printf("trace_stages:"); if (trace_stages) printf("ON!"); else printf("off");
+				#endif
 			} else
 			if (key == 'a') {
 				ViewObjs[0].x --;
@@ -460,6 +518,7 @@ bool vagi_loop() {
 	}
 	
 	// Handle user inputs NOW!
+	vagi_trace_stage("vagi_handle_input");
 	vagi_handle_input();
 	
 	//
@@ -472,7 +531,9 @@ bool vagi_loop() {
 	if (PLAYER_CONTROL) ViewObjs[0].direction = vars[vEGODIR];
 	else vars[vEGODIR] = ViewObjs[0].direction;
 	
+	vagi_trace_stage("CalcVObjsDir");
 	CalcVObjsDir();	// agi_view.c: This makes ViewObjs chose a new direction
+	vagi_trace_stage("CalcVObjsDir: done.");
 	
 	oldScore = vars[vSCORE];
 	SOUND_ON = TestFlag(fSOUND);
@@ -496,9 +557,11 @@ bool vagi_loop() {
 	lcd_text_row = 0;
 	#endif
 	new_room_called = false;
-	word timeout = 10;
-	//while (CallLogic(0) == 0) {
+	word timeout = 10;	// Catch rogue logic
 	
+	vagi_trace_stage("LOG0...");
+	
+	//while (CallLogic(0) == 0) {
 	while ((CallLogic(0) == 0) && (--timeout > 0)) {
 		new_room_called = false;
 		
@@ -510,12 +573,12 @@ bool vagi_loop() {
 		ResetFlag(fPLAYERCOMMAND);
 		oldScore = vars[vSCORE];
 	}
+	//} while (new_room_called);
 	if (timeout <= 0) {
 		printf("Script TO!"); getchar();
 	}
 	
-	//} while (new_room_called);
-	//printf("logic0 finished.\n");
+	vagi_trace_stage("POST");
 	
 	ViewObjs[0].direction = vars[vEGODIR];
 	
@@ -534,6 +597,8 @@ bool vagi_loop() {
 	}
 	*/
 	UpdateVObj();
+	
+	vagi_trace_stage("UpdateVObj: done");
 	
 	if (QUIT_FLAG) return false;
 	return true;

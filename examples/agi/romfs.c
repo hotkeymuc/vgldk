@@ -204,8 +204,15 @@ byte inline romfs_fpeek(romfs_handle_t h) {
 	return r;
 }
 
-int romfs_fread(romfs_handle_t h) {
-	int r = romfs_fpeek(h);
+//int romfs_fread(romfs_handle_t h) {
+byte romfs_fread(romfs_handle_t h) {
+	//int r = romfs_fpeek(h);
+	
+	//@TODO: Check EOF
+	//if (romfs_feof(h)) return -1;
+	
+	byte r = romfs_fpeek(h);
+	
 	/*
 	#ifdef ROMFS_DEBUG
 		printf("romfs_fread(");

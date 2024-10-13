@@ -46,7 +46,8 @@ typedef struct {
 	byte y;
 } fill_stack_t;
 //#define FILL_STACK_MAX 8
-#define FILL_STACK_MAX 16
+#define FILL_STACK_MAX 12
+//#define FILL_STACK_MAX 16
 //#define FILL_STACK_MAX 32
 //#define FILL_STACK_MAX 128
 //#define FILL_STACK_MAX 172
