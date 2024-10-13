@@ -11,10 +11,18 @@
 		* Crop an area out of the full frame, so the result fits into one RAM bank (8192 bytes)
 		* Scroll & redraw to allow viewing the whole picture
 		* PIC resources must be kept at 4bpp (or more), while the resulting LCD pixel will be 1bpp. Dither!
+		* or scale down, but keep track of fine-detailed control pixels in priority frame
 	
 	AGI implementations are based on:
 		* ScummVM: https://github.com/scummvm/scummvm/tree/master/engines/agi
 		* GBAGI: https://github.com/Davidebyzero/GBAGI.git
+	
+	@TODO:
+		* Inventory objects
+		* Handling/mapping of function keys (e.g. F10 / F6)
+		* Nicer MessageBox and bigger font
+		* Re-locate VIEW code to other code segment as well (together with PIC code), to make room in main segment.
+		+ Sound (1-channel via TI TTS chip, anaylze VTech GL6000SL intro)
 	
 	2024-09-11 Bernhard "HotKey" Slawik
 */
@@ -25,7 +33,7 @@
 //#define VAGI_SHOW_EGO_INFO	// Show info about ego ViewObjs[0]
 
 //#define AGI_LOGIC_DEBUG	// Debug control flow
-#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
+//#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
 //#define AGI_COMMANDS_INCLUDE_NAMES	// Include command names for debugging, requires ~0x800+ bytes of space!
 
 //#define AGI_LOGIC_DEBUG_IFS	// Even verboser logic debug: Show "IF v[x] > y" etc.
@@ -81,6 +89,7 @@ typedef word uint16;
 #define MULT_HI (MULT & 256)
 
 /*
+// Note: static values are buggy in VGLDK (i.e.: Not get initialized, yet...)
 byte rand() {
 	static byte state[STATE_BYTES] = { 0x87, 0xdd, 0xdc, 0x10, 0x35, 0xbc, 0x5c };
 	static word c = 0x42;
@@ -305,7 +314,8 @@ byte timer_frame;
 
 void vagi_init() {
 	vagi_res_init();	// calls romfs_init()
-	rand_init();
+	rand_init();	// Init data
+	vagi_lcd_init();	// Reset dither error
 	
 	AGIVER.major = 2;
 	AGIVER.minor = 0;

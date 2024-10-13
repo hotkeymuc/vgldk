@@ -493,8 +493,8 @@ typedef struct {
 		
 		byte c;
 		
-		if (x < 0 || x >= _width || y < 0 || y >= _height)
-			return false;
+		// Check "outside" to be faster!
+		//if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
 		
 		c = frame_get_pixel_4bit(x, y);
 		
@@ -579,14 +579,18 @@ bool inline _draw_Fill(int16 x, int16 y) {
 			continue;
 		
 		// Scan for left border
-		for (c = px - 1; draw_FillCheck(c, py); c--)
-			;
+		if (px == 0) {
+			c = 0;
+		} else {
+			for (c = px - 1; (c > 0) && draw_FillCheck(c, py); c--);
+			c++;
+		}
 		
 		newspanUp = newspanDown = true;
-		for (c++; draw_FillCheck(c, py); c++) {
+		for (; (c < _width) && draw_FillCheck(c, py); c++) {
 			putVirtPixel(c, py);
 			
-			if (draw_FillCheck(c, py - 1)) {
+			if ((py > 0) && (draw_FillCheck(c, py - 1))) {
 				if (newspanUp) {
 					stack[stack_pos].x = c;
 					stack[stack_pos].y = py-1;
@@ -602,7 +606,7 @@ bool inline _draw_Fill(int16 x, int16 y) {
 				newspanUp = true;
 			}
 			
-			if (draw_FillCheck(c, py + 1)) {
+			if ((py+1 < _height) && (draw_FillCheck(c, py + 1))) {
 				if (newspanDown) {
 					stack[stack_pos].x = c;
 					stack[stack_pos].y = py+1;
@@ -635,7 +639,7 @@ void draw_Fill() {
 				#ifdef VAGI_PIC_IGNORE_FILL_STACK
 				// Ignore!
 				#else
-				printf("FILL_STACK!");
+				printf("F!");
 				#endif
 			}
 		}

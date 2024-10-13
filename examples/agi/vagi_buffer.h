@@ -25,7 +25,7 @@
 				Y: 100%
 */
 #define BUFFER_WIDTH 160
-#define BUFFER_HEIGHT 100
+#define BUFFER_HEIGHT 100	// Note: This is LESS THAN THE REAL AGI PIC! We are doing some scaling/cropping here!
 #define BUFFER_ADDR 0xc000	// Will always be banked there
 #define BUFFER_BANK_PRI 1	// shared with VAGI_FRAME_BANK_LO=1
 #define BUFFER_BANK_TMP 2	// shared with VAGI_FRAME_BANK_HI=2 
@@ -42,11 +42,12 @@
 	//#define BUFFER_PROCESS_HCROP	// Just extract 100 pixels in height (and employ scrolling with re-rendering)
 	#define BUFFER_PROCESS_HCRUSH	// RECOMMENDED: Crush the 168 frame height down to 100
 	
-	// Chose one inlining option:
+	// Chose inlining options:
 	#define BUFFER_SWITCH_INLINE inline	// Inline buffer switch calls
 	//#define BUFFER_SWITCH_INLINE 	// Do not inline buffer switch calls
-	//#define BUFFER_PIXEL_INLINE inline	// Inline buffer set/get pixel
-	#define BUFFER_PIXEL_INLINE 	// Do not inline buffer set/get pixel
+	
+	#define BUFFER_PIXEL_INLINE inline	// Inline buffer set/get pixel
+	//#define BUFFER_PIXEL_INLINE 	// Do not inline buffer set/get pixel
 
 
 
@@ -301,7 +302,13 @@ void draw_buffer(
 		y2 = screen_to_buffer_y(y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
-		//v_err = (int)(rand() & 0x7f) - 64;	// Add some noise
+		#ifdef VAGI_DRAW_DITHER
+			// Reset dither error
+			//v_err = 0;
+			//v_err = ((ix * iy) * 0x77) & 0x1f;
+			//v_err = (int)(rand() & 0x7f) - 64;
+			v_err = (int)(rand() & 0x1f) - 0x0f;
+		#endif
 		
 		for(x = area_x1; x < area_x2; x++) {
 			//if (x >= LCD_WIDTH) break;	// Beyond screen (already checked before loop)
@@ -344,7 +351,13 @@ void draw_buffer_combined(
 		y2 = screen_to_buffer_y(y) + y_ofs;
 		if (y2 >= BUFFER_HEIGHT) break;	// Beyond buffer
 		
-		//v_err = (y * 0x77) & 0x1f;	// Add some noise
+		#ifdef VAGI_DRAW_DITHER
+			// Reset dither error
+			//v_err = 0;
+			//v_err = ((ix * iy) * 0x77) & 0x1f;
+			//v_err = (int)(rand() & 0x7f) - 64;
+			v_err = (int)(rand() & 0x1f) - 0x0f;
+		#endif
 		
 		for(x = area_x1; x < area_x2; x++) {
 			x2 = screen_to_buffer_x(x) + x_ofs;
@@ -418,9 +431,13 @@ void draw_buffer_sprite_priority(
 		
 		syo = (word)sprite_w * screen_to_game_y((word)iy);	// Sprite offset
 		
-		
-		//v_err = ((ssx * y) * 0x77) & 0x1f;	// Add some noise
-		//v_err = rand() & 0x1f;	// Add some noise
+		#ifdef VAGI_DRAW_DITHER
+			// Reset dither error
+			//v_err = 0;
+			//v_err = ((ix * iy) * 0x77) & 0x1f;
+			//v_err = (int)(rand() & 0x7f) - 64;
+			v_err = (int)(rand() & 0x1f) - 0x0f;
+		#endif
 		
 		for(byte ix = 0; ix < ssw; ix++) {
 			x = ssx + ix;

@@ -11,14 +11,25 @@
 #define LCD_PIXEL_INLINE inline // Inline the pixel set func (to potentially gain speed?)
 //#define LCD_PIXEL_INLINE  // Do not inline the pixel set func (to potentially gain speed?)
 
-// Chose one pixel drawing algorithm:
+// Chose one pixel drawing algorithm (and its options):
 //#define VAGI_DRAW_MONO	// Just hard-cut black or white
 //#define VAGI_DRAW_PATTERN	// Diagonal hatch line patterns
-//#define VAGI_DRAW_DITHER	// Error dithering (bad for partial redraws)
-#define VAGI_DRAW_BAYER	// Bayer pattern dithering
-	#define VAGI_DRAW_BAYER_4x4
-	//#define VAGI_DRAW_BAYER_16x16
+//#define VAGI_DRAW_DITHER	// Error dithering (bad for partial redraws, but nice and gimmicky)
+	//#define VAGI_DRAW_DITHER_SHARPEN	// Add emphasis to the dither error (experimental)
+#define VAGI_DRAW_BAYER	// Bayer pattern dithering (nice!)
+	//#define VAGI_DRAW_BAYER_4x4
+	#define VAGI_DRAW_BAYER_16x16	// Slightly better, but requires 0x100 bytes of table
 
+
+#ifdef VAGI_DRAW_DITHER
+extern int v_err;
+int v_err;
+#endif
+void vagi_lcd_init() {
+	#ifdef VAGI_DRAW_DITHER
+	v_err = 0;
+	#endif
+}
 
 #ifdef LCD_PIXEL_USE_MASK
 	// Look-up quickly
@@ -109,9 +120,7 @@
 #endif
 
 
-#ifdef VAGI_DRAW_DITHER
-int v_err;
-#endif
+
 
 void vagi_set_pixel_8bit(byte x, byte y, byte v) {
 	// Draw pixel to VRAM
@@ -127,7 +136,7 @@ void vagi_set_pixel_8bit(byte x, byte y, byte v) {
 		else if (c < 12) c = ((y & 1) ? ((x & 1) ? 1 : 0) : ((x & 1) ? 0 : 1) );
 		else c = 1;
 		*/
-	
+		
 		/*
 		// 5 shades:
 			 if (c <  3) c = 0;	// 0=white (unset)
@@ -190,16 +199,41 @@ void vagi_set_pixel_8bit(byte x, byte y, byte v) {
 	#endif
 	#ifdef VAGI_DRAW_DITHER
 		// Dithering with error
-		v += v_err;
-		if (v < 0x80) {
-			//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
-			lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
-			v_err = (v - 0x00);
-		} else {
-			//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
-			lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
-			v_err = (v - 0xff);
-		}
+		#ifdef VAGI_DRAW_DITHER_SHARPEN
+			int vv = v + v_err * 2;	//VAGI_DRAW_DITHER_SHARPEN;
+			if (vv < 0x80) {
+				//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+				lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
+				v_err = vv - 0;
+			} else {
+				//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+				lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
+				v_err = vv - 255;
+			}
+		#else
+			/*
+			v += v_err;	// OK for no sharpening (stays inside numerical range)
+			if (v < 0x80) {
+				//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+				lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
+				v_err = (v - 0x00);
+			} else {
+				//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+				lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
+				v_err = (v - 0xff);
+			}
+			*/
+			int vv = v + v_err;
+			if (vv < 0x80) {
+				//lcd_set_pixel_1bit(x, y, 1);	// B/W monochrome (1=black)
+				lcd_set_pixel_1bit_on(x, y);	// B/W monochrome (1=black)
+				v_err = vv - 0;
+			} else {
+				//lcd_set_pixel_1bit(x, y, 0);	// B/W monochrome (0=white)
+				lcd_set_pixel_1bit_off(x, y);	// B/W monochrome (0=white)
+				v_err = vv - 255;
+			}
+		#endif
 	#endif
 	
 	#ifdef VAGI_DRAW_BAYER

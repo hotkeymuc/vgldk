@@ -86,7 +86,7 @@ void InitViewSystem() {
 	for(i = 0; i < 14; i++) {
 		memset(&priTable[i*12], (i<3) ? 4 : i+1, 12);
 	}
-	//memset(&priTable[168], 0, 4);
+	memset(&priTable[168], 0, 4);
 	
 	
 	
@@ -735,32 +735,28 @@ void EraseObj(int num) {
 
 void UpdateObjCel(VOBJ *v) {
 	
-	//@TODO: Implement
-	//(void)v;
-	
-	/*
-	U8 *celData;
+	//U8 *celData;
 	int prevHeight, prevWidth;
 	int x1, y1, x2, y2, width1, height1, width2, height2, width, height;
 	
 	if(!PIC_VISIBLE)
 		return;
 	
-	celData = v->pCel;
+	//celData = v->pCel;
 	prevHeight = v->prevHeight;
 	prevWidth = v->prevWidth;
-	v->prevHeight	= celData[1];
-	v->prevWidth	= celData[0];
+	v->prevHeight	= v->height;	//celData[1];
+	v->prevWidth	= v->width;	//celData[0];
 	
 	if(v->y < v->prevY) {
 		y1		= v->prevY;
 		y2		= v->y;
 		height1	= prevHeight;
-		height2	= celData[1];
+		height2	= v->height;	//celData[1];
 	} else {
 		y1		= v->y;
 		y2		= v->prevY;
-		height1	= celData[1];
+		height1	= v->height;	//celData[1];
 		height2	= prevHeight;
 	}
 	
@@ -770,24 +766,43 @@ void UpdateObjCel(VOBJ *v) {
 		x1		= v->prevX;
 		x2		= v->x;
 		width1	= prevWidth;
-		width2	= celData[0];
+		width2	= v->width;	//celData[0];
 	} else {
 		x1		= v->x;
 		x2		= v->prevX;
-		width1	= celData[0];
+		width1	= v->width;	//celData[0];
 		width2	= prevWidth;
 	}
 	
 	width = ((x2+width2) < (x1+width1))? width1 : width2 + x2-x1;
 	
 	
-	if(x1+width > PIC_WIDTH+1)
-		width = PIC_WIDTH-x1+1;
-	if(height-y1 > 0)
-		height = y1+1;
+	if (x1 < 0) x1 = 0;
+	if (y1 < 0) y1 = 0;
 	
-	RenderUpdate(x1, y1-height+1, x1+width+1, y1+1);
-	*/
+	if(x1+width+1 >= PIC_WIDTH)
+		width = PIC_WIDTH-1-x1-1;
+	if(y1-height-1 <= 0)
+		height = y1-1;
+	
+	//RenderUpdate(x1, y1-height+1, x1+width+1, y1+1);
+	
+	// Draw over its PREVIOUS position and size
+	byte sx1 = game_to_screen_x(x1);
+	byte sy1 = game_to_screen_y(y1);
+	byte sw = game_to_screen_x(width);
+	byte sh = game_to_screen_y(height);
+	
+	// Redraw object background
+	draw_buffer(
+		BUFFER_BANK_VIS,
+		
+		sx1-1,       sx1+sw+1,
+		sy1-sh-1, sy1+1,
+		
+		0,0	//, true
+	);
+	
 }
 
 void UpdateObjLoop(VOBJ *v) {
@@ -1006,7 +1021,7 @@ void BlitVObj(VOBJ *v) {
 	ix = 0;
 	iy = 0;
 	
-	buffer_switch(BUFFER_BANK_PRI);
+	buffer_switch(BUFFER_BANK_PRI);	// We need to check priority a lot!
 	
 	while(true) {
 		b = vagi_res_read(view_res_h);
@@ -1016,6 +1031,7 @@ void BlitVObj(VOBJ *v) {
 			iy ++;
 			if (iy >= v->height) break;
 			
+			// Prepare next row of pixels
 			ix = 0;
 			gy ++;
 			gx = v->x + (cell_mirroring ? (v->width - 1) : 0);
@@ -1029,7 +1045,8 @@ void BlitVObj(VOBJ *v) {
 				// Reset dither error
 				//v_err = 0;
 				//v_err = ((ix * iy) * 0x77) & 0x1f;
-				v_err = (int)(rand() & 0x7f) - 64;
+				//v_err = (int)(rand() & 0x7f) - 64;
+				v_err = (int)(rand() & 0x1f) - 0x0f;
 			#endif
 			continue;
 		}
@@ -1037,26 +1054,36 @@ void BlitVObj(VOBJ *v) {
 		count = b & 0x0f;
 		
 		if (col == cell_transparency) {
-			// Skip transparent pixels
+			// Skip transparent pixels in cel
 			ix += count;
 			if (cell_mirroring) gx -= count; else gx += count;
+			
 		} else {
 			cv = AGI_PALETTE_TO_LUMA[col];
 			// RLE
 			for(i = 0; i < count; i ++) {
 				
-				// Scale and check priority!
+				// Scale and check priority...
 				sx = game_to_screen_x((word)gx);
 				bx = screen_to_buffer_x((word)sx);
 				if (bx < BUFFER_WIDTH) {
-					c_prio = buffer_get_pixel_4bit(bx, by);
-					if (c_prio < v->priority) {
+					
+					// Get priority value at current position
+					// If we detect a control priority (< 3): scan down until we hit a "normal" priority!
+					byte bby = by;
+					do {
+						c_prio = buffer_get_pixel_4bit(bx, bby);
+						if (c_prio >= 3) break;	// Normal one found
+						bby++;	// Go down
+					} while (bby < BUFFER_HEIGHT);
+					
+					if (c_prio <= v->priority) {
 						
-						VIEW_INVISIBLE = false;	// A pixel was drawn!
+						VIEW_INVISIBLE = false;	// A pixel was drawn, so the view is visible in some form!
 						
 						//lcd_set_pixel_4bit(sx, sy, cv);
 						#if VAGI_SCREEN_W > 160
-							// Fill gaps
+							// If screenresolution is horizontally scaled: Fill gaps by doubling up!
 							for(byte xx = sx; xx < sx+2; xx++) {
 								vagi_set_pixel_8bit(xx, sy, cv);
 							}
@@ -1154,15 +1181,20 @@ void DrawBlitLists() {
 	//draw_buffer(BUFFER_BANK_VIS, v->x,v->x+v->width, v->y, v->y+v->height, 0,0,true);
 	VOBJ *v;
 	byte i;
+	// Unblit all
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		if (v->flags & (oDRAWN|oUPDATE) == (oDRAWN|oUPDATE)) {
 		//if (v->flags & (oDRAWN) == (oDRAWN)) {
 			//if (!(v->flags & oSKIPUPDATE))
-			UnBlitVObj(v);
+			//UnBlitVObj(v);
+			
+			UpdateObjCel(v);	// Only redraw the pixels that were crossed during movement
+			
 		//	BlitVObj(v);
 		}
 	}
+	// Re-blit all
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		//if (v->flags & (oDRAWN|oUPDATE) == (oDRAWN|oUPDATE)) {
@@ -1456,7 +1488,7 @@ void ShowObj(int num) {
 	// draw it
 	//SaveBlit(b = NewBlit(&objView));
 	BlitVObj(&objView);
-	UpdateObjCel(&objView);
+	//UpdateObjCel(&objView);
 	
 	//@TODO: Display description
 	/*
