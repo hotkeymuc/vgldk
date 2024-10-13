@@ -41,6 +41,7 @@ const word lcd_addr = LCD_ADDR;
 #define LCD_SCANLINE_SIZE (LCD_W / 8)
 
 // Select a font
+//#define LCD_FONT_6x5	// Allows 40x20 text mode
 //#define LCD_FONT_4x6	// Allows 60x16 text mode
 //#define LCD_FONT_4x7	// Allows 60x14 text mode
 //#define LCD_FONT_5x8	// Allows 48x12 text mode
@@ -49,6 +50,7 @@ const word lcd_addr = LCD_ADDR;
 
 //#define FONT_FULL_ASCII	// Include all 256 instead of only 128 chars
 
+#ifndef LCD_FONT_6x5
 #ifndef LCD_FONT_4x6
 #ifndef LCD_FONT_4x7
 #ifndef LCD_FONT_5x8
@@ -61,9 +63,18 @@ const word lcd_addr = LCD_ADDR;
 #endif
 #endif
 #endif
+#endif
 
 
 // Font
+#ifdef LCD_FONT_6x5
+	#include "font-6x5.c"
+	#define font_bitmap      console_font_6x5_font_bitmap
+	#define font_char_width  console_font_6x5_char_width
+	#define font_char_height console_font_6x5_char_height
+	#define font_first_char  console_font_6x5_first_char
+	#define font_last_char   console_font_6x5_last_char
+#endif
 #ifdef LCD_FONT_4x6
 	#include "font-4x6.c"
 	#define font_bitmap      console_font_4x6_font_bitmap
@@ -317,6 +328,12 @@ void lcd_draw_glypth_at(byte x, byte y, byte code) {
 	if (x >= LCD_W) return;
 	if (y+font_char_height >= LCD_H) return;
 	
+	// Map char code to glyph
+	if ((code < font_first_char) || (code > font_last_char))
+		code = 0;	// Use 0 as "unknown"
+	else
+		code -= font_first_char;
+	
 	//byte screen_cx = (x >> 3);	// Byte x offset on screen
 	byte screen_bx = (x & 0x07);	// Bit x offset on screen
 	byte clear_mask = ~(0xff >> screen_bx);	// Inverse bit x offset on screen
@@ -337,7 +354,7 @@ void lcd_draw_glypth_at(byte x, byte y, byte code) {
 			*(p+1) |= d << shift_next;
 		}
 		*/
-		// Set
+		// Clear background and set
 		*p = (*p & clear_mask) | ( d >> screen_bx );
 		if (over > 0) {
 			*(p+1) = (*(p+1) & clear_mask_next) | (d << shift_next);
