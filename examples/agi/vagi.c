@@ -25,7 +25,7 @@
 //#define VAGI_SHOW_EGO_INFO	// Show info about ego ViewObjs[0]
 
 //#define AGI_LOGIC_DEBUG	// Debug control flow
-//#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
+#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
 //#define AGI_COMMANDS_INCLUDE_NAMES	// Include command names for debugging, requires ~0x800+ bytes of space!
 
 //#define AGI_LOGIC_DEBUG_IFS	// Even verboser logic debug: Show "IF v[x] > y" etc.
@@ -33,7 +33,7 @@
 //#define PACKED_DIRS 1	// Game contains "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 //#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 #define VAGI_RES_IGNORE_COMPRESSED	// Do not show "unsupported" messages on compressed resources
-#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry
+//#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry (what it should NEVER)
 
 #define VGLDK_NO_SOUND	// We do not support it, so don't waste space
 
@@ -361,11 +361,28 @@ void vagi_handle_input() {
 		} else {
 			
 			// Handle Input/GUI
+			if (key == 't') {
+				// Enable trace_ops (requires AGI_LOGIC_DEBUG_OPS)
+				trace_ops = 1 - trace_ops;
+				printf("TRACE:"); if (trace_ops) printf("ON!"); else printf("off");
+			} else
+			if (key == 'a') {
+				ViewObjs[0].x --;
+			} else
+			if (key == 'd') {
+				ViewObjs[0].x ++;
+			} else
+			if (key == 'w') {
+				ViewObjs[0].y --;
+			} else
+			if (key == 's') {
+				ViewObjs[0].y ++;
+			} else
 			if (key == 'r') {
-				// Re-set ego
-				ViewObjs[0].x = 30;
-				ViewObjs[0].y = 80;
+				// Re-set ego state
 				ViewObjs[0].priority = 14;
+				ViewObjs[0].flags |= (oDRAWN|oUPDATE);
+				ViewObjs[0].motion = 0;
 			} else
 			if (key == 'p') {
 				// Show priority

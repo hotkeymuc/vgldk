@@ -10,6 +10,11 @@ Implementation of fs.h using the "Parallel Buddy" Arduino connected to the VGL p
 
 ----> WORK IN PROGRESS!
 
+@TODO:
+	* 2024-10-13: Make it compatible with "Tandy Portable Disk Drive"?
+		see: http://tandy.wiki/TPDD
+
+
 2020-08-02 Bernhard "HotKey" Slawik (vgldk.git)
 
 */

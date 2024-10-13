@@ -250,7 +250,11 @@ word ExecuteLogic(LOGIC *log) {
 		#ifdef AGI_LOGIC_DEBUG_OPS
 		if (trace_ops) {
 			// Show logic num
-			printf_x2(log->num); putchar(':');
+			lcd_text_col = 0; lcd_text_row = 0;
+			printf("TRACE: LOG#");
+			printf_d(log->num);
+			
+			putchar('@');
 			
 			// Show Instruction pointer
 			word cp = vagi_res_tell(log->res_h);

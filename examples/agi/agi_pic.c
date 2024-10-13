@@ -463,6 +463,7 @@ typedef struct {
 	}
 	#define draw_FillCheck(x,y) ((*p_draw_FillCheck)(x, y))
 #else
+	
 	// Working but slow (because it checks things that don't change throughout the fill!)
 	bool inline draw_FillCheck(int16 x, int16 y) {
 		// Return TRUE if the current pixel should be flood-filled
