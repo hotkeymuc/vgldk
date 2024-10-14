@@ -1517,7 +1517,9 @@ void cGetString() {
 	//printf("GetString: ["); printf(GetMessage(curLog,code_1)); printf("]: ");
 	//MessageBoxXY(GetMessage(curLog,code_1), code_3, code_2, 80);
 	DrawAGIString(GetMessage(curLog,code_1), code_3, code_2);
-	putchar(cursorChar);	// Use the defined char (there's a AGI command to set that!)
+	
+	//putchar(cursorChar);	// Use the defined char (there's a AGI command to set that)
+	putchar('>');
 	gets(strings[code_0]);
 }
 

@@ -346,25 +346,18 @@ BOOL CheckObjCollision(VOBJ *v1) {
 
 BOOL CheckObjControls(VOBJ *v) {
 	
-	buffer_switch(BUFFER_BANK_PRI);	// Map destination working buffer to 0xc000
 	int sx = game_to_screen_x(v->x);
-	int px = screen_to_buffer_x(sx);
-	/*
-	#ifdef BUFFER_PROCESS_HCROP
-		// 1:1 with crop/transform
-		int py = v->y;
-	#endif
-	#ifdef BUFFER_PROCESS_HCRUSH
-		// Scale (crush) 168 down to 100
-		int py = (v->y * 3) / 5;
-	#endif
-	*/
 	int sy = game_to_screen_y(v->y);
-	int py = screen_to_buffer_y(sy);
+	int bx = screen_to_buffer_x(sx);
+	int by = screen_to_buffer_y(sy);
 	
+	if (bx < 0) bx = 0;
+	if (bx >= BUFFER_WIDTH) bx = BUFFER_WIDTH-1;
+	if (by < 0) by = 0;
+	if (by >= BUFFER_HEIGHT) by = BUFFER_HEIGHT-1;
 	
 	int flags = FLAG_CONTROL;
-	int x = v->width;	//v->pCel[0];
+	int x = screen_to_buffer_x(game_to_screen_x(v->width));	//v->pCel[0];
 	int pri;
 	
 	
@@ -372,9 +365,16 @@ BOOL CheckObjControls(VOBJ *v) {
 		v->priority = priTable[v->y];
 	
 	if (v->priority != 15) {
+		buffer_switch(BUFFER_BANK_PRI);	// Map destination working buffer to 0xc000
+		
 		flags |= FLAG_WATER;
 		do {
-			pri = buffer_get_pixel_4bit(px++, py);
+			pri = buffer_get_pixel_4bit(bx++, by);
+			if (bx >= BUFFER_WIDTH) {
+				//@TODO: flags &= ~FLAG_CONTROL; ?
+				break;
+			}
+			
 			if (pri == 0) {
 				flags &= ~FLAG_CONTROL;
 				break;
@@ -436,8 +436,6 @@ void SolidifyObjPosition(VOBJ *v) {
 	
 	if( CheckObjInScreen(v)	&& (!CheckObjCollision(v)) && CheckObjControls(v) )
 		return;
-	
-	//@FIXME: This hangs?
 	
 	while( (!CheckObjInScreen(v)) || CheckObjCollision(v) || (!CheckObjControls(v)) ) {
 		switch(checkDir) {
@@ -1073,7 +1071,7 @@ void BlitVObj(VOBJ *v) {
 					byte bby = by;
 					do {
 						c_prio = buffer_get_pixel_4bit(bx, bby);
-						if (c_prio >= 3) break;	// Normal one found
+						if (c_prio >= 3) break;	// Normal priority found (GBAGI searches further down if "priority < 3")
 						bby++;	// Go down
 					} while (bby < BUFFER_HEIGHT);
 					
@@ -1083,7 +1081,7 @@ void BlitVObj(VOBJ *v) {
 						
 						//lcd_set_pixel_4bit(sx, sy, cv);
 						#if VAGI_SCREEN_W > 160
-							// If screenresolution is horizontally scaled: Fill gaps by doubling up!
+							// If screen resolution is horizontally scaled: Fill gaps by doubling up!
 							for(byte xx = sx; xx < sx+2; xx++) {
 								vagi_set_pixel_8bit(xx, sy, cv);
 							}
@@ -1181,15 +1179,21 @@ void DrawBlitLists() {
 	//draw_buffer(BUFFER_BANK_VIS, v->x,v->x+v->width, v->y, v->y+v->height, 0,0,true);
 	VOBJ *v;
 	byte i;
+	
 	// Unblit all
 	for(i = 0; i < MAX_VOBJ; i++) {
 		v = &ViewObjs[i];
 		if (v->flags & (oDRAWN|oUPDATE) == (oDRAWN|oUPDATE)) {
 		//if (v->flags & (oDRAWN) == (oDRAWN)) {
 			//if (!(v->flags & oSKIPUPDATE))
-			//UnBlitVObj(v);
 			
-			UpdateObjCel(v);	// Only redraw the pixels that were crossed during movement
+			// Trying to be smart:
+			if ((v->flags & oMOTIONLESS) || ((v->x == v->prevX) && (v->y == v->prevY) && (v->width == v->prevWidth) && (v->height == v->prevHeight))) {
+				// Not moved: Skip it
+			} else {
+				//UnBlitVObj(v);	// Draw over with background
+				UpdateObjCel(v);	// Only redraw the pixels that were crossed during movement
+			}
 			
 		//	BlitVObj(v);
 		}
@@ -1462,8 +1466,11 @@ int CalcPriY(int pri) {
 
 // displays the view and it's description
 void ShowObj(int num) {
+	char obj_message_buf[255];
 	
-	//char *s;
+	char c;
+	char *p = &obj_message_buf[0];	// Destination pointer
+	
 	//BLIT *b;
 	static VOBJ objView; // static because of GCC bug
 	
@@ -1490,19 +1497,33 @@ void ShowObj(int num) {
 	BlitVObj(&objView);
 	//UpdateObjCel(&objView);
 	
-	//@TODO: Display description
-	/*
 	// display the description
+	/*
 	s = (char*)viewDir[num]+5;
 	vagi_res_seek_to( objView.descPos )..
 	MessageBox(s + bGetW(s+3));
 	*/
-	MessageBox("TBI");
+	// Seek to view...
+	view_res_h = vagi_res_open(AGI_RES_KIND_VIEW, num);
+	if (view_res_h >= 0) {
+		vagi_res_seek_to(view_res_h, objView.descPos);
+		p = &obj_message_buf[0];	// Destination pointer
+		while (c = vagi_res_read(view_res_h)) {
+			*p++ = c;
+		}
+		*p = 0;
+		vagi_res_close(view_res_h);
+		
+		// Display!
+		MessageBox(&obj_message_buf[0]);
+	}
+	//if (TestFlag(fPRINTMODE))
 	getchar();
 	
-	// clean up
+	// Clean up
 	//RestoreBlit(b);
-	UpdateObjCel(&objView);
+	//UpdateObjCel(&objView);
+	UnBlitVObj(&objView);
 	
 }
 

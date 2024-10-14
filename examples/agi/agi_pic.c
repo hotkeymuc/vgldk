@@ -8,7 +8,7 @@ based on scummvm's agi implementation 2024-09-14
 2024-09-16 Bernhard "HotKey" Slawik
 */
 
-//#define AGI_PIC_FILL_CASES	// Optimize fill by pre-selecting a "draw_FillCheck_case" function to use throughout the fill
+#define AGI_PIC_FILL_CASES	// Optimize fills by pre-selecting a "draw_FillCheck_case" function to use throughout the fill
 //#define AGI_PIC_NIBBLE_MODE	// nibbleMode=false for SQ2, it uses separate bytes for color value of 0xf0 / 0xf2
 
 #include "agi_pic.h"
@@ -447,18 +447,28 @@ typedef struct {
 	typedef bool (draw_FillCheck_t)(int16, int16);
 	
 	bool draw_FillCheck_case1(int16 x, int16 y) {
-		if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		//if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		
 		//if (!_priOn && _scrOn && _scrColor != 15)
 		return (frame_get_pixel_4bit(x, y) == 15);
 	}
 	bool draw_FillCheck_case2(int16 x, int16 y) {
-		if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		//if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		
 		//if (_priOn && !_scrOn && _priColor != 4)
 		return (frame_get_pixel_4bit(x, y) == 4);
 	}
-	bool draw_FillCheck_case3(int16 x, int16 y) {
-		if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
-		//return (_scrOn && frame_get_pixel_4bit(x, y) == 15 && _scrColor != 15);
+	bool draw_FillCheck_case3a(int16 x, int16 y) {
+		//if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		
+		// htk addition:
+		//if (vagi_drawing_step == VAGI_STEP_PRI) return (c != _priColor);
+		return (frame_get_pixel_4bit(x, y) == 4);
+	}
+	bool draw_FillCheck_case3b(int16 x, int16 y) {
+		//if (x < 0 || x >= _width || y < 0 || y >= _height) return false;
+		
+		//return (_scrOn && _scrColor != 15 && frame_get_pixel_4bit(x, y) == 15);
 		return (frame_get_pixel_4bit(x, y) == 15);
 	}
 	#define draw_FillCheck(x,y) ((*p_draw_FillCheck)(x, y))
@@ -519,7 +529,7 @@ typedef struct {
 			//return (c != _priColor);
 			return (c == 4);
 		
-		return (_scrOn && c == 15 && _scrColor != 15);
+		return (_scrOn && _scrColor != 15 && c == 15);
 	}
 #endif
 
@@ -542,15 +552,18 @@ bool inline _draw_Fill(int16 x, int16 y) {
 	
 	#ifdef AGI_PIC_FILL_CASES
 	// Pre-select the appropriate checking function (we can decide these things IN ADVANCE before entering the flood fill)
+	// Only do the buffer look-up at runtime
 	draw_FillCheck_t *p_draw_FillCheck;
 	if (!_priOn && _scrOn && _scrColor != 15)
 		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case1;
 	else if (_priOn && !_scrOn && _priColor != 4)
 		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case2;
+	else if (vagi_drawing_step == VAGI_STEP_PRI)
+		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case3a;
 	else {
 		if (!_scrOn) return false;
 		if (_scrColor == 15) return false;
-		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case3;
+		p_draw_FillCheck = (draw_FillCheck_t *)&draw_FillCheck_case3b;
 	}
 	#endif
 	

@@ -217,7 +217,7 @@ void process_frame_to_buffer(byte dest_bank, byte x_src, byte y_src) {
 				
 				// Get pixel from frame
 				c = frame_get_pixel_4bit(x2, y2-1);
-				if ((c == 0) || (c == PRI_CONTROL) || (c == PRI_SIGNAL)) {
+				if (c < 3) {	//(c == 0) || (c == PRI_CONTROL) || (c == PRI_SIGNAL)) {
 					// Write to final working buffer
 					buffer_switch(dest_bank);	// Map destination working buffer to 0xc000
 					buffer_set_pixel_4bit(x, y, c);

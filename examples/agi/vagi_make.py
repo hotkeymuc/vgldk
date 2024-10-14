@@ -31,8 +31,8 @@ else:
 	sys.exit(1)
 
 
-GAMES_PATH = '/z/apps/_games/_SCUMM'
 GAME_PACKED_DIRS = 0
+GAMES_PATH = '/z/apps/_games/_SCUMM'
 
 # Chose a game:
 #GAME_ID = 'SQ1'
@@ -42,11 +42,40 @@ GAME_ID = 'SQ2'	# my fav! (AGIv2)
 #GAME_ID = 'KQ3'; GAME_PACKED_DIRS = 1	# Script error and memory corruption in 1st interactive screen
 #GAME_ID = 'LSL1'; GAME_PACKED_DIRS = 1
 #GAME_ID = 'CAULDRON'; GAME_PACKED_DIRS = 1
+#GAME_ID = 'PQ1'	#; GAME_PACKED_DIRS = 1	# Loops at start screen
+#GAME_ID = 'DonaldDucksPlayground'
 ### Not working:
+#GAME_ID = 'Dave'; # SIG err
 #GAME_ID = 'Enclosure'	# SIG err
 #GAME_ID = 'SpaceQuest0__rep_104'	# SIG error at start screen
-#GAME_ID = 'SpaceQuest_NewAdventuresOfRogerWilco'
 #GAME_ID = 'SpaceQuestX_TheLostChapter'; GAME_PACKED_DIRS = 1	# SIG err
+#GAME_ID = 'SpaceQuest_NewAdventuresOfRogerWilco'
+#GAME_ID = 'Manhunter - New York'
+#GAME_ID = 'Manhunter2 - San Francisco'
+
+### Fan made
+#GAMES_PATH = '/z/apps/_games/_SCUMM/_FANMADE'
+#GAME_ID = 'Disciple'
+#GAME_ID = 'Enclosure'
+#GAME_ID = 'FuckQuest1'
+#GAME_ID = 'FuckQuest2'
+#GAME_ID = 'HanksQuest'
+#GAME_ID = 'KQ2q'
+#GAME_ID = 'Naturette1'
+#GAME_ID = 'Sergeis-Destiny'
+#GAME_ID = 'Sergeis-acidopol'
+#GAME_ID = 'agi-piano'
+#GAME_ID = 'corpsedemo_11'
+#GAME_ID = 'goodman'
+#GAME_ID = 'jjuu'
+#GAME_ID = 'jquest'
+#GAME_ID = 'lplanet'
+#GAME_ID = 'pirate_demo2'
+#GAME_ID = 'rette13e'
+#GAME_ID = 'ruby02'
+#GAME_ID = 'spacetrek'
+#GAME_ID = 'vgsrc'
+
 
 GAME_PATH = f'{GAMES_PATH}/{GAME_ID}'	# Where to find the game
 GAME_CART_FILENAME = f'out/DATA_{GAME_ID}.bin'	# Where to put the bundled game ROM

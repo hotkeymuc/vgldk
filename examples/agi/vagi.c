@@ -18,8 +18,11 @@
 		* GBAGI: https://github.com/Davidebyzero/GBAGI.git
 	
 	@TODO:
+		* Sort views by priority before "Blitting" (see agi_view.c:UpdateVObj() ff.)
 		* Inventory objects
+		* bug: Not triggering signals (KQ1 when entering the castle in PIC 2; SQ2 when exiting the pod at the ship bay in PIC4?)
 		* Handling/mapping of function keys (e.g. F10 / F6)
+		* Show game title and score
 		* Nicer MessageBox and bigger font
 		* Re-locate VIEW code to other code segment as well (together with PIC code), to make room in main segment.
 		+ Sound (1-channel via TI TTS chip, anaylze VTech GL6000SL intro)
@@ -41,11 +44,15 @@
 //#define PACKED_DIRS 1	// Game contains "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 //#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 #define VAGI_RES_IGNORE_COMPRESSED	// Do not show "unsupported" messages on compressed resources
-//#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry (what it should NEVER)
+//#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry (what it NEVER should, but does...)
 
 //#define VAGI_TRACE_STAGES	// Allow on-screen tracing of engine stages
 
+// VGLDK settings:
 #define VGLDK_NO_SOUND	// We do not support it, so don't waste space
+//#define LCD_FONT_4x6	// Default: Allows 60x16 text mode
+//#define LCD_FONT_6x8	// Allows 40x12 text mode
+#define LCD_FONT_6x5	// Allows 40x20 text mode
 
 #ifdef VAGI_MINIMAL
 	#include <vgldk.h>
@@ -168,7 +175,7 @@ byte rand() {
 #include "vagi_buffer.h"	// This handles the (smaller) working buffer(s) needed at run-time (derived from frame)
 #include "vagi_res.h"	// This allows reading from AGI resources as if they were files
 
-
+/*
 // Test sprite
 #define sprite_width 8
 #define sprite_height 14
@@ -189,7 +196,7 @@ static const byte sprite_data[sprite_width*sprite_height] = {
 	  3,   3, 0xf, 0x0, 0x0, 0xf,   3,   3, 
 	  3,   3,   3, 0xf, 0xf,   3,   3,   3, 
 };
-
+*/
 
 
 // The AGI specific fun starts here:
@@ -386,6 +393,9 @@ void vagi_init() {
 	SOUND_ON	= TRUE;
 	//SetFlag(fSOUND);
 	ResetFlag(fSOUND);
+	
+	// Test!
+	
 	
 }
 
