@@ -430,11 +430,12 @@ void vagi_init() {
 }
 
 void vagi_handle_input() {
-	// GBAGI: DoDelayNPoll() / PollInput()
 	byte key;
 	int i;
 	
+	// GBAGI: DoDelayNPoll() / PollInput()
 	//while((BOOL)(event = ReadEvent()) && (!TestFlag(fPLAYERCOMMAND))) {
+	
 	while (!TestFlag(fPLAYERCOMMAND)) {
 		key = keyboard_inkey();
 		
@@ -442,13 +443,6 @@ void vagi_handle_input() {
 		
 		// Handle directions
 		int d = -1;
-		//@FIXME: Something got effed up with the keyboard scan codes!
-		//if (key == 0xbb) d = dirLEFT;
-		//if (key == 0xba) d = dirRIGHT;
-		//if (key == 0xb8) d = dirUP;
-		//if (key == 0xb9) d = dirDOWN;
-		
-		// It is supposed to be THIS:
 		if (key == KEY_LEFT) d = dirLEFT;
 		if (key == KEY_RIGHT) d = dirRIGHT;
 		if (key == KEY_UP) d = dirUP;
@@ -503,7 +497,6 @@ void vagi_handle_input() {
 			if (
 				//(INPUT_ENABLED) && (	// Input is usually only available if INPUT_ENABLED is set
 				(key == ' ')
-				//|| (key == 0xc0)	//@FIXME: Something got effed up with the keyboard scan codes!
 				//)
 			){
 				//lcd_text_col = 0; lcd_text_row = inputPos; printf(">");
@@ -641,12 +634,11 @@ bool vagi_loop() {
 	ResetFlag(fRESTART);
 	ResetFlag(fRESTORE);
 	
-	/*
+	
 	if(!TEXT_MODE) {
-		UpdateGfx();	// screenc: Calls UpdateVObj
+		//UpdateGfx();	// screenc: Calls UpdateVObj()
+		UpdateVObj();
 	}
-	*/
-	UpdateVObj();
 	
 	vagi_trace_stage("UpdateVObj: done");
 	
@@ -671,9 +663,18 @@ void main() __naked {
 	byte running = 1;
 	//byte i;
 	
-	//printf("VAGI\n");
+	printf("VAGI\n\n");
+	printf("Based on:\n");
+	printf("* ScummVM's AGI\n");
+	printf("  https://github.com/scummvm\n");
+	printf("* Brian Provinciano's GBAGI\n");
+	printf("  http://www.bripro.com\n");
+	printf("* davidebyzero's fork of GBAGI\n");
+	printf("  https://github.com/Davidebyzero/GBAGI.git\n");
+	
 	vagi_init();
 	
+	// Run tests
 	//test_draw_combined();	// Test drawing combined vis & prio
 	//test_draw_agi_scroll();	// Test partial redraw
 	//test_draw_agi_combined(VAGI_START_PIC_NUM, true);	// Test rendering actual AGI PIC data
