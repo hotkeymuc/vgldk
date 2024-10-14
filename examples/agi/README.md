@@ -5,6 +5,6 @@ This is a back-port of Sierra Online's Adventure Game Interpreter (AGI) to the V
 
 It is heavily based on:
 * ScummVM
-* [GBAGI](https://github.com/Davidebyzero/GBAGI.git)
+* Brian Provinciano's [GBAGI (davidebyzero's fork)](https://github.com/Davidebyzero/GBAGI.git)
 
 2024-09-18 Bernhard "HotKey" Slawik
