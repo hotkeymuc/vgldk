@@ -1,7 +1,17 @@
 /***************************************************************************
- *  GBAGI: The Game Boy Advance Adventure Game Interpreter
- *  Copyright (C) 2003,2004 Brian Provinciano, http://www.bripro.com
- *
+
+VAGI - VTech AGI
+===========
+2024-09-14 Bernhard "HotKey" Slawik
+
+The VAGI code is heavily based on:
+	* ScummVM's AGI: https://github.com/scummvm/scummvm/tree/master/engines/agi
+	* Brian Provinciano's GBAGI
+		Copyright (C) 2003,2004 Brian Provinciano, http://www.bripro.com
+	* davidebyzero's fork of GBAGI
+		https://github.com/Davidebyzero/GBAGI.git
+
+ **************************************************************************
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
@@ -15,7 +25,8 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software Foundation,
  *  Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
- ***************************************************************************/
+ ***************************************************************************
+ */
 
 
 //#include "gbagi.h"
