@@ -115,7 +115,7 @@ def put(t):
 #def hexdump(data, addr=0):
 #	put(monitor.hexdump(data, addr=addr))
 
-def game_make(game_path, cart_filename):
+def game_make(game_id, game_path, cart_filename):
 	# Pack one AGI game into a ROM file
 	filespecs = [
 		f'{game_path}/LOGDIR',
@@ -128,6 +128,7 @@ def game_make(game_path, cart_filename):
 	
 	put('Generating game ROM "%s" from file specs: %s...' % (cart_filename, filespecs))
 	romfs_gen.generate_rom(
+		name = game_id,
 		filename_src = None,	# Use empty buffer
 		filename_dst = cart_filename,
 		
@@ -145,6 +146,7 @@ def game_make(game_path, cart_filename):
 		pad = 0xff,
 		verbose = False,
 		fix_crossing = False,	#True
+		create_index = True
 	)
 	
 
@@ -367,7 +369,7 @@ if __name__ == '__main__':
 	#@TODO: Add argparse command line arguments!
 	
 	# Compile the game data ROM
-	game_make(game_path=GAME_PATH, cart_filename=GAME_CART_FILENAME)
+	game_make(game_id=GAME_ID, game_path=GAME_PATH, cart_filename=GAME_CART_FILENAME)
 	
 	# Gather some meta information
 	defines = {
