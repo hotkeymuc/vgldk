@@ -13,7 +13,7 @@ import sys
 import os
 import glob	# for wildcard file specs
 from optparse import OptionParser
-
+import struct	# for generating index
 
 def put(t):
 	print(str(t))
@@ -21,8 +21,12 @@ def put(t):
 #ID_PREFIX = 'RFS_'
 ID_PREFIX = 'R_'
 
+INDEX_FILENAME = '.'	# "Filename" of index data
+INDEX_FILENAME_LENGTH = 12	# 8+1+3
+ROMFS_HEADER_ID = b'ROMFS000'
+
 class ROMFS_File:
-	def __init__(self, filename, data=b'', id=None, org_filename=None, align_size=1):
+	def __init__(self, filename, data=b'', id=None, org_filename=None, align_size=1, include_in_index=True):
 		self.filename = filename
 		self.data = data
 		self.id = ID_PREFIX + self.filename.replace('.', '_').upper()
@@ -30,6 +34,8 @@ class ROMFS_File:
 		self.org_filename = org_filename if org_filename is not None else self.filename
 		
 		self.align_size = align_size
+		
+		self.include_in_index = include_in_index	# The index itself shouldn't
 		
 		self.data_offset = 0	# Absolute data offset (always starts at 0), unaligned
 		self.aligned_offset = 0	# Absolute data offset (alsways starts at 0), aligned
@@ -39,7 +45,8 @@ class ROMFS_File:
 		self.mem_bank = 0	# The bank where the data starts
 
 class ROMFS:
-	def __init__(self, file_offset=0, chip_offset=0, mem_offset=0, mem_bank_start=0, mem_bank_size=0x1000):
+	def __init__(self, name='', file_offset=0, chip_offset=0, mem_offset=0, mem_bank_start=0, mem_bank_size=0x1000):
+		self.name = name
 		self.files = []
 		self.data_offset = 0	# Absolute data offset (always starts at 0), unaligned
 		self.aligned_offset = 0	# Absolute data offset (alsways starts at 0), aligned
@@ -225,8 +232,44 @@ class ROMFS:
 		
 		r += '#endif\n'
 		return r
+	
+	def create_index_data(self):
+		r = b''
+		
+		# Header
+		r += ROMFS_HEADER_ID
+		
+		# Filename length
+		r += struct.pack('>B', INDEX_FILENAME_LENGTH)
+		
+		# ROM name
+		r += bytes(self.name, 'ascii') + (b'\0' * (INDEX_FILENAME_LENGTH - len(self.name)))
+		
+		indexed_count = 0
+		for f in self.files:
+			if not f.include_in_index: continue
+			indexed_count += 1
+		
+		# Number of entries
+		r += struct.pack('>H', indexed_count)
+		
+		for f in self.files:
+			if not f.include_in_index: continue
+			
+			# Filename
+			r += bytes(f.filename, 'ascii') + (b'\0' * (INDEX_FILENAME_LENGTH - len(f.filename)))
+			
+			# Data (bank, ofs, bank_size, +size)
+			r += struct.pack('>B', f.mem_bank)
+			r += struct.pack('>H', (f.aligned_offset % self.mem_bank_size))
+			r += struct.pack('>B', (f.size // self.mem_bank_size))
+			r += struct.pack('>H', (f.size % self.mem_bank_size))
+			
+		
+		return r
 
 def generate_rom(
+		name,
 		filename_src,
 		filename_dst,
 		filename_h,
@@ -240,10 +283,11 @@ def generate_rom(
 		pad = 0xff,
 		verbose = False,
 		fix_crossing = False,
+		create_index = True,
 	):
 	
 	# Create an ROMFS instance to hold the infos
-	romfs = ROMFS(file_offset=file_offset, chip_offset=chip_offset, mem_offset=mem_offset, mem_bank_size=mem_bank_size, mem_bank_start=mem_bank_start)
+	romfs = ROMFS(name=name, file_offset=file_offset, chip_offset=chip_offset, mem_offset=mem_offset, mem_bank_size=mem_bank_size, mem_bank_start=mem_bank_start)
 	
 	# Process file specs
 	if verbose: put('Gathering...')
@@ -266,6 +310,15 @@ def generate_rom(
 	if len(romfs.files) == 0:
 		put('No files matched the given spec(s).')
 		sys.exit(1)
+	
+	if create_index:
+		put('Creating (dummy) index...')
+		index_filename = INDEX_FILENAME
+		index_data = romfs.create_index_data()
+		
+		# Add it as the first file
+		f = ROMFS_File(filename=index_filename, data=index_data, org_filename=index_filename, align_size=align_size, include_in_index=False)
+		romfs.files.insert(0, f)
 	
 	
 	# Lay out!
@@ -320,6 +373,15 @@ def generate_rom(
 			if verbose: put(f'		* Appending data at offset 0x{f.file_offset:06X} ({f.size:,} bytes)...')
 			data += f.data
 	
+	# Post-process index
+	if create_index:
+		put('Updating index...')
+		index_data2 = romfs.create_index_data()
+		if len(index_data2) != len(index_data):
+			put(f'!!! Index changed size!')
+			sys.exit(11)
+		data = index_data2 + data[len(index_data):]
+	
 	put(f'Writing output file "{filename_dst}": {len(data):,} bytes / {len(data)/1024:6.1f} KB...')
 	with open(filename_dst, 'wb') as h:
 		h.write(data)
@@ -331,6 +393,8 @@ if __name__ == '__main__':
 		usage='Usage: %prog [options] file_spec...'
 	)
 	
+	name = 'UNNAMED'
+	create_index = True
 	align_size = 1	#0x100	#0x1000	# 0x2000	# 0x4000
 	file_offset = 0x4000
 	chip_offset = file_offset
@@ -341,6 +405,8 @@ if __name__ == '__main__':
 	fix_crossing = False
 	verbose = False
 	
+	parser.add_option('-n', '--name', dest='name', default=name, action='store', type='str', help=f'ROM name ("{name}")')
+	parser.add_option('-i', '--create-index', dest='create_index', default=create_index, action='store_true', help='Add index section at start')
 	parser.add_option('-f', '--file-offset', dest='file_offset', default=file_offset, action='store', type='int', help=f'Offset in final file (default: 0x{file_offset:04X})')
 	parser.add_option('-c', '--chip-offset', dest='chip_offset', default=chip_offset, action='store', type='int', help=f'Offset in ROM chip (default: 0x{chip_offset:04X})')
 	parser.add_option('-m', '--mem-offset', dest='mem_offset', default=mem_offset, action='store', type='int', help=f'Offset in memory (default: 0x{mem_offset:04X})')
@@ -372,6 +438,7 @@ if __name__ == '__main__':
 		sys.exit(1)
 	
 	generate_rom(
+		name = opt.name,
 		filename_src = opt.filename_src,
 		filename_dst = opt.filename_dst,
 		filename_h = opt.filename_h,
@@ -384,7 +451,8 @@ if __name__ == '__main__':
 		align_size = max(1, opt.align_size),	#0x2000
 		pad = opt.pad,
 		verbose = opt.verbose,
-		fix_crossing = opt.fix_crossing
+		fix_crossing = opt.fix_crossing,
+		create_index = opt.create_index
 	)
 	
 	
