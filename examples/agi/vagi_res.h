@@ -13,7 +13,7 @@ It re-directs accesses to ROM FS, which stores the raw files.
 //#define ROMFS_DEBUG	// Verbose ROM access output to stdout
 //#define R_MEM_OFFSET 0x4000	// Where to find the banked memory area
 //#define R_BANK_SIZE 0x4000	// How big one bank is
-
+#define ROMFS_SHOW_ROM_NAME	// Shows the ROM name briefly on startup
 
 // At 0x4000:
 //#define romfs_switch_bank(bank) bank_0x4000_port = (0x20 | bank)	// and: bank_type_port = bank_type_port | 0x02
@@ -303,7 +303,7 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	if (rh < 0) {
 		vagi_res_printf_res(kind, num);
 		printf("VOL."); printf_d(state->res_vol);
-		printf(": err=-"); printf_d(-rh);
+		printf(" err=-"); printf_d(-rh);
 		getchar();
 		
 		return rh;
@@ -335,7 +335,7 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	if ((vi & 0x7f) != state->res_vol) {
 		// Volume mismatch (volume file number VS stored volume number of resource)
 		vagi_res_printf_res(kind, num);
-		printf("VOL mis:");
+		printf("VOL miss:");
 		printf_d(vi & 0x7f); printf(" != "); printf_d(state->res_vol);
 		getchar();
 		#ifdef VAGI_RES_IGNORE_VOLUME_MISS
@@ -375,11 +375,11 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 		#else
 		// Show info
 		vagi_res_printf_res(kind, num);
-		printf("Compressed:");
+		printf("Compr:");
 		printf_x2(enclen >> 8); printf_x2(enclen & 0xff);
 		printf(" -> ");
 		printf_x2(declen >> 8); printf_x2(declen & 0xff);
-		printf("...");
+		//printf("...");
 		#endif
 		if (vi & 0x80) {
 			#ifdef VAGI_RES_IGNORE_COMPRESSED

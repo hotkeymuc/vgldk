@@ -30,8 +30,12 @@ void romfs_init() {
 		//printf("fs="); printf_x2(romfs_filename_len); getchar();
 		
 		// ROM name
-		//romfs_fskip(h, romfs_filename_len);
-		printf("ROM: \""); for(i = 0; i < romfs_filename_len; i++) { putchar(romfs_fread(h)); } printf("\""); getchar();
+		#ifdef ROMFS_SHOW_ROM_NAME
+			printf("ROM: \""); for(i = 0; i < romfs_filename_len; i++) { putchar(romfs_fread(h)); } printf("\"");
+			//getchar();
+		#else
+			romfs_fskip(h, romfs_filename_len);
+		#endif
 		
 		// File count (LO, HI = Z80 word)
 		romfs_num_files = romfs_fread(h);
@@ -90,10 +94,14 @@ void romfs_init() {
 			romfs_fskip(h, sizeof(romfs_entry_t));
 		}
 		
-		if (r < 0) {
-			printf("ROMFS:\""); printf(name); printf("\"?!");
-			//getchar();
-		}
+		#ifdef ROMFS_IGNORE_NOT_FOUND
+			// Ignore
+		#else
+			if (r < 0) {
+				printf("ROMFS:\""); printf(name); printf("\"?!");
+				//getchar();
+			}
+		#endif
 		
 		romfs_fclose(h);
 		return r;

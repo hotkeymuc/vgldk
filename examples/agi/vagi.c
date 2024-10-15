@@ -75,6 +75,7 @@ The VAGI code is heavily based on:
 //#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 #define VAGI_RES_IGNORE_COMPRESSED	// Do not show "unsupported" messages on compressed resources
 //#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry (what it NEVER should, but does...)
+#define ROMFS_IGNORE_NOT_FOUND	// Do not show "not found" messages (e.g. while scanning for volumes on startup)
 
 //#define VAGI_TRACE_STAGES	// Allow on-screen tracing of engine stages
 //#define VAGI_SHOW_INTRO	// Show intro splash screen with credits
@@ -664,8 +665,8 @@ void main() __naked {
 	byte running = 1;
 	//byte i;
 	
+	printf("VAGI - VGLDK Adventure Game Interpreter\n");
 	#ifdef VAGI_SHOW_INTRO
-		printf("VAGI - VGLDK Adventure Game Interpreter\n");
 		printf("by Bernhard \"HotKey\" Slawik\n\n");
 		printf("Heavily based on:\n");
 		printf(" * ScummVM's AGI\n");
