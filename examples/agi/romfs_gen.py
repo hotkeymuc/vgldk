@@ -21,9 +21,10 @@ def put(t):
 #ID_PREFIX = 'RFS_'
 ID_PREFIX = 'R_'
 
-INDEX_FILENAME = '.'	# "Filename" of index data
-INDEX_FILENAME_LENGTH = 12	# 8+1+3
-ROMFS_HEADER_ID = b'ROMFS000'
+ROMFS_INDEX_FILENAME = '.'	# "Filename" of index data
+ROMFS_FILENAME_LENGTH = 12	# 8+1+3
+ROMFS_ID_STRING = b'ROMFS000'
+ROMFS_ID_LEN = len(ROMFS_ID_STRING)
 
 class ROMFS_File:
 	def __init__(self, filename, data=b'', id=None, org_filename=None, align_size=1, include_in_index=True):
@@ -195,6 +196,7 @@ class ROMFS:
 		args = ' '.join(sys.argv)
 		r += f'*	Command line arguments: "{str(args)}"\n'
 		r += '*	\n'
+		r += '*	Name: "%s"\n' % self.name
 		r += '*	Files:\n'
 		r += ''.join([ '*		%s\n'%f.org_filename for f in self.files ])
 		r += '*	\n'
@@ -202,6 +204,7 @@ class ROMFS:
 		r += '*/\n'
 		
 		r += '\n'
+		r += f'#define R_NAME "{self.name}"\n'
 		r += f'#define R_BANK_SIZE 0x{self.mem_bank_size:04X}\n'
 		r += '\n'
 		r += '// File look-up table\n'
@@ -237,13 +240,13 @@ class ROMFS:
 		r = b''
 		
 		# Header
-		r += ROMFS_HEADER_ID
+		r += ROMFS_ID_STRING
 		
 		# Filename length
-		r += struct.pack('>B', INDEX_FILENAME_LENGTH)
+		r += struct.pack('B', ROMFS_FILENAME_LENGTH)
 		
 		# ROM name
-		r += bytes(self.name, 'ascii') + (b'\0' * (INDEX_FILENAME_LENGTH - len(self.name)))
+		r += bytes(self.name, 'ascii') + (b'\0' * (ROMFS_FILENAME_LENGTH - len(self.name)))
 		
 		indexed_count = 0
 		for f in self.files:
@@ -251,19 +254,26 @@ class ROMFS:
 			indexed_count += 1
 		
 		# Number of entries
-		r += struct.pack('>H', indexed_count)
+		#r += struct.pack('>H', indexed_count)	# HI LO Wrong!
+		r += struct.pack('<H', indexed_count)	# LO HI = Z80 word = correct
 		
 		for f in self.files:
 			if not f.include_in_index: continue
 			
 			# Filename
-			r += bytes(f.filename, 'ascii') + (b'\0' * (INDEX_FILENAME_LENGTH - len(f.filename)))
+			r += bytes(f.filename, 'ascii') + (b'\0' * (ROMFS_FILENAME_LENGTH - len(f.filename)))
 			
 			# Data (bank, ofs, bank_size, +size)
-			r += struct.pack('>B', f.mem_bank)
-			r += struct.pack('>H', (f.aligned_offset % self.mem_bank_size))
-			r += struct.pack('>B', (f.size // self.mem_bank_size))
-			r += struct.pack('>H', (f.size % self.mem_bank_size))
+			#	typedef struct {
+			#		byte bank;
+			#		word addr;
+			#		byte banks;
+			#		word size;	// Remainder of the actual size (banks * bank_size + size)
+			#	} romfs_entry_t;
+			r += struct.pack('B', f.mem_bank)
+			r += struct.pack('<H', (f.aligned_offset % self.mem_bank_size))	# LO HI = Z80 word
+			r += struct.pack('B', (f.size // self.mem_bank_size))
+			r += struct.pack('<H', (f.size % self.mem_bank_size))	# LO HI = Z80 word
 			
 		
 		return r
@@ -313,7 +323,7 @@ def generate_rom(
 	
 	if create_index:
 		put('Creating (dummy) index...')
-		index_filename = INDEX_FILENAME
+		index_filename = ROMFS_INDEX_FILENAME
 		index_data = romfs.create_index_data()
 		
 		# Add it as the first file

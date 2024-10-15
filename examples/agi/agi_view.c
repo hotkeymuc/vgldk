@@ -1198,9 +1198,17 @@ void DrawBlitLists() {
 		//if (v->flags & (oDRAWN) == (oDRAWN)) {
 			//if (!(v->flags & oSKIPUPDATE))
 			
+			
+			
 			// Trying to be smart:
+			// Only redraw if something changed
+			
+			//@FIXME: Also if mirroring/direction changed!! See SQ2 "broom" scene while wandering
+			//@FIXME: Also if cel changed? (Updates separately?)
+			
 			if ((v->flags & oMOTIONLESS) || ((v->x == v->prevX) && (v->y == v->prevY) && (v->width == v->prevWidth) && (v->height == v->prevHeight))) {
 				// Not moved: Skip it
+				
 			} else {
 				//UnBlitVObj(v);	// Draw over with background
 				UpdateObjCel(v);	// Only redraw the pixels that were crossed during movement

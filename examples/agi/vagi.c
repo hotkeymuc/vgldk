@@ -77,6 +77,7 @@ The VAGI code is heavily based on:
 //#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry (what it NEVER should, but does...)
 
 //#define VAGI_TRACE_STAGES	// Allow on-screen tracing of engine stages
+//#define VAGI_SHOW_INTRO	// Show intro splash screen with credits
 
 // VGLDK settings:
 #define VGLDK_NO_SOUND	// We do not support it, so don't waste space
@@ -618,7 +619,7 @@ bool vagi_loop() {
 	}
 	//} while (new_room_called);
 	if (timeout <= 0) {
-		printf("Script TO!"); getchar();
+		printf("TO!"); getchar();
 	}
 	
 	vagi_trace_stage("POST");
@@ -663,15 +664,17 @@ void main() __naked {
 	byte running = 1;
 	//byte i;
 	
-	printf("VAGI\n\n");
-	printf("Based on:\n");
-	printf("* ScummVM's AGI\n");
-	printf("  https://github.com/scummvm\n");
-	printf("* Brian Provinciano's GBAGI\n");
-	printf("  http://www.bripro.com\n");
-	printf("* davidebyzero's fork of GBAGI\n");
-	printf("  https://github.com/Davidebyzero/GBAGI.git\n");
-	
+	#ifdef VAGI_SHOW_INTRO
+		printf("VAGI - VGLDK Adventure Game Interpreter\n");
+		printf("by Bernhard \"HotKey\" Slawik\n\n");
+		printf("Heavily based on:\n");
+		printf(" * ScummVM's AGI\n");
+		printf("   https://github.com/scummvm\n");
+		printf(" * Brian Provinciano's GBAGI\n");
+		printf("   http://www.bripro.com\n");
+		printf(" * davidebyzero's fork of GBAGI\n");
+		printf("   https://github.com/Davidebyzero/GBAGI\n");
+	#endif
 	vagi_init();
 	
 	// Run tests
@@ -751,7 +754,7 @@ void main() __naked {
 		running = vagi_loop();
 	}
 	
-	printf("END-OF-ROM");
+	//printf("END-OF-ROM");
 	
 	#if VGLDK_SERIES == 0
 	return 42;	// Apps can return stuff

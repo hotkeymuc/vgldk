@@ -23,13 +23,18 @@ These things must be defined outside:
 
 #define ROMFS_MAX_HANDLES 6	//4
 
+#define ROMFS_FILENAME_LEN 12	// 8+1+3
+#define ROMFS_ID_STRING "ROMFS000"
+#define ROMFS_ID_LEN 8	// "ROMFS000"
+#define ROMFS_HEADER_SIZE (ROMFS_ID_LEN + 1 + ROMFS_FILENAME_LEN + 2)	// <ID_STRING> <filename_len:U8> <rom_name> <entries:U16> index[]
+#define ROMFS_INDEX_SIZE (ROMFS_FILENAME_LEN + sizeof(romfs_entry_t))	// <filename> <romfs_entry_t>
 
 // romfs_gen.py creates these entries
 typedef struct {
 	byte bank;
 	word addr;
 	//word size;	// Must be > 16 bit (32 bit?) for Sierra
-	word banks;
+	byte banks;
 	word size;	// Remainder of the actual size (banks * bank_size + size)
 } romfs_entry_t;
 
@@ -53,8 +58,18 @@ typedef struct {
 //static romfs_state_t romfs_state;	// One single state
 typedef int romfs_handle_t;	// Those are processed by user programs
 
+extern romfs_state_t romfs_states[ROMFS_MAX_HANDLES];
+#ifdef ROMFS_USE_FILENAMES
+	extern word romfs_num_files;
+	extern byte romfs_filename_len;
+#endif
+
 void romfs_init();
 
+#ifdef ROMFS_USE_FILENAMES
+	int romfs_find(const char *name);
+#endif
+romfs_entry_t *romfs_get_entry(byte index);
 romfs_handle_t romfs_fopen(byte index);
 bool romfs_factive(romfs_handle_t h);
 int romfs_fclose(romfs_handle_t h);

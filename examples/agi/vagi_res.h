@@ -9,9 +9,11 @@ It re-directs accesses to ROM FS, which stores the raw files.
 */
 
 // ROM FS:
+#define ROMFS_USE_FILENAMES	// Actually use filenames in ROMFS index data; do not open using baked-in header file
 //#define ROMFS_DEBUG	// Verbose ROM access output to stdout
 //#define R_MEM_OFFSET 0x4000	// Where to find the banked memory area
 //#define R_BANK_SIZE 0x4000	// How big one bank is
+
 
 // At 0x4000:
 //#define romfs_switch_bank(bank) bank_0x4000_port = (0x20 | bank)	// and: bank_type_port = bank_type_port | 0x02
@@ -31,8 +33,19 @@ void inline romfs_switch_bank(byte bank) {
 	bank_0x8000_port = (0x20 | bank);	// Map desired chip segment to memory segment 0x8000
 }
 
+
 #include "romfs.h"
-#include "romfs_data.h"
+
+
+#ifdef ROMFS_USE_FILENAMES
+	// Do not include any knowledge of the ROMFS data, use filename look ups instead.
+	#define R_MEM_OFFSET 0x8000
+	#define R_BANK_SIZE 0x4000
+#else
+	// The ROMFS index is baked into the source for maximum performance (no string comparisons)
+	#include "romfs_data.h"
+#endif
+
 #include "romfs.c"	//@FIXME: Only the main C file gets passed to the VGLDK compiler pass...
 
 #define VAGI_RES_MAX_HANDLES 6
@@ -48,11 +61,14 @@ void inline romfs_switch_bank(byte bank) {
 //#define VAGI_RES_IGNORE_VOLUME_MISS	// Not recommended, just for debugging quirks among different games
 //#define VAGI_RES_IGNORE_COMPRESSED
 
+#define AGI_RES_MAX_VOL 6	// Keep it at 6 (i.e. VOL.0-VOL.5)
+
 enum AGI_RES_KIND {
 	AGI_RES_KIND_LOG,
 	AGI_RES_KIND_PIC,
 	AGI_RES_KIND_SND,
 	AGI_RES_KIND_VIEW,
+	AGI_RES_KIND_WORDS,
 	
 	AGI_RES_KIND_COUNT
 };
@@ -62,39 +78,68 @@ enum AGI_RES_KIND {
 //	"PIC",
 //	"SND",
 //	"VIEW",
+//	"WORDS",	// Special!
 //};
 static const char AGI_RES_KIND_ID[AGI_RES_KIND_COUNT] = {
 	'L',
 	'P',
 	'S',
-	'V'
+	'V',
+	'W'	// words
 };
 
-static const byte AGI_DIR_FILES[AGI_RES_KIND_COUNT] = {
-	R_LOGDIR,
-	R_PICDIR,
-	R_SNDDIR,
-	R_VIEWDIR,
-};
-
-static const byte AGI_VOL_FILES[] = {
-	R_VOL_0,
-	#ifdef R_VOL_1
-	R_VOL_1,
-	#endif
-	#ifdef R_VOL_2
-	R_VOL_2,
-	#endif
-	#ifdef R_VOL_3
-	R_VOL_3,
-	#endif
-	#ifdef R_VOL_4
-	R_VOL_4,
-	#endif
-	#ifdef R_VOL_5
-	R_VOL_5,
-	#endif
-};
+#ifdef ROMFS_USE_FILENAMES
+	// Use filenames
+	/*
+	const char *AGI_DIR_FILENAMES[AGI_RES_KIND_COUNT] = {
+		"LOGDIR",
+		"PICDIR",
+		"SNDDIR",
+		"VIEWDIR",
+		"WORDS.TOK",	// words!
+	};
+	const char *AGI_VOL_FILENAMES[AGI_RES_MAX_VOL] = {
+		"VOL.0",
+		"VOL.1",
+		"VOL.2",
+		"VOL.3",
+		"VOL.4",
+		"VOL.5",
+	};
+	*/
+	// Dynamic indices, get resolved on startup.
+	extern byte AGI_DIR_INDICES[AGI_RES_KIND_COUNT];
+	extern byte AGI_VOL_INDICES[AGI_RES_MAX_VOL];
+	byte AGI_DIR_INDICES[AGI_RES_KIND_COUNT];
+	byte AGI_VOL_INDICES[AGI_RES_MAX_VOL];
+#else
+	// Use baked-in data from romfs_data.h
+	static const byte AGI_DIR_INDICES[AGI_RES_KIND_COUNT] = {
+		R_LOGDIR,
+		R_PICDIR,
+		R_SNDDIR,
+		R_VIEWDIR,
+		R_WORDS_TOK,
+	};
+	static const byte AGI_VOL_INDICES[] = {
+		R_VOL_0,
+		#ifdef R_VOL_1
+		R_VOL_1,
+		#endif
+		#ifdef R_VOL_2
+		R_VOL_2,
+		#endif
+		#ifdef R_VOL_3
+		R_VOL_3,
+		#endif
+		#ifdef R_VOL_4
+		R_VOL_4,
+		#endif
+		#ifdef R_VOL_5
+		R_VOL_5,
+		#endif
+	};
+#endif
 
 
 // State
@@ -127,12 +172,46 @@ void vagi_res_printf_res(byte kind, word num) {
 }
 
 void vagi_res_init() {
+	byte i;
+	//int idx;
+	
 	romfs_init();
 	
 	// Mark all states as inactive
-	for (byte h = 0; h < VAGI_RES_MAX_HANDLES; h++) {
-		vagi_res_states[h].active = false;
+	for (i = 0; i < VAGI_RES_MAX_HANDLES; i++) {
+		vagi_res_states[i].active = false;
 	}
+	
+	#ifdef ROMFS_USE_FILENAMES
+		// Resolve filenames to ROMFS indices
+		/*
+		for (i = 0; i < AGI_RES_KIND_COUNT; i++) {
+			printf("Resolving DIR \""); printf(AGI_DIR_FILENAMES[i]); printf("\"...");
+			idx = romfs_find(AGI_DIR_FILENAMES[i]);
+			AGI_DIR_INDICES[i] = idx;
+		}
+		*/
+		AGI_DIR_INDICES[AGI_RES_KIND_LOG] = romfs_find("LOGDIR");
+		AGI_DIR_INDICES[AGI_RES_KIND_PIC] = romfs_find("PICDIR");
+		AGI_DIR_INDICES[AGI_RES_KIND_SND] = romfs_find("SNDDIR");
+		AGI_DIR_INDICES[AGI_RES_KIND_VIEW] = romfs_find("VIEWDIR");
+		AGI_DIR_INDICES[AGI_RES_KIND_WORDS] = romfs_find("WORDS.TOK");
+		
+		/*
+		for (i = 0; i < AGI_RES_MAX_VOL; i++) {
+			printf("Resolving VOL \""); printf(AGI_VOL_FILENAMES[i]); printf("\"...");
+			idx = romfs_find(AGI_VOL_FILENAMES[i]);
+			AGI_VOL_INDICES[i] = idx;
+		}
+		*/
+		AGI_VOL_INDICES[0] = romfs_find("VOL.0");
+		AGI_VOL_INDICES[1] = romfs_find("VOL.1");
+		AGI_VOL_INDICES[2] = romfs_find("VOL.2");
+		AGI_VOL_INDICES[3] = romfs_find("VOL.3");
+		AGI_VOL_INDICES[4] = romfs_find("VOL.4");
+		AGI_VOL_INDICES[5] = romfs_find("VOL.5");
+		//printf("resolved"); getchar();
+	#endif
 }
 
 vagi_res_handle_t vagi_res_open(byte kind, word num) {
@@ -140,9 +219,12 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	byte vi;
 	word declen;
 	word enclen;
+	vagi_res_handle_t h;
+	romfs_handle_t rh;
+	byte ri;
 	
 	// Find a free handle/state
-	vagi_res_handle_t h;
+	
 	for (h = 0; h < VAGI_RES_MAX_HANDLES; h++) {
 		if (vagi_res_states[h].active == false) break;
 	}
@@ -154,6 +236,7 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 		return VAGI_RES_ERROR_UNKNOWN_KIND;
 	}
 	
+	// Initialize a new vagi_res_state
 	vagi_res_state_t *state = &vagi_res_states[h];
 	state->active = false;	// Set to true later on, if everthing works out
 	//state->kind = kind;	// We actually don't need to access that after open
@@ -172,14 +255,25 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	
 	// Open directory for the given kind (LOG, PIC, SND, VIEW)
 	//printf("Opening DIR...");
-	romfs_handle_t rh;
-	rh = romfs_fopen(AGI_DIR_FILES[kind]);
+	
+	ri = AGI_DIR_INDICES[kind];
+	rh = romfs_fopen(ri);
 	if (rh < 0) {
 		vagi_res_printf_res(kind, num);
 		printf("DIR err=-"); printf_d(-rh); getchar();
 		//return 0;
 		return rh;
 	}
+	
+	if (kind == AGI_RES_KIND_WORDS) {
+		// WORDS.TOK is not a dir, so: Return the first handle right away!
+		// Activate state
+		state->active = true;
+		state->romfs_handle = rh;
+		state->offset = 0;
+		return rh;
+	}
+	
 	
 	if (num*3 > romfs_fsize(rh)) {
 		return ROMFS_ERROR_EOF;
@@ -204,7 +298,8 @@ vagi_res_handle_t vagi_res_open(byte kind, word num) {
 	
 	// Open volume file (assume the VOL.* files are located sequencially)
 	//printf("Opening VOL...");
-	rh = romfs_fopen(AGI_VOL_FILES[state->res_vol]);
+	ri = AGI_VOL_INDICES[state->res_vol];
+	rh = romfs_fopen(ri);
 	if (rh < 0) {
 		vagi_res_printf_res(kind, num);
 		printf("VOL."); printf_d(state->res_vol);

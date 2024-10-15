@@ -65,10 +65,6 @@ char agi_message_buf[AGI_MAX_MESSAGE_LENGTH];	// Buffer for GetMessage()
 
 
 
-#ifdef _WINDOWS
-#define _PRINT_LOG
-#endif
-
 //U8 *code;	//@TODO: We need to re-direct this to agi_res_read()
 //word code_ofs;
 U16 logScan[256];	// Stores offset inside given logic
@@ -246,19 +242,11 @@ word CallLogic(U8 num) {
 }
 
 
-#ifdef _PRINT_LOG
-char zs[1000];
-int cmdnum;
-#endif
 //U8 *ExecuteLogic(LOGIC *log) {
 word ExecuteLogic(LOGIC *log) {
 	//register unsigned int op;
 	//unsigned int op;
 	U8 op;
-#ifdef _PRINT_LOG
-	int i,l;
-	cmdnum = 0;
-#endif
 	#ifdef AGI_LOGIC_DEBUG
 		//printf("ExecLogic("); printf_d(log->num); printf(") <\n");
 	#endif
@@ -267,11 +255,9 @@ word ExecuteLogic(LOGIC *log) {
 	#endif
 	
 	//code = log->code+logScan[log->num];
-	//code_ofs = log->ofs_code + logScan[log->num];
 	vagi_res_seek_to(log->res_h, log->ofs_code + logScan[log->num]);
 	
 	//while(code && (BOOL)(op = *code++)) {
-	//while((!vagi_res_eof(log->res_h)) && (BOOL)(op = vagi_res_read(log->res_h))) {
 	while(!vagi_res_eof(log->res_h)) {
 		op = vagi_res_read(log->res_h);
 		#ifdef AGI_LOGIC_DEBUG_OPS
@@ -303,42 +289,6 @@ word ExecuteLogic(LOGIC *log) {
 		}
 		#endif
 		
-#ifdef _WINDOWS
-	if(sndFlag!=-1) {
-		SetFlag(sndFlag);
-		sndFlag=-1;
-	}                         
-	if((vars[vSECONDS]%30)==0)
-				SystemUpdate();
-	if(++vars[vSECONDS]>=60) {
-		vars[vSECONDS]=0;
-		if(++vars[vMINUTES]>=60) {
-			vars[vMINUTES]=0;
-			if(++vars[vHOURS]>=60) {
-				vars[vHOURS]=0;
-				vars[vDAYS]++;
-			}
-		}
-	}
-	if(sndBuf) StopSound();
-#endif
-#ifdef _PRINT_LOG
-		cmdnum++;
-		sprintf(zs,"$%03d:%04X:\t%s ",log->num,(code-log->code)-1,agiCommands[op].name);
-		for(i=0;i<agiCommands[op].nParams;i++) {
-			l=strlen(zs);
-			if(i){
-				sprintf(zs+l,",");
-				l++;}
-			if((agiCommands[op].pMask<<i)&0x80) {
-				sprintf(zs+l,"x%d(%d) ",code[i],vars[code[i]]);
-			} else
-				sprintf(zs+l,"%d",code[i]);
-		}
-		l=strlen(zs);
-		sprintf(zs+l,"");
-		fprintf(flog,"%s\n",zs);
-#endif
 		agiCommands[op].func();
 		
 		#ifdef AGI_LOGIC_DEBUG_IFS
@@ -356,13 +306,7 @@ word ExecuteLogic(LOGIC *log) {
 		if (new_room_called) return 0;
 	}
 	
-	#ifdef AGI_LOGIC_DEBUG
-		//printf(">EOX\n");
-		if (log->num == 2) getchar();	// Debug SQ2 "broom"
-	#endif
-	
 	//return code;
-	//return code_ofs;
 	return 0;
 	//return vagi_res_eof(log->res_h);	// Main function loops until we return TRUE
 }
@@ -370,8 +314,6 @@ word ExecuteLogic(LOGIC *log) {
 
 void ExecuteGoto() {
 	//code += (S16)(bGetW(code)+2);
-	//code_ofs = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
-	//vagi_res_seek_to(curLog->res_h, code_ofs);
 	
 	//word o = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
 	//code_seek_to(o);
@@ -386,9 +328,6 @@ void ExecuteIF() {
 	unsigned int orCnt=0;
 	//unsigned int op;
 	U8 op;
-#ifdef _PRINT_LOG
-	int i,l;
-#endif
 	#ifdef AGI_LOGIC_DEBUG_IFS
 		printf("IF...");
 	#endif
@@ -408,26 +347,8 @@ void ExecuteIF() {
 			}
 			if(op == 0xFD) {
 				IS_NOT = !IS_NOT;
-#ifdef _PRINT_LOG
-		fprintf(flog,"\t\tNOT\n");
-#endif
 			}
 		} else {
-#ifdef _PRINT_LOG
-		sprintf(zs,"$%03d:%04X:\t\t%s ",curLog->num,(code-curLog->code)-1,testCommands[op].name);
-		for(i=0;i<testCommands[op].nParams;i++) {
-			l=strlen(zs);
-			if(i){
-				sprintf(zs+l,",");
-				l++;}
-			if((testCommands[op].pMask<<i)&0x80) {
-				sprintf(zs+l,"x%d(%d) ",code[i],vars[code[i]]);
-			} else
-				sprintf(zs+l,"%d ",code[i]);
-		}
-		l=strlen(zs);
-#endif
-			
 			// Actually execute operation
 			testCommands[op].func();
 			
@@ -442,10 +363,6 @@ void ExecuteIF() {
 				IF_RESULT	= !IF_RESULT;
 				IS_NOT		= FALSE;
 			}
-#ifdef _PRINT_LOG
-		fprintf(flog,"%s\n\t\t\t=%s\n",zs,IF_RESULT?"TRUE":"FALSE");
-#endif
-			
 			if (IF_RESULT) {
 				#ifdef AGI_LOGIC_DEBUG_IFS
 					printf("(HIT)");
@@ -476,6 +393,7 @@ void SkipORTrue() {
 	//unsigned int op;
 	U8 op;
 	//int op;
+	
 	#ifdef AGI_LOGIC_DEBUG_IFS
 		printf("(skipORtrue)");
 	#endif
@@ -496,9 +414,11 @@ void SkipANDFalse() {
 	//unsigned int op;
 	U8 op;
 	//int op;
+	
 	#ifdef AGI_LOGIC_DEBUG_IFS
 		printf("(skipANDfalse)");
 	#endif
+	
 	while((op = code_get()) != 0xFF) {
 		//if (op < 0) return;	// EOF = -1
 		if(op < 0xFC) {
@@ -512,7 +432,7 @@ void SkipANDFalse() {
 	
 	//word o = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
 	//code_seek_to(o);
-	code_seek_relative(code_get_word());
+	code_seek_relative(code_get_word());	// Might be negative...!
 }
 
 
