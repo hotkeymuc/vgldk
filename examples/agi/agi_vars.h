@@ -32,8 +32,6 @@ The VAGI code is heavily based on:
  */
 
 
-
-
 #define MAX_VARS			256	// GBAGI default: 256
 extern U8 vars[MAX_VARS];
 
@@ -51,7 +49,7 @@ typedef struct {
 
 extern CTLMAP ctlMap[MAX_CONTROLLERS];
 
-#define MAX_STRINGS			12	// GBAGI default: 24
+#define MAX_STRINGS			24	//12	// GBAGI default: 24 (SQ2 requires 24)
 #define MAX_STRINGS_LEN		40	// GBAGI default: 40
 extern char strings[MAX_STRINGS][MAX_STRINGS_LEN+1];
 

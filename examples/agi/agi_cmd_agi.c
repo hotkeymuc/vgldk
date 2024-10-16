@@ -1817,7 +1817,7 @@ void cQuit() {
 	printf("cQuit!"); getchar();
 	#endif
 	
-	if(code_0 || MessageBox("Really quit?")) {
+	if(code_0 || MessageBox("Quit?")) {
 		//AGIExit();
 		QUIT_FLAG = TRUE;
 		//code = NULL;
@@ -1995,6 +1995,7 @@ void cTraceOn() {
 	// no debugging would be needed--the games are already done, and it would
 	// just slow down performance
 	//code=code;
+	//trace_ops = true;
 }
 
 //trace.info(LOGNUM,TOP,HEIGHT);
@@ -2147,10 +2148,9 @@ void cMenuInput() {
 //	the inventory items.
 void cShowObjV() {
 	U8 code_0 = code_get();
-	//@TODO: Implement
-	/*
+	
 	ShowObj(vars[code_0]);
-	*/
+	
 }
 
 //open.dialogue();
@@ -2341,6 +2341,10 @@ void cMousePosn() {
 	// not to be implemented, the GBA has no mouse, heh
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
+	#ifdef VAGI_MOUSE
+		vars [ code_0 ] = mouse_x;
+		vars [ code_1 ] = mouse_y;
+	#endif
 }
 
 //	The release.key command sets the interpreter back to normal ego movement

@@ -53,8 +53,9 @@ The VAGI code is heavily based on:
 		* bug: Not triggering signals (KQ1 when entering the castle in PIC 2; SQ2 when exiting the pod at the ship bay in PIC4?)
 		* Handling/mapping of function keys (e.g. F10 / F6)
 		* Show game title and score
-		* Nicer MessageBox and bigger font
-		* Re-locate VIEW code to other code segment as well (together with PIC code), to make room in main segment.
+		+ Menus
+		OK Nicer MessageBox and bigger font
+		+ Re-locate VIEW code to other code segment as well (together with PIC code), to make room in main segment.
 		+ Sound (1-channel via TI TTS chip, anaylze VTech GL6000SL intro)
 	
 	2024-09-11 Bernhard "HotKey" Slawik
@@ -249,7 +250,6 @@ byte timer_frame;
 
 
 // PIC code (on separate code segment!)
-
 #define AGI_PIC_SHOW_PROGRESS	// Show progress bar while rendering PICs, requires ~400 (0x195) bytes
 #include "agi_pic.h"
 
@@ -258,14 +258,16 @@ byte timer_frame;
 	// Include known entry points in segment 1
 	#include "code_segment_1.h"
 	
-	#include "vagi_pic_stub.c"	// Provide stubs ("trampolines") to functions in the other bank
+	// Provide stubs ("trampolines") to functions in the other bank
+	#include "vagi_pic_stub.c"
+	#include "agi_words_stub.c"
 	
 #endif
 #ifdef CODE_SEGMENT_1
 	
 	// Include the PIC code
-	//#include "vagi_pic.h"
 	#include "vagi_pic.c"
+	#include "agi_words.c"	// Provide stubs ("trampolines") to functions in the other bank
 	
 #endif	// Code segmenting
 

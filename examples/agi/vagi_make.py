@@ -36,8 +36,8 @@ GAMES_PATH = '/z/apps/_games/_SCUMM'
 
 # Chose a game:
 #GAME_ID = 'SQ1'
-GAME_ID = 'SQ2'	# my fav! (AGIv2)
-#GAME_ID = 'KQ1'
+#GAME_ID = 'SQ2'	# my fav! (AGIv2)
+GAME_ID = 'KQ1'
 #GAME_ID = 'KQ2'; GAME_PACKED_DIRS = 1	# working with script error 004
 #GAME_ID = 'KQ3'; GAME_PACKED_DIRS = 1	# Script error and memory corruption in 1st interactive screen
 #GAME_ID = 'LSL1'; GAME_PACKED_DIRS = 1
