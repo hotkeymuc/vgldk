@@ -99,8 +99,9 @@ typedef struct {
 	
 	S16	x,y;
 	U8	width,height;
-	U8 settings;	// htk
+	U8	settings;	// htk
 	U16	descPos;	// htk
+	bool invisible;	// htk
 	
 	S16 prevX,prevY;
 	U8 prevWidth,prevHeight;
@@ -162,17 +163,15 @@ typedef struct {
 #define MAX_PVIEWS 32
 extern PVIEW pViews[MAX_PVIEWS], *pPView;
 */
-
-extern U8 priTable[172];
-
 //#define MAX_VOBJ			32 // erm..can be set to higher in the object file, but none use it more than 17 AFAIK (save me RAM!)
 #define MAX_VOBJ			18	// GBAGI default: 32
-
-
 //#define TEST_Y(x1,x2,y)	((x1 >= code[1]) && (y >= code[2]) && (x2 <= code[3]) && (y <= code[4]))
 
 
-extern VOBJ picView, objView, ViewObjs[MAX_VOBJ];
+extern U8 priTable[172];
+extern VOBJ picView, ViewObjs[MAX_VOBJ];
+
+//extern VOBJ objView;
 //extern BLIT blUpdate, blStatic;
 //extern BLIT blits[MAX_VOBJ];
 extern BOOL PRI_FIXED;
@@ -195,16 +194,12 @@ void UpdateObjFollow(VOBJ *v);
 void SetObjView(VOBJ *v, int num);
 void SetObjLoop(VOBJ *v, int loop);
 void SetObjCel(VOBJ *v, int cel);
+
 void DrawObj(int num);
 void EraseObj(int num);
 void UpdateObjCel(VOBJ *v);
 void UpdateObjLoop(VOBJ *v);
-/*
-void SaveBlit(BLIT *b);
-void RestoreBlit(BLIT *b);
-*/
-void UnBlitVObj(VOBJ *v);	// htk
-void BlitVObj(VOBJ *v);
+
 BOOL CheckUpdateVObj(VOBJ *v);
 BOOL CheckStaticVObj(VOBJ *v);
 
@@ -219,11 +214,12 @@ void AddBlit(VOBJ *v, BLIT *blParent);
 BLIT *NewBlit(VOBJ *v);
 void DrawBlitList(BLIT *blParent);
 void UpdateBlitList(BLIT *blParent);
+
+void SaveBlit(BLIT *b);
+void RestoreBlit(BLIT *b);
 */
 void AddToPic(U8 num, U8 loop, U8 cel, U8 x, U8 y, U8 pri);
-void AddObjPicPri(VOBJ *v);
 int  CalcPriY(int pri);
 void ShowObj(int num);
-
 
 #endif

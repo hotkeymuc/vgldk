@@ -138,7 +138,7 @@ extern U8 invObjRooms[MAX_IOBJ];
 //void ExecuteInvDialog(void);
 //U8 FindObj(char *name);
 
-void dump_vars();
+//void dump_vars();
 //U8 rand();
 
 #endif

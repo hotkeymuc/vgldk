@@ -51,7 +51,7 @@ int pushedScriptCount, scriptCount;
 // invobj.c:
 U8 invObjRooms[MAX_IOBJ];
 
-
+/*
 void dump_vars() {
 	//for(int i = 0; i < MAX_VARS; i++) {
 	printf("v:");
@@ -60,6 +60,7 @@ void dump_vars() {
 	}
 	putchar('\n');
 }
+*/
 
 /*
 #define STATE_BYTES 7

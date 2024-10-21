@@ -44,7 +44,7 @@ void vagi_pic_draw(byte pic_num) {
 	buffer_switch(BUFFER_BANK_VIS);
 	buffer_clear(0xf);
 	
-	//printf("call...");getchar();
+	//printf("banking...");getchar();
 	code_segment_call_b(2, code_segment_1__vagi_pic_draw_addr, pic_num);
 	//printf("back.");getchar();
 }

@@ -13,6 +13,7 @@ VAGI PIC drawing (high-level)
 
 bool vagi_pic_render_frame(word pic_num, byte drawing_step) {
 	// Render one full-size AGI PIC (either its visual or priority data)
+	//printf("render_frame...");getchar();
 	
 	// Mount our cartridge ROM to address 0x4000 (data must be inside the ROM binary at position 0x4000 * n)
 	//bank_type_port = bank_type_port | 0x02;	// Switch address region 0x4000-0x7FFF to use cartridge ROM (instead of internal ROM)
@@ -40,8 +41,8 @@ bool vagi_pic_render_frame(word pic_num, byte drawing_step) {
 
 void vagi_pic_draw(byte pic_num) {
 	// Render both frames and create working buffers
+	//printf("vagi_pic_draw!");getchar();
 	const byte status_row = LCD_TEXT_ROWS-1;	//0;
-	
 	lcd_text_col = 0; lcd_text_row = status_row; printf("Loading PIC "); printf_d(pic_num);
 	
 	// Render and process the VIS frame.

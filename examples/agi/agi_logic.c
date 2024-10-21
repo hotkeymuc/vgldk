@@ -271,7 +271,7 @@ word ExecuteLogic(LOGIC *log) {
 			
 			// Show Instruction pointer
 			word cp = vagi_res_tell(log->res_h);
-			printf_x2(cp >> 8); printf_x2(cp & 0x0f);
+			printf_x2(cp >> 8); printf_x2(cp & 0xff);
 			putchar(':');
 			
 			// Show OP
@@ -285,7 +285,7 @@ word ExecuteLogic(LOGIC *log) {
 			//for(i=0;i<agiCommands[op].nParams;i++) { code_peek()....
 			//cursor_col = lcd_text_col;
 			//printf("...");
-			//getchar();
+			getchar();
 		}
 		#endif
 		

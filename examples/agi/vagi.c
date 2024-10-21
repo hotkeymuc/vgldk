@@ -62,15 +62,15 @@ The VAGI code is heavily based on:
 */
 
 
+#define VAGI_SHOW_INTRO	// Show intro splash screen with credits
 //#define VAGI_MOUSE	// Support mouse
 //#define VAGI_MINIMAL	// Squeeze all as much space as possible. No stdio!
 //#define VAGI_SHOW_EGO_INFO	// Show info about ego ViewObjs[0]
 
 //#define AGI_LOGIC_DEBUG	// Debug control flow
 //#define AGI_LOGIC_DEBUG_OPS	// Verbose logic output (each OP, each CallLogic)
-//#define AGI_COMMANDS_INCLUDE_NAMES	// Include command names for debugging, requires ~0x800+ bytes of space!
-
 //#define AGI_LOGIC_DEBUG_IFS	// Even verboser logic debug: Show "IF v[x] > y" etc.
+//#define AGI_COMMANDS_INCLUDE_NAMES	// Include command names for debugging, requires ~0x800+ bytes of space!
 
 //#define PACKED_DIRS 1	// Game contains "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 //#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
@@ -79,7 +79,6 @@ The VAGI code is heavily based on:
 #define ROMFS_IGNORE_NOT_FOUND	// Do not show "not found" messages (e.g. while scanning for volumes on startup)
 
 //#define VAGI_TRACE_STAGES	// Allow on-screen tracing of engine stages
-//#define VAGI_SHOW_INTRO	// Show intro splash screen with credits
 
 // VGLDK settings:
 #define VGLDK_NO_SOUND	// We do not support it, so don't waste space
@@ -103,7 +102,7 @@ The VAGI code is heavily based on:
 	#include <vgldk.h>
 	#include <stdiomin.h>	// for gets/puts/printf/printf_d. Will be auto-included on VGLDK_SERIES=0
 	
-	#define HEX_USE_DUMP	// For dump(addr, count)
+	//#define HEX_USE_DUMP	// For dump(addr, count)
 	#define HEX_DUMP_WIDTH 16	// Usually 4 for 20-character screens
 	#include <hex.h>	// provides printf_x2
 #endif
@@ -208,28 +207,6 @@ byte rand() {
 #include "vagi_buffer.h"	// This handles the (smaller) working buffer(s) needed at run-time (derived from frame)
 #include "vagi_res.h"	// This allows reading from AGI resources as if they were files
 
-/*
-// Test sprite
-#define sprite_width 8
-#define sprite_height 14
-#define sprite_transparency 3
-static const byte sprite_data[sprite_width*sprite_height] = {
-	  3,   3,   3, 0xf, 0xf,   3,   3,   3, 
-	  3,   3, 0xf, 0x0, 0x0, 0xf,   3,   3, 
-	  3, 0xf, 0x0, 0x0, 0x0, 0x0, 0xf,   3, 
-	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
-	0xf, 0x0, 0xf, 0x0, 0x0, 0xf, 0x0, 0xf, 
-	0xf, 0x0, 0xf, 0x0, 0x0, 0xf, 0x0, 0xf, 
-	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
-	0xf, 0x0, 0x0, 0x5, 0x5, 0x0, 0x0, 0xf, 
-	0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xf, 
-	0xf, 0x0, 0xf, 0x0, 0x0, 0xf, 0x0, 0xf, 
-	0xf, 0x0, 0x0, 0xf, 0xf, 0x0, 0x0, 0xf, 
-	  3, 0xf, 0x0, 0x0, 0x0, 0x0, 0xf,   3, 
-	  3,   3, 0xf, 0x0, 0x0, 0xf,   3,   3, 
-	  3,   3,   3, 0xf, 0xf,   3,   3,   3, 
-};
-*/
 
 
 // The AGI specific fun starts here:
@@ -241,7 +218,7 @@ byte timer_frame;
 	extern bool trace_stages;
 	bool trace_stages;
 	
-	#define vagi_trace_stage(t) if (trace_stages) { lcd_text_row = 0; lcd_text_col = 0; printf(t); }
+	#define vagi_trace_stage(t) if (trace_stages) { lcd_text_row = 0; lcd_text_col = 0; printf(t); getchar();}
 #else
 	#define vagi_trace_stage(t)	;
 #endif
@@ -250,24 +227,32 @@ byte timer_frame;
 
 
 // PIC code (on separate code segment!)
-#define AGI_PIC_SHOW_PROGRESS	// Show progress bar while rendering PICs, requires ~400 (0x195) bytes
+//#define AGI_PIC_SHOW_PROGRESS	// Show progress bar while rendering PICs, requires ~400 (0x195) bytes
+//#define AGI_PIC_FILL_CASES	// Optimize fill by pre-selecting a "draw_FillCheck_case" function to use throughout the fill
 #include "agi_pic.h"
 
 
+// VIEW code
+#include "agi_view.h"
+U8 priTable[172];
+VOBJ picView, ViewObjs[MAX_VOBJ];
+#include "agi_view_render.h"
+
+#ifdef CODE_SEGMENT_1
+	
+	// Include the real code in secondary segment
+	#include "vagi_pic.c"
+	//#include "agi_words.c"
+	#include "agi_view_render.c"
+	
+#endif
 #ifndef CODE_SEGMENT_1
-	// Include known entry points in segment 1
-	#include "code_segment_1.h"
+	#include "code_segment_1.h"	// Auto-generated list of jump addresses
 	
 	// Provide stubs ("trampolines") to functions in the other bank
 	#include "vagi_pic_stub.c"
-	#include "agi_words_stub.c"
-	
-#endif
-#ifdef CODE_SEGMENT_1
-	
-	// Include the PIC code
-	#include "vagi_pic.c"
-	#include "agi_words.c"	// Provide stubs ("trampolines") to functions in the other bank
+	//#include "agi_words_stub.c"
+	#include "agi_view_render_stub.c"
 	
 #endif	// Code segmenting
 
@@ -279,13 +264,14 @@ byte timer_frame;
 	}
 #endif
 #ifdef CODE_SEGMENT_0
-// Exclusively in code segment 0
+// Primary code segment
+
+// VIEW renderer
+//#include "agi_view_render.c"
 
 // Text/Parser
+#include "agi_words.c"
 #include "agi_text.h"
-
-// VIEW code
-#include "agi_view.h"
 
 // LOG code
 #include "agi_vars.h"
@@ -304,14 +290,14 @@ byte timer_frame;
 #include "agi_logic.c"
 
 
-
-
-
 void vagi_init() {
+	
+	//vagi_trace_stage("res");
 	vagi_res_init();	// calls romfs_init()
 	rand_init();	// Init data
 	vagi_lcd_init();	// Reset dither error
 	
+	//vagi_trace_stage("state");
 	AGIVER.major = 2;
 	AGIVER.minor = 0;
 	
@@ -319,9 +305,6 @@ void vagi_init() {
 	szGameID[1] = '\0';
 	cursorChar = '>';
 	
-	#ifdef VAGI_TRACE_STAGES
-	trace_stages = false;
-	#endif
 	timer_frame = 0;
 	
 	QUIT_FLAG = FALSE;
@@ -382,8 +365,10 @@ void vagi_init() {
 	//SetFlag(fSOUND);
 	ResetFlag(fSOUND);
 	
-	// Test!
-	
+	#ifdef VAGI_TRACE_STAGES
+	trace_stages = true;	// Default state
+	trace_ops = true;	// Default state
+	#endif
 	
 }
 
@@ -489,6 +474,7 @@ void vagi_handle_input() {
 
 bool vagi_loop() {
 	// aka. GBAGI: agimain.c:AGIMain() (without the outer loop)
+	vagi_trace_stage("loop");
 	
 #ifdef SKIPTOSCREEN
 	int m=1;
@@ -519,7 +505,7 @@ bool vagi_loop() {
 	}
 	
 	// Handle user inputs NOW!
-	vagi_trace_stage("vagi_handle_input");
+	vagi_trace_stage("input");
 	vagi_handle_input();
 	
 	//
@@ -534,7 +520,7 @@ bool vagi_loop() {
 	
 	vagi_trace_stage("CalcVObjsDir");
 	CalcVObjsDir();	// agi_view.c: This makes ViewObjs chose a new direction
-	vagi_trace_stage("CalcVObjsDir: done.");
+	//vagi_trace_stage("CalcVObjsDir: done.");
 	
 	oldScore = vars[vSCORE];
 	SOUND_ON = TestFlag(fSOUND);
@@ -583,6 +569,13 @@ bool vagi_loop() {
 	
 	ViewObjs[0].direction = vars[vEGODIR];
 	
+	if(ViewObjs[0].invisible) {	// This was moved from agi_view to agi_view_renderer (which has no access to Set/ResetFlag in its code segment)
+		SetFlag(fEGOHIDDEN);
+	} else {
+		ResetFlag(fEGOHIDDEN);
+	}
+
+	
 	//if( (oldScore!=vars[vSCORE]) || (TestFlag(fSOUND)!=SOUND_ON) ) WriteStatusLine();
 	
 	vars[vOBJBORDER] = 0;
@@ -598,7 +591,7 @@ bool vagi_loop() {
 		UpdateVObj();
 	}
 	
-	vagi_trace_stage("UpdateVObj: done");
+	vagi_trace_stage("done");
 	
 	if (QUIT_FLAG) return false;
 	return true;
@@ -632,7 +625,10 @@ void main() __naked {
 		printf(" * davidebyzero's fork of GBAGI\n");
 		printf("   https://github.com/Davidebyzero/GBAGI\n");
 	#endif
+	
+	//printf("init...");getchar();
 	vagi_init();
+	//printf("loop...");getchar();
 	
 	// Run tests
 	//test_draw_combined();	// Test drawing combined vis & prio
