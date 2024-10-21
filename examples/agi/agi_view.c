@@ -1374,14 +1374,14 @@ void UpdateBlitList(BLIT *blParent) {
 
 void AddToPic(U8 num, U8 loop, U8 cel, U8 x, U8 y, U8 pri) {
 	//@TODO: Implement
-	/*
+	
 	SetObjView(&picView, num);
 	SetObjLoop(&picView, loop);
 	SetObjCel(&picView, cel);
 	
 	
-	picView.prevHeight				= picView.pCel[1];
-	picView.prevWidth				= picView.pCel[0];
+	picView.prevHeight				= picView.width;	//.pCel[1];
+	picView.prevWidth				= picView.height;	//pCel[0];
 	picView.x = picView.prevX		= x;
 	picView.y = picView.prevY		= y;
 	picView.flags					= oIGNOREVOBJS|oINGOREHORIZON|oFIXEDPRIORITY;
@@ -1396,7 +1396,7 @@ void AddToPic(U8 num, U8 loop, U8 cel, U8 x, U8 y, U8 pri) {
 	AddObjPicPri(&picView);
 	DrawBlitLists();
 	UpdateObjCel(&picView);
-	
+	/*
 	if(pPView < pViews+MAX_PVIEWS) {
 		pPView->view	= num;
 		pPView->loop	= loop;
@@ -1410,13 +1410,11 @@ void AddToPic(U8 num, U8 loop, U8 cel, U8 x, U8 y, U8 pri) {
 }
 
 void AddObjPicPri(VOBJ *v) {
-	
-	//@TODO: Implement!
-	BlitVObj(v);
-	
-	/*
-	U8 *pBuf;
+	//U8 *pBuf;
 	int x,y,height,celMaxX,pHigh=0;
+	
+	//@FIXME:
+	// I guess this MUST be implemented in order for KQ1 to enter castle?
 	
 	if(!(v->priority & 0xF))
 		v->priority |= priTable[v->y];
@@ -1435,37 +1433,54 @@ void AddObjPicPri(VOBJ *v) {
 		y--;
 	} while(priTable[y] == priTable[v->y]);
 	
-	height = (v->pCel[1] > pHigh)? pHigh:v->pCel[1];
+	height = (v->height > pHigh)? pHigh:v->height;
 	
 	// draw  a control box for the view object
-	pBuf = MAKE_PICBUF_PTR(v->x,v->y);
+	//pBuf = MAKE_PICBUF_PTR(v->x,v->y);
+	buffer_switch(BUFFER_BANK_PRI);	// We need to access priority
+	U8 sx = game_to_screen_x((word)v->x);
+	U8 bx = screen_to_buffer_x((word)sx);
+	U8 sy = game_to_screen_y((word)v->y);
+	U8 by = screen_to_buffer_y((word)sy);
 	
 	// draw a control line on the bottom
-	x = v->pCel[0];
-	do
-		*(pBuf++) = (v->priority&0xF0) | (*pBuf & 0x0F);
-	while(--x);
+	x = screen_to_buffer_x(game_to_screen_x((word)(v->width)));
+	do {
+		//*(pBuf++) = (v->priority&0xF0) | (*pBuf & 0x0F);
+		buffer_set_pixel_4bit(bx, by, v->priority);
+		bx ++;
+	} while(--x);
 	
 	// now if the view is larger than 1px high, draw the rest of the box
 	if(height > 1) {
-		pBuf = MAKE_PICBUF_PTR(v->x,v->y);
+		//pBuf = MAKE_PICBUF_PTR(v->x,v->y);
+		bx = screen_to_buffer_x((word)sx);
 		
 		// draw the left and right sides of the box
-		celMaxX = v->pCel[0] - 1;
-		y = height-1;
+		celMaxX = v->width - 1;
+		U8 sx2 = game_to_screen_x((word)(v->x + celMaxX));
+		U8 bx2 = screen_to_buffer_x((word)sx2);
+		//y = height-1;
+		y = screen_to_buffer_y(game_to_screen_y((word)(height-1)));
 		do {
-			pBuf 			-= PIC_WIDTH;
-			pBuf[0]			= (v->priority&0xF0) | (pBuf[0]&0xF);
-			pBuf[celMaxX]	= (v->priority&0xF0) | (pBuf[celMaxX]&0xF);
+			//pBuf 			-= PIC_WIDTH;
+			//pBuf[0]			= (v->priority&0xF0) | (pBuf[0]&0xF);
+			//pBuf[celMaxX]	= (v->priority&0xF0) | (pBuf[celMaxX]&0xF);
+			by --;
+			buffer_set_pixel_4bit(bx, by, v->priority);
+			buffer_set_pixel_4bit(bx2, by, v->priority);
 		} while(--y);
 		
 		// draw the top line
-		x = v->pCel[0] - 2;
-		do
-			*++pBuf = (v->priority&0xF0) | (*pBuf & 0x0F);
-		while(--x);
+		//x = v->pCel[0] - 2;
+		x = screen_to_buffer_x(game_to_screen_x((word)(v->width)));
+		do {
+			//*++pBuf = (v->priority&0xF0) | (*pBuf & 0x0F);
+			bx ++;
+			buffer_set_pixel_4bit(bx, by, v->priority);
+		} while(--x);
 	}
-	*/
+	
 }
 
 
