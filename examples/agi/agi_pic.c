@@ -682,7 +682,7 @@ void draw_Fill() {
 				#ifdef VAGI_PIC_IGNORE_FILL_STACK
 				// Ignore!
 				#else
-				printf("F!");
+				printf("FILL!");
 				#endif
 			}
 		}
@@ -1089,30 +1089,29 @@ void drawPictureV2(word pic_num) {
 		#ifdef AGI_PIC_SHOW_PROGRESS
 		if (status == 0) {	// Only when status variable overflows
 			// Status bar
-			// 240 pixels with 8 pixel chunks = 30 chunks
+			// 240 pixels with 8 pixel chunks = 30 x 8-pixel chunks
+			// We'll use 15 for VIS and 15 for PRI
+			const byte lcd_blocks = (LCD_WIDTH/8);
+			const byte num_ticks = lcd_blocks;
 			const byte bar_height = 4;
-			//word a = LCD_ADDR;	// At top
-			word a = LCD_ADDR + (LCD_HEIGHT*LCD_WIDTH/8) - bar_height*(LCD_WIDTH/8);	// At bottom
-			
-			//byte progress = ((word)_dataOffset * 30) / _dataSize;	// Leads to overflow while multiplying
-			//byte progress = ((word)agi_res_ofs * 3) / (agi_res_size / 10);	// Must work with smaller numbers
+			word a = LCD_ADDR + (LCD_HEIGHT - bar_height)*lcd_blocks;	// At bottom
+			word data_pos = vagi_res_tell(pic_res_h);
+			word data_size = vagi_res_size(pic_res_h);
 			byte progress;
 			if (vagi_drawing_step == VAGI_STEP_VIS)
-				//progress = ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
-				//progress = ((word)vagi_res_states[pic_res_h].offset * 3) / (vagi_res_states[pic_res_h].res_size / 5);	// Must work with smaller numbers
-				progress = ((word)vagi_res_tell(pic_res_h) * 3) / (vagi_res_size(pic_res_h) / 5);	// Must work with smaller numbers
+				//progress = ((word)vagi_res_tell(pic_res_h) * 3) / (vagi_res_size(pic_res_h) / 5);	// Must work with smaller numbers
+				progress = ((word)data_pos * 3) / (data_size / 5);	// Must work with smaller numbers
 			else
-				//progress = 15 + ((word)agi_res_ofs * 3) / (agi_res_size / 5);	// Must work with smaller numbers
-				//progress = 15 + ((word)vagi_res_states[pic_res_h].offset * 3) / (vagi_res_states[pic_res_h].res_size / 5);	// Must work with smaller numbers
-				progress = 15 + ((word)vagi_res_tell(pic_res_h) * 3) / (vagi_res_size(pic_res_h) / 5);	// Must work with smaller numbers
+				//progress = 15 + ((word)vagi_res_tell(pic_res_h) * 3) / (vagi_res_size(pic_res_h) / 5);	// Must work with smaller numbers
+				progress = (num_ticks/2) + ((word)data_pos * 3) / (data_size / 5);	// Must work with smaller numbers
 			
 			// Draw bar
-			memset((byte *)(a + progress), 0x00, 30);
-			a += 30;
+			memset((byte *)(a + progress), 0x00, lcd_blocks);
+			a += lcd_blocks;	// small border
 			for(byte i = 1; i < bar_height; i++) {
 				if (progress > 0) memset((byte *)a, 0xff, progress);
-				if (progress < 30) memset((byte *)(a + progress), (i&1) ? 0x55 : 0xAA, 30-progress);
-				a += 30;
+				if (progress < num_ticks) memset((byte *)(a + progress), (i&1) ? 0x55 : 0xAA, num_ticks-progress);
+				a += lcd_blocks;
 			}
 		}
 		status++;

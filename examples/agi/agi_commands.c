@@ -30,6 +30,9 @@ The VAGI code is heavily based on:
  ***************************************************************************
  */
 
+// Info: http://agiwiki.sierrahelp.com/index.php/Actions,_Tests_and_Flags_in_the_Adventure_Game_Interpreter
+
+
 #include "agi_commands.h"
 //#include "gbagi.h"
 //#include "commands.h"

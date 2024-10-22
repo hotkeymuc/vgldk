@@ -75,7 +75,7 @@ The VAGI code is heavily based on:
 //#define PACKED_DIRS 1	// Game contains "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 //#define PACKED_DIRS 0	// Game does not contain "PACKED_DIRS" (see GBAGI/gbarom/makerom.c:"gi->version->flags&PACKED_DIRS" )
 #define VAGI_RES_IGNORE_COMPRESSED	// Do not show "unsupported" messages on compressed resources
-//#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry (what it NEVER should, but does...)
+#define VAGI_PIC_IGNORE_FILL_STACK	// Do not show "FILL_STACK_MAX" if flood fill goes awry (what it NEVER should, but does...)
 #define ROMFS_IGNORE_NOT_FOUND	// Do not show "not found" messages (e.g. while scanning for volumes on startup)
 
 //#define VAGI_TRACE_STAGES	// Allow on-screen tracing of engine stages
@@ -367,8 +367,8 @@ void vagi_init() {
 	
 	#ifdef VAGI_TRACE_STAGES
 	trace_stages = true;	// Default state
-	trace_ops = true;	// Default state
 	#endif
+	trace_ops = false;	// Default state
 	
 }
 
@@ -447,9 +447,11 @@ void vagi_handle_input() {
 				DrawAGIString(">", 0, inputPos - 4);
 				gets(&szInput[0]);
 				
+				
 				// fPLAYERCOMMAND and fSAIDOK are Reset in game loop before calling vagi_handle_input
 				ParseInput(&szInput[0]);	// agi.c:ParseInput
 				// This will automatically set the flag SetFlag(fPLAYERCOMMAND);
+				
 				lcd_text_col = 0; lcd_text_row = 0;
 			}
 			

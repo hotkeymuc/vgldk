@@ -150,19 +150,24 @@ void UpdateVObj() {
 			//BlitVObj(v);
 			
 			if(!(v->flags & oFIXEDLOOP)) {
-				if( (v->totalLoops==2)||(v->totalLoops==3) )
+				if( (v->totalLoops==2)||(v->totalLoops==3) ) {
 					newLoop =  loopDirsFull[v->direction];
-				else if(AGIVER.major==3) {
+				} else
+				if(AGIVER.major==3) {
 					if(AGIVER.minor<=0x2086) {
-						if(v->totalLoops>=4) // King's Quest 4
+						if(v->totalLoops>=4) { // King's Quest 4
 							newLoop = loopDirsSingle[v->direction];
+						}
 					} else { // known in 0x2102, 0x2107, 0x2149  (kq4 demo, demo pack 4, mh1, mh2)
-						if((v->totalLoops==4)||(TestFlag(fLOOPMODE)&&v->totalLoops>4))
+						if((v->totalLoops==4)||(TestFlag(fLOOPMODE)&&v->totalLoops>4)) {
 							newLoop = loopDirsSingle[v->direction];
+						}
 					}
 				} else {
-					if(v->totalLoops==4) // version 2
+					if (v->totalLoops==4) {
+						// version 2
 						newLoop = loopDirsSingle[v->direction];
+					}
 				}
 			}
 			if((v->stepCount == 1) && (newLoop != lpIGNORE) && (v->loop != newLoop))
@@ -833,12 +838,10 @@ void UpdateObjLoop(VOBJ *v) {
 		switch (v->cycle) {
 			case cyNORMAL:
 				cel++;
-				if(cel > max)
-					cel = 0;
+				if(cel > max) cel = 0;
 				break;
 			case cyENDOFLOOP:
-				if((cel < max) && (++cel != max))
-						break;
+				if((cel < max) && (++cel != max)) break;
 				SetFlag(v->loopFlag);
 				v->flags		&= ~oCYCLE;
 				v->direction	= dirNONE;

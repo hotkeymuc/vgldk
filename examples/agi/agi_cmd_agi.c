@@ -48,6 +48,8 @@ The VAGI code is heavily based on:
 //#include "gamedata.h"
 //#include "saverestore.h"
 
+// Info: http://agiwiki.sierrahelp.com/index.php/Actions,_Tests_and_Flags_in_the_Adventure_Game_Interpreter
+
 #include "agi_logic.h"
 #include "agi_commands.h"
 
@@ -947,8 +949,9 @@ void cEndOfLoop() {
 	U8 code_1 = code_get();
 	VOBJ *v = &ViewObjs[ code_0 ];
 	v->cycle		= cyENDOFLOOP;
-	v->flags		|= oUPDATE|oCYCLE|oSKIPUPDATE;
-	ResetFlag(v->loopFlag = code_1);
+	v->flags		|= (oUPDATE|oCYCLE|oSKIPUPDATE);
+	v->loopFlag = code_1;
+	ResetFlag(code_1);
 }
 
 //reverse.cycle(oA);
@@ -1309,10 +1312,13 @@ void cLoadSound() {
 void cSound() {
 	U8 code_0 = code_get();
 	U8 code_1 = code_get();
-	//@TODO: Implement
+	
+	//@TODO: Implement sound!
+	lcd_text_row = 0; lcd_text_col = 0; printf("(SOUND)");
 	/*
 	StartSound(code_0,code_1);
 	*/
+	SetFlag(code_1);	// Required for e.g.: KQ1, room2: entering the door. This bug took me AGES!
 }
 
 //stop.sound();
@@ -1385,7 +1391,7 @@ void cDisplayV() {
 	SET_ROWCOL(vars[ code_0 ], vars[ code_1 ]);
 	DrawAGIString(GetMessage(curLog,vars[ code_2 ]));
 	*/
-	DrawAGIString(GetMessage(curLog, vars[ code_2 ]), code_1, code_0);
+	DrawAGIString(GetMessage(curLog, vars[ code_2 ]), vars[code_1], vars[code_0]);
 }
 
 //clear.lines(TOP,BOTTOM,COLOUR);
@@ -1463,8 +1469,8 @@ void cSetTextAttribute() {
 //	Shakes the screen num amount of times then continues exection of the game.
 //	This is used for earthquake scenes and the like.
 void cShakeScreen() {
-	U8 code_0 = code_get();
-	//@TODO: Implement
+	U8 code_0 = code_get();	// number of iterations
+	//@TODO: Implement using simple memcpy()
 	/*
 	ShakeScreen(code_0);
 	*/
@@ -1547,9 +1553,10 @@ void cGetString() {
 //word.to.string(wA,sB);
 //	This command is supposed to convert a word to a string
 void cWordToString() {
-	U8 code_0 = code_get();
-	U8 code_1 = code_get();
-	strncpy(strings[ code_0 ], wordStrings[ code_1 ], MAX_STRINGS_LEN);
+	U8 code_0 = code_get();	// word number - copy this...
+	U8 code_1 = code_get();	// string number - ...to this string
+	//strncpy(strings[ code_0 ], wordStrings[ code_1 ], MAX_STRINGS_LEN);	// GBAGI
+	strncpy(strings[ code_1 ], wordStrings[ code_0 ], MAX_STRINGS_LEN);
 }
 
 //parse(sA);
@@ -1612,10 +1619,56 @@ void cAcceptInput() {
 //	specified by codeA and codeB. The combination of the two codes allow the use
 //	of ALT+KEY, CTRL+KEY combinations among others. After this is called, when
 //	the player presses the set key, the controller will be set to TRUE.
+/*
+Parameters: low byte of keycode, high byte of keycode, controller number. Assign a key to a controller.
+The first number is the low byte of the key's keycode, the second is the high byte.
+The last number is the number of the controller which is to be activated by this key.
+
+The keycodes are given in the IBM Tech Ref. in section 2 under "Keyboard Encoding and Usage", and (I think) in the BASIC manual.
+ASCII characters have a zero high byte (second number) and the ASCII code in the low byte.
+Function keys, Alt keys, etc. have the a zero low byte (first number) and a high byte which is the extended keycode from the manual.
+Joystick buttons have the following keycodes (these are in 'sysdefs'):
+
+						low byte	high byte
+	single click, button	0	1	1
+	single click, button	1	1	2
+	double click, button	0	1	3
+	double click, button	1	1	4
+
+The following are the set.key() commands to give the keyboard map of Black Cauldron[2]:
+	set.key(0, 32, c.debug); [@D
+	
+	set.key(0, 59, c.sound.toggle)[F1
+	set.key(0, 60, c.help); [F2 set.key(0, 61, c.save.game); [F3
+	set.key(0, 62, c.useit); [F4
+	set.key(0, 63, c.restore.game); [F5
+	set.key(0, 64, c.doit); [F6
+	set.key(0, 65, c.restart); [F7
+	set.key(0, 66, c.lookit);[F8
+	set.key(0, 68, c.show.mem); [F10
+	
+	set.key(9, 0, c.status); [TAB
+	set.key(27, 0, c.pause); [ESC
+	
+	set.key(3, 0, c.cancel.line); [^C
+	set.key(5, 0, c.echo.line); [^E
+	set.key(10, 0, c.reset.joy); [^J
+	set.key(16, 0, c.new.prompt); [^P
+	set.key(18, 0, c.rgb.toggle); [^R
+	set.key(19, 0, c.sound.toggle); [^S
+	
+	set.key(joy.low.byte, button0, c.doit);
+	set.key(joy.low.byte, button1, c.useit);
+	set.key(joy.low.byte, button0.dbl, c.lookit);
+	set.key(joy.low.byte, button1.dbl, c.status);
+	
+	The controller definitions are in 'sysdefs'. You may map up to 29 keys. More than one key may map to a single controller, but a single key can't map to more than one controller.
+*/
 void cSetKey() {
 	U8 code_0w = code_get_word();
 	U8 code_2 = code_get();
 	int i;
+	
 	
 	//printf("ctrl["); printf_d(code_2); printf("]="); printf_x2(code_0w >> 8); printf_x2(code_0w & 0xff);
 	for(i=0; i<MAX_CONTROLLERS-1; i++) {

@@ -88,8 +88,12 @@ void inline code_seek_to(U16 o) {
 	vagi_res_seek_to(curLog->res_h, o);
 }
 void inline code_seek_relative(S16 s) {
-	word code_ofs = vagi_res_tell(curLog->res_h) + s;
-	vagi_res_seek_to(curLog->res_h, code_ofs);
+	//if (s > 0) {
+	//	vagi_res_skip(curLog->res_h, s);
+	//} else {
+		word code_ofs = vagi_res_tell(curLog->res_h) + s;
+		vagi_res_seek_to(curLog->res_h, code_ofs);
+	//}
 }
 
 void code_term() {
@@ -318,6 +322,7 @@ void ExecuteGoto() {
 	//word o = vagi_res_tell(curLog->res_h) + (S16)(vagi_res_read_word(curLog->res_h));
 	//code_seek_to(o);
 	code_seek_relative((S16)(code_get_word()));
+	
 }
 
 

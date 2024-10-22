@@ -51,9 +51,8 @@ void vagi_pic_draw(byte pic_num) {
 
 void vagi_pic_show() {
 	//lcd_clear();
-	draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
-	
-	//code_segment_call(2, code_segment_1__vagi_pic_show_addr);
+	//draw_buffer(BUFFER_BANK_VIS, 0,LCD_WIDTH, 0,LCD_HEIGHT, 0,0);	//, false);
+	code_segment_call(2, code_segment_1__vagi_pic_show_addr);
 }
 
 #endif
