@@ -50,6 +50,20 @@ Other international names:
 //#define VGLDK_STDIN_GETS stdio_gets
 //#define VGLDK_STDIN_INKEY keyboard_inkey
 
+// Power the machine off. Verified on a real Spanish VTech Genio 2000 (Genius LEADER 2000/4000 family hardware); not tested on other models.
+// Bit 0 of port 0x12 requests power-off. This is the sequence the original firmware uses: write 1 to the port, then halt.
+// Interrupts are disabled first. It does not return: if the power does not drop, the CPU just stays halted. (Bytes: F3 3E 01 D3 12 76 18 FD)
+void poweroff() __naked {
+	__asm
+		di
+		ld	a, #0x01
+		out	(0x12), a
+	00001$:
+		halt
+		jr	00001$
+	__endasm;
+}
+
 // Entry point from crt0.s
 void vgldk_init() __naked {
 	__asm
@@ -68,24 +82,10 @@ void vgldk_init() __naked {
 	
 	//main();
 	__asm
-		jp _main
+		call _main
+		;; main() returned: switch off instead of running into undefined code
+		jp _poweroff
 	__endasm;
 }
 
-/*
-void shutdown() {
-	__asm
-		; V-Tech power down:
-		
-		; LCD off?
-		ld	a, 1
-		out	(0ah), a
-		
-		; Power off
-		ld	a, 1
-		out	(12h), a
-		halt
-	__endasm;
-}
-*/
 #endif	// __GL4000_SYSTEM_H
